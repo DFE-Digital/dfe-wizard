@@ -1,8 +1,11 @@
+# frozen_string_literal: true
+
 module DfE
   module Wizard
     class Step
       include ActiveModel::Model
       attr_accessor :wizard
+
       delegate :store, :url_helpers, to: :wizard
 
       def self.model_name
@@ -10,7 +13,7 @@ module DfE
       end
 
       def self.formatted_name
-        name.sub(/::Step\z/, '').sub(/Step/, '')
+        name.sub(/::Step\z/, '').sub('Step', '')
       end
 
       def self.route_name

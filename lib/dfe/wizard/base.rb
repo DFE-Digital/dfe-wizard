@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module DfE
   module Wizard
     class Base
@@ -59,7 +61,9 @@ module DfE
       end
 
       def step_params
-        @step_params.require(current_step_name).permit(permitted_params) if @step_params && @step_params[current_step_name].present?
+        return unless @step_params && @step_params[current_step_name].present?
+
+        @step_params.require(current_step_name).permit(permitted_params)
       end
 
       def current_step_instance

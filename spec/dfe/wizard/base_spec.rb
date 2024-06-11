@@ -5,6 +5,7 @@ require 'rails'
 module TestWizard
   class TestDoYouKnowWhichCourse < DfE::Wizard::Step
     attr_accessor :answer
+
     validates :answer, presence: true
 
     def self.permitted_params
@@ -345,7 +346,8 @@ RSpec.describe DfE::Wizard::Base do
         # for this spec.
         #
         without_partial_double_verification do
-          allow(url_helpers).to receive(:test_wizard_test_do_you_know_which_course_path).and_return('/do-you-know-which-course')
+          allow(url_helpers).to receive(:test_wizard_test_do_you_know_which_course_path)
+            .and_return('/do-you-know-which-course')
         end
       end
 
@@ -460,7 +462,9 @@ RSpec.describe DfE::Wizard::Base do
         # for this spec.
         #
         without_partial_double_verification do
-          allow(url_helpers).to receive(:test_wizard_test_course_name_selection_path).with({ provider_id: 10 }).and_return('/provider/10/courses')
+          allow(url_helpers).to receive(:test_wizard_test_course_name_selection_path)
+            .with({ provider_id: 10 })
+            .and_return('/provider/10/courses')
         end
       end
 

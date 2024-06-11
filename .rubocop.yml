@@ -1,13 +1,210 @@
 AllCops:
-  TargetRubyVersion: 2.6
+  TargetRubyVersion: 3.2.4
+  NewCops: enable
+  Exclude:
+    - 'bin/*'
+    - 'node_modules/**/*'
 
+Lint/DeprecatedOpenSSLConstant:
+  Enabled: true
+
+Lint/MixedRegexpCaptureTypes:
+  Enabled: true
+
+Lint/RaiseException:
+  Enabled: true
+
+Lint/StructNewOverride:
+  Enabled: true
+
+Lint/EmptyFile:
+  Enabled: true
+
+Lint/MissingSuper:
+  Enabled: false
+
+Lint/ConstantDefinitionInBlock:
+  Enabled: true
+
+Lint/SymbolConversion:
+  Enabled: true
+
+Lint/DuplicateBranch:
+  Enabled: true
+
+Lint/EmptyBlock:
+  Enabled: true
+
+Metrics/BlockLength:
+  Enabled: false
+
+Metrics/MethodLength:
+  Enabled: false
+
+Metrics/AbcSize:
+  Enabled: false
+
+Metrics/ParameterLists:
+  Enabled: false
+
+Metrics/ModuleLength:
+  Enabled: false
+
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
+Metrics/ClassLength:
+  Enabled: false
+
+Metrics/PerceivedComplexity:
+  Enabled: false
+
+Metrics/CollectionLiteralLength:
+  Enabled: false
+
+Naming/MethodParameterName:
+  AllowedNames:
+    - e
+    - to
+
+Naming/MemoizedInstanceVariableName:
+  Enabled: false
+
+Naming/AccessorMethodName:
+  Enabled: true
+
+Naming/VariableNumber:
+  Enabled: false
+
+Naming/InclusiveLanguage:
+  CheckStrings: true
+
+Style/AndOr:
+  EnforcedStyle: conditionals
+
+# Exclude Rails generated files
 Style/StringLiterals:
   Enabled: true
-  EnforcedStyle: double_quotes
+  EnforcedStyle: single_quotes
+  Exclude:
+    - config/boot.rb
+    - config/application.rb
+    - config/environment.rb
+    - config/environments/*
+    - config/initializers/assets.rb
+    - config/initializers/content_security_policy.rb
+    - config/initializers/filter_parameter_logging.rb
+    - config/initializers/inflections.rb
+    - bin/rails
+    - bin/rake
 
-Style/StringLiteralsInInterpolation:
+# sometimes reduce is fine
+Style/EachWithObject:
+  Enabled: false
+
+# This cop has too many false positives (it also requires underscores for things that are not numbers)
+Style/NumericLiterals:
+  Enabled: false
+
+# Sometimes it's easier to think about a negated if, for example `render_error if !model.valid?` vs `render_error unless model.valid?`
+Style/NegatedIf:
+  Enabled: false
+
+# 🤷‍♂️
+Style/AsciiComments:
+  Enabled: false
+
+Style/ConditionalAssignment:
   Enabled: true
-  EnforcedStyle: double_quotes
+  Exclude:
+    - db/migrate/20210119154820_add_request_method_and_response_headers_to_vendor_api_requests.rb
 
-Layout/LineLength:
-  Max: 120
+Style/TrailingCommaInHashLiteral:
+  EnforcedStyleForMultiline: comma
+  Exclude:
+    - config/boot.rb
+    - config/application.rb
+    - config/environment.rb
+    - config/environments/*
+    - config/initializers/assets.rb
+    - config/initializers/content_security_policy.rb
+    - config/initializers/filter_parameter_logging.rb
+    - config/initializers/inflections.rb
+    - bin/rails
+    - bin/rake
+
+Style/TrailingCommaInArrayLiteral:
+  EnforcedStyleForMultiline: comma
+
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+Style/TrailingCommaInArguments:
+  EnforcedStyleForMultiline: comma
+
+Style/BlockDelimiters:
+  Enabled: true
+  Exclude:
+    - spec/**/**
+
+Style/Documentation:
+  Enabled: false
+
+Style/FormatStringToken:
+  EnforcedStyle: template
+
+Style/RegexpLiteral:
+  Enabled: true
+  EnforcedStyle: mixed
+  AllowInnerSlashes: true
+
+Style/IfUnlessModifier:
+  Enabled: false
+
+Style/GuardClause:
+  Enabled: false
+
+Style/ClassAndModuleChildren:
+  Enabled: false
+
+Style/FormatString:
+  Enabled: true
+  EnforcedStyle: sprintf
+
+Style/GlobalStdStream:
+  Enabled: false
+
+Style/HashAsLastArrayItem:
+  Enabled: false
+
+Style/HashSyntax:
+  EnforcedShorthandSyntax: either
+
+Style/CaseLikeIf:
+  Enabled: false
+
+Style/ExplicitBlockArgument:
+  Enabled: false
+
+Style/NilLambda:
+  Exclude:
+    - app/views/provider_interface/interviews/cancel.html.erb
+
+Style/CombinableLoops:
+  Exclude:
+    - app/presenters/support_interface/provider_relationships_diagram.rb
+
+Style/IdenticalConditionalBranches:
+  Exclude:
+    # wizard.clear_state! duplication in commit method conditional
+    - app/controllers/provider_interface/organisation_permissions_setup_controller.rb
+
+Style/OptionalBooleanParameter:
+  AllowedMethods:
+    - perform
+Style/FetchEnvVar:
+  Enabled: false
+
+Style/RedundantLineContinuation:
+  Exclude:
+    - app/lib/vendor_api/changes/*
