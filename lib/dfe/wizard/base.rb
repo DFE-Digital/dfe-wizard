@@ -130,6 +130,8 @@ module DfE
         step_params || {}
       end
 
+      def default_path_prefix; end
+
       delegate :permitted_params, to: :step_object_class
     end
   end

@@ -41,16 +41,28 @@ module DfE
       end
 
       def next_step_path(next_step_klass)
-        url_helpers.public_send("#{next_step_klass.route_name}_path", next_step_path_arguments)
+        url_helpers.public_send("#{next_route_name(next_step_klass)}_path", next_step_path_arguments)
       end
 
       def previous_step_path(previous_step_klass)
-        url_helpers.public_send("#{previous_step_klass.route_name}_path", previous_step_path_arguments)
+        url_helpers.public_send("#{previous_route_name(previous_step_klass)}_path", previous_step_path_arguments)
       end
 
-      def next_step_path_arguments; end
+      def next_step_path_arguments
+        wizard.default_path_arguments if wizard.respond_to?(:default_path_arguments)
+      end
 
-      def previous_step_path_arguments; end
+      def previous_step_path_arguments
+        wizard.default_path_arguments if wizard.respond_to?(:default_path_arguments)
+      end
+
+      def previous_route_name(previous_step_klass)
+        [wizard.default_path_prefix, previous_step_klass.route_name].compact.join('_')
+      end
+
+      def next_route_name(next_step_klass)
+        [wizard.default_path_prefix, next_step_klass.route_name].compact.join('_')
+      end
     end
   end
 end
