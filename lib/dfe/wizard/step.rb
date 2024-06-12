@@ -48,9 +48,13 @@ module DfE
         url_helpers.public_send("#{previous_step_klass.route_name}_path", previous_step_path_arguments)
       end
 
-      def next_step_path_arguments; end
+      def next_step_path_arguments
+        wizard.default_path_arguments if wizard.respond_to?(:default_path_arguments)
+      end
 
-      def previous_step_path_arguments; end
+      def previous_step_path_arguments
+        wizard.default_path_arguments if wizard.respond_to?(:default_path_arguments)
+      end
     end
   end
 end
