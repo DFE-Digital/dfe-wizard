@@ -24,5 +24,9 @@ module TestWizard
     def default_path_arguments
       { provider_code:, recruitment_cycle_year:, code: }
     end
+
+    def default_path_prefix
+      'some_prefix'
+    end
   end
 end

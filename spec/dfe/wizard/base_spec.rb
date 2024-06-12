@@ -223,7 +223,7 @@ RSpec.describe DfE::Wizard::Base do
 
       before do
         without_partial_double_verification do
-          expect(url_helpers).to receive(:test_wizard_some_first_path)
+          expect(url_helpers).to receive(:some_prefix_test_wizard_some_first_path)
             .with({ provider_code: '1TZ', recruitment_cycle_year: 2025, code: '2T3F' })
             .and_return('/organisations/1TZ/2025/courses/2T3F/name-selection')
         end
@@ -365,9 +365,11 @@ RSpec.describe DfE::Wizard::Base do
 
       before do
         without_partial_double_verification do
-          expect(url_helpers).to receive(:test_wizard_some_second_path)
+          expect(url_helpers).to receive(:some_prefix_test_wizard_some_second_path)
             .with({ provider_code: '1TZ', recruitment_cycle_year: 2025, code: '2T3F' })
             .and_return('/organisations/1TZ/2025/courses/2T3F/name-selection')
+
+          expect(url_helpers).not_to receive(:test_wizard_some_second_path)
         end
       end
 
