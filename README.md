@@ -8,6 +8,7 @@ DfE::Wizard is a Ruby gem designed for creating and managing multi-step wizards 
 - [Defining the Steps](#defining-the-steps)
 - [Saving Mechanism](#saving-mechanism)
 - [Extra Attributes](#extra-attributes)
+- [Namespace routes](#namespace-routes)
 - [Logging](#logging)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -177,6 +178,78 @@ end
   current_user: some_user,
   any_other_attribute: 'foo',
 )
+```
+
+## Namespace routes
+
+If the wizard steps routes is under a namespace / scope routes you can define the
+defaults inside of a wizard.
+
+In the example above all wizard routes will be under:
+
+    /publish/organisations/:provider_code/:recruitment_cycle_year/courses/:course_code/ALL-WIZARD-STEPS-ROUTES-HERE
+
+
+This mean the wizard will have to pass provider_code, recruitment_cycle_year, course_code
+in every step routing.
+
+```ruby
+  def default_path_arguments
+    { provider_code:, recruitment_cycle_year:, course_code: }
+  end
+```
+
+Now to tell the library what is namespace / scope prefix:
+
+```
+publish_provider_recruitment_cycle_course_name_of_the_step_path
+```
+
+publish_provider_recruitment_cycle_course - defined below
+named_of_the_step - based on step name identifier
+
+```ruby
+  def default_path_prefix
+    'publish_provider_recruitment_cycle_course'
+  end
+```
+
+The final result example in mywizard:
+
+```ruby
+class MyWizard < DfE::Wizard::Base
+  steps do
+    [
+      {
+        first_step: FirstStep,
+        second_step: SecondStep,
+        third_step: ThirdStep,
+        # Add more steps as needed
+      }
+    ]
+  end
+
+  def default_path_prefix
+    'publish_provider_recruitment_cycle_course'
+  end
+
+  def default_path_arguments
+    { provider_code:, recruitment_cycle_year:, course_code: }
+  end
+end
+
+this will make `wizard.next_step_path` to call the following named routes
+passing the default_path_arguments as parameter
+
+```ruby
+publish_provider_recruitment_cycle_course_first_step_path
+# => /publish/organisations/:provider_code/:recruitment_cycle_year/courses/:course_code/first-step
+
+publish_provider_recruitment_cycle_course_second_step_path
+/publish/organisations/:provider_code/:recruitment_cycle_year/courses/:course_code/second-step
+
+publish_provider_recruitment_cycle_course_third_step_path
+# => /publish/organisations/:provider_code/:recruitment_cycle_year/courses/:course_code/third-step
 ```
 
 ## Logging
