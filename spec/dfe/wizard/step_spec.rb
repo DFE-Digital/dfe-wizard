@@ -7,6 +7,10 @@ RSpec.describe DfE::Wizard::Step do
     it 'returns the name demodulized' do
       expect(described_class.model_name).to eq('Wizard')
     end
+
+    it 'returns the name with original i18n key' do
+      expect(described_class.model_name.i18n_key).to eq(:'dfe/wizard/step')
+    end
   end
 
   describe '.formatted_name' do
