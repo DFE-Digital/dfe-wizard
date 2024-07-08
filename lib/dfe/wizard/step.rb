@@ -9,7 +9,10 @@ module DfE
       delegate :store, :url_helpers, to: :wizard
 
       def self.model_name
-        ActiveModel::Name.new(self, nil, formatted_name.demodulize)
+        original_i18n_key = super.i18n_key
+        model_name = ActiveModel::Name.new(self, nil, formatted_name.demodulize)
+        model_name.i18n_key = original_i18n_key
+        model_name
       end
 
       def self.formatted_name
