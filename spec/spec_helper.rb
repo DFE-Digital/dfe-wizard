@@ -1,10 +1,15 @@
 # frozen_string_literal: true
 
 require 'dfe/wizard'
+require 'bundler'
+Bundler.require
 
 Dir['spec/support/**/*.rb'].each { |f| require File.expand_path(f) }
+Dir['spec/factories/**/*.rb'].each { |f| require File.expand_path(f) }
 
 RSpec.configure do |config|
+  config.include FactoryBot::Syntax::Methods
+
   # Enable flags like --only-failures and --next-failure
   config.example_status_persistence_file_path = '.rspec_status'
 

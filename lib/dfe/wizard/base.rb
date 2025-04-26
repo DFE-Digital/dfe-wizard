@@ -5,9 +5,8 @@ module DfE
     class Base
       attr_reader :current_step_name, :steps
       attr_writer :step_params
-      attr_accessor :edit
+      attr_accessor :edit, :state_store
 
-      delegate :next_step, to: :current_step
       delegate :info, to: :logger, allow_nil: true
 
       def initialize(current_step:, step_params: {}, **args)
@@ -111,6 +110,30 @@ module DfE
         else
           info('Next step class not found')
           raise MissingStepError, "Next step for #{current_step.step_name} missing."
+        end
+      end
+
+      def data
+        state_store.read
+      end
+
+      def path_traversal(target_step = nil, data = nil)
+        steps_processor.path_traversal(target_step, data)
+      end
+
+      def next_step
+        if current_step && current_step.respond_to?(:next_step)
+          current_step.next_step
+        else
+          steps_processor.next_step
+        end
+      end
+
+      def previous_step
+        if current_step && current_step.respond_to?(:next_step)
+          current_step.previous_step
+        else
+          steps_processor.previous_step
         end
       end
 
