@@ -3,8 +3,7 @@ class NationalityStep < DfE::Wizard::Step
 
   def self.permitted_params
     %w[
-      british
-      irish
+      nationalities
       other_nationalities
     ]
   end
