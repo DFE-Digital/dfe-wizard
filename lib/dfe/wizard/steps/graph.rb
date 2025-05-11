@@ -40,7 +40,7 @@ module DfE
             when:,
             then:,
             else:,
-            label:
+            label:,
           }
         end
 
