@@ -1,15 +1,11 @@
-Dir[
-  File.expand_path(File.join(File.dirname(__FILE__), 'personal_information_wizard/steps/*'))
-].each { |f| require f }
-
 class PersonalInformationWizard < DfE::Wizard::Base
   def steps_mapping
     [
-      { name_and_date_of_birth: NameAndDateOfBirthStep },
-      { nationality: NationalityStep },
-      { right_to_work_or_study: RightToWorkOrStudyStep },
-      { immigration_status: ImmigrationStatusStep },
-      { review: ReviewStep },
+      { name_and_date_of_birth: Steps::NameAndDateOfBirth },
+      { nationality: Steps::Nationality },
+      { right_to_work_or_study: Steps::RightToWorkOrStudy },
+      { immigration_status: Steps::ImmigrationStatus },
+      { review: Steps::Review },
     ]
   end
 
@@ -39,11 +35,13 @@ class PersonalInformationWizard < DfE::Wizard::Base
   end
 
   def route_strategy
-    DfE::Wizard::RouteStrategy::NamedRoutes.new(self)
+    DfE::Wizard::RouteStrategy::NamedRoutes.new(
+      namespace: 'personal-information',
+    )
   end
 
   def logger
-    DfE::Wizard::Logger.new(Rails.logger) if Rails.env.local?
+    DfE::Wizard::Logger.new(ActiveSupport::Logger.new(STDOUT)) if Rails.env.local?
   end
 
   def needs_permission_to_work_or_study?(data)
@@ -53,9 +51,6 @@ class PersonalInformationWizard < DfE::Wizard::Base
   end
 end
 
-## Controller Named routes
-## Multiple controllers:  DfE::Wizard::RouteStrategy::NamedRoutes.new
-##
 # def new
 #  PersonalInformationWizard.new(
 #    state_store: PersonalInformationStateStore.new(current_application),

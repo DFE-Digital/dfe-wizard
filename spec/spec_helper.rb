@@ -7,6 +7,8 @@ Bundler.require
 Dir['spec/support/**/*.rb'].each { |f| require File.expand_path(f) }
 Dir['spec/factories/**/*.rb'].each { |f| require File.expand_path(f) }
 
+require File.expand_path('rails-dummy/config/environment', __dir__)
+
 RSpec.configure do |config|
   config.include FactoryBot::Syntax::Methods
 

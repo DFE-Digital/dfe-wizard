@@ -2,7 +2,7 @@ RSpec.describe PersonalInformationWizard do
   subject(:wizard) do
     described_class.new(
       current_step:,
-      state_store: PersonalInformationStateStore.new(application_form),
+      state_store: StateStores::PersonalInformation.new(application_form),
     )
   end
 
@@ -129,6 +129,7 @@ RSpec.describe PersonalInformationWizard do
 
       it 'moves to nationality' do
         expect(wizard.next_step).to eq(:nationality)
+        expect(wizard.next_step_path).to eq('/personal-information/nationality')
       end
     end
 
@@ -140,6 +141,7 @@ RSpec.describe PersonalInformationWizard do
 
         it 'skips to review' do
           expect(wizard.next_step).to eq(:review)
+          expect(wizard.next_step_path).to eq('/personal-information/review')
         end
       end
 
@@ -148,6 +150,7 @@ RSpec.describe PersonalInformationWizard do
 
         it 'skips to review' do
           expect(wizard.next_step).to eq(:review)
+          expect(wizard.next_step_path).to eq('/personal-information/review')
         end
       end
 
@@ -156,6 +159,7 @@ RSpec.describe PersonalInformationWizard do
 
         it 'proceeds to right_to_work_or_study' do
           expect(wizard.next_step).to eq(:right_to_work_or_study)
+          expect(wizard.next_step_path).to eq('/personal-information/right-to-work-or-study')
         end
       end
     end
@@ -168,6 +172,7 @@ RSpec.describe PersonalInformationWizard do
 
         it 'proceeds to review' do
           expect(wizard.next_step).to eq(:review)
+          expect(wizard.next_step_path).to eq('/personal-information/review')
         end
       end
 
@@ -176,6 +181,7 @@ RSpec.describe PersonalInformationWizard do
 
         it 'proceeds to immigration_status' do
           expect(wizard.next_step).to eq(:immigration_status)
+          expect(wizard.next_step_path).to eq('/personal-information/immigration-status')
         end
       end
     end
@@ -186,6 +192,7 @@ RSpec.describe PersonalInformationWizard do
 
       it 'proceeds to review' do
         expect(wizard.next_step).to eq(:review)
+        expect(wizard.next_step_path).to eq('/personal-information/review')
       end
     end
   end
@@ -206,6 +213,7 @@ RSpec.describe PersonalInformationWizard do
 
       it 'returns to nationality step' do
         expect(wizard.previous_step).to eq(:nationality)
+        expect(wizard.previous_step_path).to eq('/personal-information/nationality')
       end
     end
 
@@ -215,6 +223,7 @@ RSpec.describe PersonalInformationWizard do
 
       it 'returns to name_and_date_of_birth step' do
         expect(wizard.previous_step).to eq(:name_and_date_of_birth)
+        expect(wizard.previous_step_path).to eq('/personal-information/name-and-date-of-birth')
       end
     end
 
@@ -224,6 +233,7 @@ RSpec.describe PersonalInformationWizard do
 
       it 'returns to nationality step' do
         expect(wizard.previous_step).to eq(:nationality)
+        expect(wizard.previous_step_path).to eq('/personal-information/nationality')
       end
     end
 
@@ -233,6 +243,7 @@ RSpec.describe PersonalInformationWizard do
 
       it 'returns to right_to_work_or_study step' do
         expect(wizard.previous_step).to eq(:right_to_work_or_study)
+        expect(wizard.previous_step_path).to eq('/personal-information/right-to-work-or-study')
       end
     end
 
@@ -242,6 +253,7 @@ RSpec.describe PersonalInformationWizard do
 
       it 'returns nil' do
         expect(wizard.previous_step).to be_nil
+        expect(wizard.previous_step_path).to be_nil
       end
     end
   end
