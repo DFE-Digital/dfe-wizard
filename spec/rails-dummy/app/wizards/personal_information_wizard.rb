@@ -14,11 +14,13 @@ class PersonalInformationWizard < DfE::Wizard::Base
       graph.start :name_and_date_of_birth
       graph.add_edge :name_and_date_of_birth, to: :nationality
 
-      graph.add_branch(:nationality,
-                       when: :needs_permission_to_work_or_study?,
-                       then: :right_to_work_or_study,
-                       else: :review,
-                       label: 'Non-UK/Irish')
+      graph.add_branch(
+        :nationality,
+        when: :needs_permission_to_work_or_study?,
+        then: :right_to_work_or_study,
+        else: :review,
+        label: 'Non-UK/Irish'
+      )
 
       graph.add_branch(
         :right_to_work_or_study,
@@ -72,43 +74,3 @@ end
 #  end
 # end
 #
-### One Controller dynamic routes: DfE::Wizard::RouteStrategy::Dynamic.new
-# before_action :verify_step
-#
-# def new
-#  PersonalInformationWizard.new(
-#    state_store:,
-#    current_step: params[:step],
-#    return_to: params[:return_to]
-#  )
-# end
-#
-# def create
-#  wizard = PersonalInformationWizard.new(
-#    state_store:,
-#    current_step: params[:step],
-#    step_params: params.require(params[:step]),
-#    return_to: params[:return_to]
-#  )
-#
-#  if wizard.save
-#    redirect_to wizard.next_step_path
-#  else
-#    render :new
-#  end
-# end
-#
-# def state_store
-#  PersonalInformationStateStore.new(current_application)
-# end
-#
-# def verify_step
-#  raise NotFound unless wizard.step_names.include?(params[:step])
-#
-#  # If you're British or Irish can not enter on /immigration-status for example
-#  raise NotFound unless wizard.step_processor.valid_for_current_state?(params[:step])
-# end
-#
-## for dynamic routing
-## new.html.erb
-## <%= render "personal_information_wizard/steps/#{params[:step]}" %>
