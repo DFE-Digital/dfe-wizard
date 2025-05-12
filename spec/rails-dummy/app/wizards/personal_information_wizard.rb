@@ -19,7 +19,7 @@ class PersonalInformationWizard < DfE::Wizard::Base
         when: :needs_permission_to_work_or_study?,
         then: :right_to_work_or_study,
         else: :review,
-        label: 'Non-UK/Irish'
+        label: 'Non-UK/Irish',
       )
 
       graph.add_branch(
@@ -27,8 +27,8 @@ class PersonalInformationWizard < DfE::Wizard::Base
         when: lambda { |data|
           data.dig(:steps, :right_to_work_or_study, :right_to_work_or_study) == 'yes'
         },
-        then: :review,
-        else: :immigration_status,
+        then: :immigration_status,
+        else: :review,
         label: 'Right to work or study?',
       )
 

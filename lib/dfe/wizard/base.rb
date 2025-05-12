@@ -189,6 +189,10 @@ module DfE
         Array(steps_list).find { |step_config| step_config[step_name] }&.fetch(step_name)
       end
 
+      def to_doc
+        steps_processor.to_doc
+      end
+
       def steps_mapping; end
       def steps_processor; end
       def route_strategy; end

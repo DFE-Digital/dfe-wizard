@@ -124,6 +124,43 @@ module DfE
           path
         end
 
+        def to_doc
+          require 'ruby-graphviz'
+          g = GraphViz.new(@wizard.class.name, rankdir: 'LR', fontname: 'Arial')
+
+          # Set default node attributes
+          g.node[:style] = 'rounded'
+          g.node[:shape] = 'rect'
+
+          # Set default edge attributes
+          g.edge[:fontname] = 'Arial'
+
+          # Create all nodes first
+          @nodes.each_key do |step|
+            g.add_nodes(step.to_s, label: step.to_s.humanize.titleize)
+          end
+
+          # Add direct edges
+          @edges.each do |from, transitions|
+            transitions.each do |transition|
+              g.add_edges(from.to_s, transition[:to].to_s, style: 'bold')
+            end
+          end
+
+          # Add conditional branches
+          @branches.each do |from, branches|
+            branches.each do |branch|
+              # 'Then' edge
+              g.add_edges(from.to_s, branch[:then].to_s, label: branch[:label], color: '#00703c')
+
+              # 'Else' edge
+              g.add_edges(from.to_s, branch[:else].to_s, label: 'Else', color: '#d4351c')
+            end
+          end
+
+          g
+        end
+
         private
 
         def evaluate_condition(condition, data)

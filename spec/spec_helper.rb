@@ -9,9 +9,9 @@ Bundler.require
 Dir['spec/support/**/*.rb'].each { |f| require File.expand_path(f) }
 Dir['spec/factories/**/*.rb'].each { |f| require File.expand_path(f) }
 
-require "rspec/rails"
+require 'rspec/rails'
 require 'capybara/rspec'
-require "capybara/rails"
+require 'capybara/rails'
 
 RSpec.configure do |config|
   config.include FactoryBot::Syntax::Methods

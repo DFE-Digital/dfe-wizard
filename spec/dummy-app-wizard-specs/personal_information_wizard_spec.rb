@@ -46,7 +46,7 @@ RSpec.describe PersonalInformationWizard do
           let(:current_step) { :review }
 
           it 'returns path from start to review via right_to_work_or_study' do
-            expected_path = %i[name_and_date_of_birth nationality right_to_work_or_study review]
+            expected_path = %i[name_and_date_of_birth nationality right_to_work_or_study immigration_status review]
             expect(wizard.path_traversal).to eq(expected_path)
           end
         end
@@ -57,15 +57,14 @@ RSpec.describe PersonalInformationWizard do
           build(:application_form, :non_uk_national, :without_right_to_work)
         end
 
-        context 'at immigration_status step' do
-          let(:current_step) { :immigration_status }
+        context 'at right_to_work_or_study step' do
+          let(:current_step) { :right_to_work_or_study }
 
-          it 'returns path from start to immigration_status' do
+          it 'returns path from start to right_to_work_or_study' do
             expected_path = %i[
               name_and_date_of_birth
               nationality
               right_to_work_or_study
-              immigration_status
             ]
             expect(wizard.path_traversal).to eq(expected_path)
           end
@@ -79,7 +78,6 @@ RSpec.describe PersonalInformationWizard do
               name_and_date_of_birth
               nationality
               right_to_work_or_study
-              immigration_status
               review
             ]
             expect(wizard.path_traversal).to eq(expected_path)
@@ -105,7 +103,7 @@ RSpec.describe PersonalInformationWizard do
         {
           steps: {
             nationality: { nationalities: ['french'] },
-            right_to_work_or_study: { right_to_work_or_study: 'no' },
+            right_to_work_or_study: { right_to_work_or_study: 'yes' },
           },
         }
       end
@@ -171,8 +169,8 @@ RSpec.describe PersonalInformationWizard do
         let(:application_form) { build(:application_form, :with_right_to_work) }
 
         it 'proceeds to review' do
-          expect(wizard.next_step).to eq(:review)
-          expect(wizard.next_step_path).to eq('/personal-information/review')
+          expect(wizard.next_step).to eq(:immigration_status)
+          expect(wizard.next_step_path).to eq('/personal-information/immigration-status')
         end
       end
 
@@ -180,8 +178,8 @@ RSpec.describe PersonalInformationWizard do
         let(:application_form) { build(:application_form, :without_right_to_work) }
 
         it 'proceeds to immigration_status' do
-          expect(wizard.next_step).to eq(:immigration_status)
-          expect(wizard.next_step_path).to eq('/personal-information/immigration-status')
+          expect(wizard.next_step).to eq(:review)
+          expect(wizard.next_step_path).to eq('/personal-information/review')
         end
       end
     end
@@ -200,7 +198,7 @@ RSpec.describe PersonalInformationWizard do
   describe '#previous_step' do
     context 'when on immigration_status step' do
       let(:current_step) { :immigration_status }
-      let(:application_form) { build(:application_form, :non_uk_national, :without_right_to_work) }
+      let(:application_form) { build(:application_form, :non_uk_national, :with_right_to_work) }
 
       it 'returns to right_to_work_or_study step' do
         expect(wizard.previous_step).to eq(:right_to_work_or_study)
@@ -242,8 +240,8 @@ RSpec.describe PersonalInformationWizard do
       let(:application_form) { build(:application_form, :non_uk_national, :with_right_to_work) }
 
       it 'returns to right_to_work_or_study step' do
-        expect(wizard.previous_step).to eq(:right_to_work_or_study)
-        expect(wizard.previous_step_path).to eq('/personal-information/right-to-work-or-study')
+        expect(wizard.previous_step).to eq(:immigration_status)
+        expect(wizard.previous_step_path).to eq('/personal-information/immigration-status')
       end
     end
 
@@ -255,6 +253,16 @@ RSpec.describe PersonalInformationWizard do
         expect(wizard.previous_step).to be_nil
         expect(wizard.previous_step_path).to be_nil
       end
+    end
+  end
+
+  describe '#to_doc' do
+    let(:current_step) { :name_and_date_of_birth }
+    let(:application_form) { build(:application_form) }
+
+    it 'returns a valid documentation' do
+      expected = File.read('spec/fixtures/personal_information_wizard.dot')
+      expect(wizard.to_doc.to_s).to eq(expected)
     end
   end
 end
