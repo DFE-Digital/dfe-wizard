@@ -52,25 +52,3 @@ class PersonalInformationWizard < DfE::Wizard::Base
     !nationalities.intersect?(%w[British Irish])
   end
 end
-
-# def new
-#  PersonalInformationWizard.new(
-#    state_store: PersonalInformationStateStore.new(current_application),
-#    current_step: :name_and_date_of_birth
-#  )
-# end
-#
-# def create
-#  wizard = PersonalInformationWizard.new(
-#    state_store: PersonalInformationStateStore.new(current_application),
-#    current_step: :name_and_date_of_birth,
-#    step_params: params.require(:name_and_date_of_birth_step)
-#  )
-#
-#  if wizard.save
-#    redirect_to wizard.next_step_path
-#  else
-#    render :new
-#  end
-# end
-#

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" class="govuk-template">
+  <head>
+    <meta charset="UTF-8">
+
+    <title>DfE Wizard - GOV.UK</title>
+
+    <%= stylesheet_link_tag "application" %>
+    <%= javascript_include_tag "application", "data-turbo-track": "reload", defer: true %>
+  </head>
+
+  <body class="govuk-template__body">
+    <%= govuk_skip_link %>
+
+    <%= govuk_header homepage_url: "https://www.gov.uk", classes: ["app-header--wide-logo", "govuk-header--full-width-border", "govuk-header--black"] %>
+
+<div class="govuk-width-container">
+  <div class="govuk-phase-banner">
+    <p class="govuk-phase-banner__content">
+      <%= govuk_tag(text: 'Beta', colour: 'orange', classes: %w[govuk-phase-banner__content__tag]) %>
+
+      <span class="govuk-phase-banner__text">
+        Beta
+      </span>
+    </p>
+  </div>
+</div>
+
+    <div class="govuk-width-container">
+      <%= yield :before_content %>
+      <main class="govuk-main-wrapper" id="main-content" role="main">
+        <% if flash[:success] %>
+          <%= govuk_notification_banner(
+            title_text: "Success",
+            success: true,
+            title_id: "success-message",
+            html_attributes: { role: "alert" },
+          ) do |notification_banner| %>
+            <% notification_banner.with_heading(text: flash[:success]) %>
+          <% end %>
+        <% end %>
+
+        <%= yield %>
+      </main>
+    </div>
+  </body>
+</html>

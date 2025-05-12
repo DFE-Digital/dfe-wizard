@@ -1,5 +1,5 @@
 Rails.application.routes.draw do
-  get 'up' => 'rails/health#show', as: :rails_health_check
+  root to: 'home#index'
 
   # Personal Information Wizard
   namespace :personal_information, path: 'personal-information' do

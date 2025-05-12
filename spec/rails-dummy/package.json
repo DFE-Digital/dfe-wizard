@@ -1,0 +1,49 @@
+{
+  "name": "dfe-wizard",
+  "private": true,
+  "engines": {
+    "node": "20.x"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "yarn run build:css && yarn run build:js",
+    "build:css": "sass ./app/assets/stylesheets/application.scss ./app/assets/builds/application.css --no-source-map --load-path=node_modules --load-path=. --quiet-deps",
+    "build:js": "esbuild app/javascript/*.* --bundle --sourcemap --outdir=app/assets/builds/",
+    "standard:fix": "standard --fix",
+    "standard": "standard",
+    "test": "vitest",
+    "stylelint": "stylelint 'app/**/*.scss'"
+  },
+  "standard": {
+    "envs": [
+      "browser"
+    ],
+    "globals": [
+      "$",
+      "google",
+      "Stimulus"
+    ]
+  },
+  "dependencies": {
+    "@hotwired/stimulus": "^3.2.2",
+    "@ministryofjustice/frontend": "2.0.0",
+    "accessible-autocomplete": "^3.0.1",
+    "dfe-autocomplete": "DFE-Digital/dfe-autocomplete#v0.2.1",
+    "govuk-frontend": "^5.9.0",
+    "lodash.debounce": "^4.0.8",
+    "lodash.throttle": "^4.1.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.4",
+    "jsdom": "^26.1.0",
+    "sass": "^1.87.0",
+    "standard": "^17.1.2",
+    "stylelint": "^16.19.1",
+    "stylelint-config-gds": "^2.0.0",
+    "stylelint-config-recess-order": "^6.0.0",
+    "stylelint-config-standard": "^38.0.0",
+    "stylelint-config-standard-scss": "^14.0.0",
+    "stylelint-selector-bem-pattern": "^4.0.1",
+    "vitest": "^3.1.3"
+  }
+}

@@ -1,13 +1,17 @@
 # frozen_string_literal: true
 
 require 'dfe/wizard'
+require File.expand_path('rails-dummy/config/environment', __dir__)
+
 require 'bundler'
 Bundler.require
 
 Dir['spec/support/**/*.rb'].each { |f| require File.expand_path(f) }
 Dir['spec/factories/**/*.rb'].each { |f| require File.expand_path(f) }
 
-require File.expand_path('rails-dummy/config/environment', __dir__)
+require "rspec/rails"
+require 'capybara/rspec'
+require "capybara/rails"
 
 RSpec.configure do |config|
   config.include FactoryBot::Syntax::Methods
@@ -21,6 +25,8 @@ RSpec.configure do |config|
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end
+
+  config.infer_spec_type_from_file_location!
 end
 
 ActiveSupport::Inflector.inflections(:en) do |inflect|

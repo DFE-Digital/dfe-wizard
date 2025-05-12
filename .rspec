@@ -1,3 +1,4 @@
 --format documentation
 --color
 --require spec_helper
+--exclude-pattern spec/rails-dummy/node_modules/**/*_spec.rb
