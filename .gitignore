@@ -11,3 +11,4 @@
 .rspec_status
 Gemfile.lock
 spec/rails-dummy/node_modules/
+.DS_Store
