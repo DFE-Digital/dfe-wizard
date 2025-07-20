@@ -1,79 +1,86 @@
+DummyNode = Struct.new(:id, :klass)
+
+class DummyStep
+  attr_reader :wizard, :name
+
+  def initialize(args = {})
+    @wizard = args[:wizard]
+    @name = args[:name]
+  end
+
+  def valid?
+    name.present?
+  end
+
+  def errors
+    OpenStruct.new(blank?: false)
+  end
+
+  def serializable_data
+    { name: }
+  end
+end
+
 module TestWizard
-  class TestDoYouKnowWhichCourse < DfE::Wizard::Step
-    attr_accessor :answer
+  class EmailStep < DfE::Wizard::Step
+    attr_accessor :email
 
-    validates :answer, presence: true
-
-    def self.permitted_params
-      [:answer]
+    def next_step
+      :verify_step
     end
 
     def previous_step
       :first_step
     end
-
-    def next_step
-      if answer == 'yes'
-        :test_provider_selection
-      else
-        :test_go_to_find
-      end
-    end
   end
 
-  class TestProviderSelection < DfE::Wizard::Step
-    attr_accessor :provider_id
+  class VerifyStep < DfE::Wizard::Step
+    attr_accessor :code
 
-    def self.permitted_params
-      %i[provider_id]
+    def next_step
+      :profile_step
     end
 
     def previous_step
-      :test_do_you_know_which_course
+      :email_step
+    end
+  end
+
+  class ProfileStep < DfE::Wizard::Step
+    def next_step
+      :confirm_step
+    end
+
+    def previous_step
+      :verify_step
+    end
+  end
+
+  class ConfirmStep < DfE::Wizard::Step
+    def next_step
+      :finished_step
+    end
+
+    def previous_step
+      :profile_step
+    end
+  end
+
+  class FinishedStep < DfE::Wizard::Step
+    def previous_step
+      :confirm_step
     end
 
     def next_step
-      :test_course_name_selection
-    end
-
-    def next_step_path_arguments
-      { provider_id: }
-    end
-  end
-
-  class TestGoToFindStep < DfE::Wizard::Step
-    def next_step; end
-  end
-
-  class TestCourseNameSelection < DfE::Wizard::Step
-  end
-
-  class TestCourseStudyModeSelection < DfE::Wizard::Step
-  end
-
-  class TestCourseSiteSelection < DfE::Wizard::Step
-  end
-
-  class TestFindSelection < DfE::Wizard::Step
-    attr_accessor :answer
-
-    def self.permitted_params
-      %i[answer]
-    end
-
-    def next_step
-      :exit if answer == 'no'
+      :exit
     end
 
     def exit_path
-      'custom_exit_path'
+      "/wizard/complete"
     end
   end
 
-  class TestReview < DfE::Wizard::Step
-  end
-
-  class MyAwesomeStoreService
+  class LegacyStore
     attr_reader :wizard
 
     def initialize(wizard)
@@ -81,66 +88,25 @@ module TestWizard
     end
 
     def save
-      :save_from_store_service
+      :saved_legacy
+    end
+
+    def update
+      :updated_legacy
     end
   end
 
-  class MyAwesomeCourseSelectionWizard < DfE::Wizard::Base
+  class LegacyWizard < DfE::Wizard::Base
     steps do
       [
-        {
-          test_do_you_know_which_course: TestDoYouKnowWhichCourse,
-          test_go_to_find: TestGoToFindStep,
-          test_provider_selection: TestProviderSelection,
-          test_course_name_selection: TestCourseNameSelection,
-          test_course_study_mode_selection: TestCourseStudyModeSelection,
-          test_course_site_selection: TestCourseSiteSelection,
-          test_find_selection: TestFindSelection,
-          test_review: TestReview,
-        },
+        { email_step: EmailStep },
+        { verify_step: VerifyStep },
+        { profile_step: ProfileStep },
+        { confirm_step: ConfirmStep },
+        { finished_step: FinishedStep }
       ]
     end
 
-    store MyAwesomeStoreService
-
-    def logger
-      if log_condition?
-        @logger ||= ActiveSupport::Logger.new(STDOUT)
-      end
-    end
-
-    def log_condition?
-      true
-    end
-  end
-
-  class TestAnotherWizardFirstStep < DfE::Wizard::Step
-    def next_step
-      :test_another_wizard_second
-    end
-  end
-
-  class TestAnotherWizardSecondStep < DfE::Wizard::Step
-  end
-
-  class AnotherWizard < DfE::Wizard::Base
-    steps do
-      [
-        {
-          test_another_wizard_first: TestAnotherWizardFirstStep,
-          test_another_wizard_second: TestAnotherWizardSecondStep,
-        },
-      ]
-    end
-
-    def logger
-      if log_condition?
-        @logger ||= ActiveSupport::Logger.new(STDOUT)
-      end
-    end
-
-    def log_condition?
-      true
-    end
+    store LegacyStore
   end
 end

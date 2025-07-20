@@ -1,29 +1,25 @@
 class PersonalInformationWizard < DfE::Wizard::Base
-  def steps_mapping
-    [
-      { name_and_date_of_birth: Steps::NameAndDateOfBirth },
-      { nationality: Steps::Nationality },
-      { right_to_work_or_study: Steps::RightToWorkOrStudy },
-      { immigration_status: Steps::ImmigrationStatus },
-      { review: Steps::Review },
-    ]
-  end
-
   def steps_processor
-    DfE::Wizard::Steps::Graph.draw(self) do |graph|
-      graph.start :name_and_date_of_birth
-      graph.add_edge :name_and_date_of_birth, to: :nationality
+    DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+      graph.add_node :name_and_date_of_birth, Steps::NameAndDateOfBirth
+      graph.add_node :nationality, Steps::Nationality
+      graph.add_node :right_to_work_or_study, Steps::RightToWorkOrStudy
+      graph.add_node :immigration_status, Steps::ImmigrationStatus
+      graph.add_node :review, Steps::Review
 
-      graph.add_branch(
-        :nationality,
+      graph.root :name_and_date_of_birth
+      graph.add_edge from: :name_and_date_of_birth, to: :nationality
+
+      graph.add_conditional_edge(
+        from: :nationality,
         when: :needs_permission_to_work_or_study?,
         then: :right_to_work_or_study,
         else: :review,
-        label: 'Non-UK/Irish',
+        label: 'Non-UK/Non-Irish',
       )
 
-      graph.add_branch(
-        :right_to_work_or_study,
+      graph.add_conditional_edge(
+        from: :right_to_work_or_study,
         when: lambda { |data|
           data.dig(:steps, :right_to_work_or_study, :right_to_work_or_study) == 'yes'
         },
@@ -32,7 +28,7 @@ class PersonalInformationWizard < DfE::Wizard::Base
         label: 'Right to work or study?',
       )
 
-      graph.add_edge :immigration_status, to: :review
+      graph.add_edge from: :immigration_status, to: :review
     end
   end
 
