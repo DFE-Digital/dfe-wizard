@@ -1,17 +1,16 @@
 digraph PersonalInformationWizard {
 rankdir = "LR";
 fontname = "Arial";
-node[ style  =  "rounded" , shape  =  "rect"];
-edge[ fontname  =  "Arial"];
-name_and_date_of_birth [label = "Name And Date Of Birth"];
+node[ style  =  "rounded,filled" , shape  =  "rect" , color  =  "#666666" , fillcolor  =  "#f9f9f9"];
+name_and_date_of_birth [fillcolor = "#d2f7ef", color = "#00703c", penwidth = "2", label = "name_and_date_of_birth"];
+review [shape = "doublecircle", color = "#aaaaaa", fillcolor = "#f5e7e7", label = "review"];
 nationality [label = "Nationality"];
 right_to_work_or_study [label = "Right To Work Or Study"];
 immigration_status [label = "Immigration Status"];
-review [label = "Review"];
-  name_and_date_of_birth -> nationality [style = "bold"];
-  immigration_status -> review [style = "bold"];
-  nationality -> right_to_work_or_study [label = "Non-UK/Irish", color = "#00703c"];
-  nationality -> review [label = "Else", color = "#d4351c"];
-  right_to_work_or_study -> immigration_status [label = "Right to work or study?", color = "#00703c"];
-  right_to_work_or_study -> review [label = "Else", color = "#d4351c"];
+  name_and_date_of_birth -> nationality [style = "bold", color = "#222222"];
+  immigration_status -> review [style = "bold", color = "#222222"];
+  nationality -> right_to_work_or_study [label = "Non-UK/Non-Irish", color = "#00703c", fontcolor = "#00703c", penwidth = "2"];
+  nationality -> review [label = "Else", color = "#d4351c", fontcolor = "#d4351c", style = "dashed"];
+  right_to_work_or_study -> immigration_status [label = "Right to work or study?", color = "#00703c", fontcolor = "#00703c", penwidth = "2"];
+  right_to_work_or_study -> review [label = "Else", color = "#d4351c", fontcolor = "#d4351c", style = "dashed"];
 }

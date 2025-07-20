@@ -28,6 +28,8 @@ module StateStores
       }
     end
 
-    def write; end
+    def write(args)
+      @application_form.update!(args)
+    end
   end
 end

@@ -14,17 +14,9 @@
 
     <%= govuk_header homepage_url: "https://www.gov.uk", classes: ["app-header--wide-logo", "govuk-header--full-width-border", "govuk-header--black"] %>
 
-<div class="govuk-width-container">
-  <div class="govuk-phase-banner">
-    <p class="govuk-phase-banner__content">
-      <%= govuk_tag(text: 'Beta', colour: 'orange', classes: %w[govuk-phase-banner__content__tag]) %>
-
-      <span class="govuk-phase-banner__text">
-        Beta
-      </span>
-    </p>
-  </div>
-</div>
+    <%= govuk_service_navigation(service_name: 'DfE Wizard docs', service_url: root_path) do |service_navigation| %>
+      <%= service_navigation.with_navigation_item text: 'Wizards', href: '/' %>
+    <% end %>
 
     <div class="govuk-width-container">
       <%= yield :before_content %>
@@ -40,7 +32,7 @@
           <% end %>
         <% end %>
 
-        <%= yield %>
+       <%= yield %>
       </main>
     </div>
   </body>
