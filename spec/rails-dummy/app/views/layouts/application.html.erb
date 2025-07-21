@@ -15,7 +15,7 @@
     <%= govuk_header homepage_url: "https://www.gov.uk", classes: ["app-header--wide-logo", "govuk-header--full-width-border", "govuk-header--black"] %>
 
     <%= govuk_service_navigation(service_name: 'DfE Wizard docs', service_url: root_path) do |service_navigation| %>
-      <%= service_navigation.with_navigation_item text: 'Wizards', href: '/' %>
+      <%= service_navigation.with_navigation_item text: 'Wizards', href: wizards_path %>
     <% end %>
 
     <div class="govuk-width-container">

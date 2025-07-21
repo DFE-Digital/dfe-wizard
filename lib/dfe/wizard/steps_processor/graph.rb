@@ -53,6 +53,10 @@ module DfE
           @nodes[node_id] = Node.new(id: node_id, klass: klass)
         end
 
+        def find_step(node_id)
+          nodes[node_id]&.klass
+        end
+
         # Sets the root (start) node for the graph.
         # @param node_id [Symbol]
         def root(node_id)
