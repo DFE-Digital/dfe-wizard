@@ -3,6 +3,54 @@
 require 'spec_helper'
 
 RSpec.describe DfE::Wizard::Step do
+  describe 'Legacy step using attr_accessor' do
+    subject(:step) { LegacyStep.new(first_name: 'Alice', last_name: 'Smith') }
+
+    it 'assigns and exposes values from attr_accessor' do
+      expect(step.first_name).to eq 'Alice'
+      expect(step.last_name).to eq 'Smith'
+
+      expect(step.serializable_data).to eq({
+                                             first_name: 'Alice',
+                                             last_name: 'Smith',
+                                           })
+    end
+
+    it 'supports validation' do
+      expect(step).to be_valid
+
+      invalid = LegacyStep.new(last_name: 'Smith')
+      expect(invalid).not_to be_valid
+      expect(invalid.errors[:first_name]).to include("can't be blank")
+    end
+  end
+
+  describe 'Modern step using ActiveModel::Attributes' do
+    subject(:step) { NameAndAge.new(first_name: 'Bob', age: 30) }
+
+    it 'sets and returns typed attributes' do
+      expect(step.first_name).to eq 'Bob'
+      expect(step.age).to eq 30
+    end
+
+    it 'provides an attributes hash with typed values' do
+      expect(step.serializable_data).to eq({
+                                             'first_name' => 'Bob',
+                                             'age' => 30,
+                                           })
+    end
+
+    it 'is valid with required attributes' do
+      expect(step).to be_valid
+    end
+
+    it 'is invalid if required attributes are missing' do
+      step.first_name = nil
+      expect(step).not_to be_valid
+      expect(step.errors[:first_name]).to include("can't be blank")
+    end
+  end
+
   describe '.model_name' do
     it 'returns the name demodulized' do
       expect(described_class.model_name).to eq('Wizard')

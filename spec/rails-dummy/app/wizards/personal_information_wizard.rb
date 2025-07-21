@@ -39,7 +39,7 @@ class PersonalInformationWizard < DfE::Wizard::Base
   end
 
   def logger
-    DfE::Wizard::Logger.new(ActiveSupport::Logger.new(STDOUT)) if Rails.env.local?
+    DfE::Wizard::Logger.new(Rails.logger) if Rails.env.local?
   end
 
   def needs_permission_to_work_or_study?(data)

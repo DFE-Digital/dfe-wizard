@@ -31,10 +31,8 @@ RSpec.describe DfE::Wizard::Base do
       def path_traversal(_, _) = %i[step_one step_two]
       def to_doc = @graphviz
 
-      def nodes
-        {
-          step_one: DummyNode.new(:step_one, DummyStep),
-        }
+      def find_step(_step_name = nil)
+        DummyStep
       end
     end.new(graphviz)
   end

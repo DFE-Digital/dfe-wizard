@@ -1,0 +1,8 @@
+<%= govuk_summary_list do |summary_list| %>
+  <% @wizards.each do |wizard| %>
+    <%= summary_list.with_row do |row| %>
+      <%= row.with_key(classes: "govuk-!-font-weight-regular") { govuk_link_to(wizard.name, wizard.link_to_start, target: '_blank') } %>
+      <%= row.with_action(text: "Diagram", href: wizard.doc_path) %>
+    <% end %>
+  <% end %>
+<% end %>

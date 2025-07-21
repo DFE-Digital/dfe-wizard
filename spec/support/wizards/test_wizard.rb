@@ -1,24 +1,19 @@
 DummyNode = Struct.new(:id, :klass)
 
-class DummyStep
-  attr_reader :wizard, :name
+class LegacyStep < DfE::Wizard::Step
+  attr_accessor :first_name, :last_name
+  validates :first_name, presence: true
+end
 
-  def initialize(args = {})
-    @wizard = args[:wizard]
-    @name = args[:name]
-  end
+class NameAndAge < DfE::Wizard::Step
+  attribute :first_name, :string
+  attribute :age, :integer
+  validates :first_name, presence: true
+end
 
-  def valid?
-    name.present?
-  end
-
-  def errors
-    OpenStruct.new(blank?: false)
-  end
-
-  def serializable_data
-    { name: }
-  end
+class DummyStep < DfE::Wizard::Step
+  attr_accessor :name
+  validates :name, presence: true
 end
 
 module TestWizard

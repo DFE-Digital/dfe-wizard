@@ -1,10 +1,8 @@
 # frozen_string_literal: true
 
 require 'dfe/wizard'
-require File.expand_path('rails-dummy/config/environment', __dir__)
 
-require 'bundler'
-Bundler.require
+require File.expand_path('rails-dummy/config/environment', __dir__)
 
 Dir['spec/support/**/*.rb'].each { |f| require File.expand_path(f) }
 Dir['spec/factories/**/*.rb'].each { |f| require File.expand_path(f) }
