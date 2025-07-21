@@ -6,9 +6,13 @@ source 'https://rubygems.org'
 gemspec
 
 gem 'actionpack'
+gem 'better_errors'
+gem 'binding_of_caller'
 gem 'capybara'
 gem 'factory_bot'
 gem 'faker'
+gem 'govuk-components'
+gem 'govuk_design_system_formbuilder'
 gem 'pry'
 gem 'railties'
 gem 'rake', '~> 13.0'
