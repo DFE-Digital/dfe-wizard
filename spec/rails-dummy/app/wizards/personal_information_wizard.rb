@@ -45,6 +45,6 @@ class PersonalInformationWizard < DfE::Wizard::Base
   def needs_permission_to_work_or_study?(data)
     nationalities = data.dig(:steps, :nationality, :nationalities)
 
-    !nationalities.intersect?(%w[British Irish])
+    !nationalities.intersect?(%w[british irish])
   end
 end

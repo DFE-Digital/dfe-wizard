@@ -8,8 +8,11 @@ Rails.application.routes.draw do
     get '/name-and-date-of-birth', to: 'name_and_date_of_birth#new', as: :name_and_date_of_birth
     post '/name-and-date-of-birth', to: 'name_and_date_of_birth#create'
     get '/nationality', to: 'nationality#new', as: :nationality
+    post '/nationality', to: 'nationality#create'
     get '/right-to-work-or-study', to: 'right_to_work_or_study#new', as: :right_to_work_or_study
+    post '/right-to-work-or-study', to: 'right_to_work_or_study#create'
     get '/immigration-status', to: 'immigration_status#new', as: :immigration_status
+    post '/immigration-status', to: 'immigration_status#create'
     get '/review', to: 'review#index', as: :review
   end
 

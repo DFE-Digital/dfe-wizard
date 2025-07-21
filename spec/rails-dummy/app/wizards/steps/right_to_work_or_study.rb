@@ -1,6 +1,6 @@
 module Steps
   class RightToWorkOrStudy < DfE::Wizard::Step
-    attr_accessor :right_to_work_or_study
+    attribute :right_to_work_or_study, :string
 
     validates :right_to_work_or_study, presence: true
 

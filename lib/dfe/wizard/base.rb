@@ -291,6 +291,17 @@ module DfE
         end
       end
 
+      def summary_steps
+        traversal = path_traversal(:review, data)
+
+        traversal.map do |step_name|
+          klass = find_step(step_name)
+          step_data = data.dig(:steps, step_name) || {}
+
+          klass.new(step_data.merge(wizard: self))
+        end
+      end
+
       def permitted_params
         step_object_class.permitted_params
       end

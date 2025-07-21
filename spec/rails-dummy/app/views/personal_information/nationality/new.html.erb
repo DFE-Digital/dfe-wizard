@@ -1,0 +1,27 @@
+<% content_for :page_title, "Name and date of birth" %>
+
+<%= govuk_back_link href: @wizard.previous_step_path || wizards_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">
+      Nationalities
+    </h1>
+
+    <%= form_with model: @wizard.current_step,
+              url: @wizard.current_step_path,
+              scope: @wizard.current_step_name do |form| %>
+      <%= form.govuk_error_summary %>
+
+       <%= form.govuk_check_boxes_fieldset :nationalities, legend: { text: "What is your nationality?" } do %>
+        <%= form.govuk_check_box :nationalities, :british, label: { text: "British" }, link_errors: true %>
+        <%= form.govuk_check_box :nationalities, :irish, label: { text: "Irish" } %>
+        <%= form.govuk_check_box :nationalities, :other, label: { text: "Other" } do %>
+          <%= form.govuk_text_field :other_nationality, label: { text: "Enter your nationality" } %>
+        <% end %>
+      <% end %>
+
+      <%= form.govuk_submit "Continue" %>
+    <% end %>
+  </div>
+</div>

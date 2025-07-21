@@ -15,7 +15,7 @@ module StateStores
             date_of_birth: application_form.date_of_birth,
           },
           nationality: {
-            nationalities: application_form.nationalities,
+            nationalities: application_form.nationalities.map { |nationality| nationality.downcase },
             other_nationalities: application_form.other_nationalities,
           },
           right_to_work_or_study: {
