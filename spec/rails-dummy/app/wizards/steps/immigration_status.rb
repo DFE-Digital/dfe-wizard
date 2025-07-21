@@ -1,12 +1,14 @@
 module Steps
   class ImmigrationStatus < DfE::Wizard::Step
-    attr_accessor :status
+    attribute :status, :string
+    attribute :other_status, :string
 
     validates :status, presence: true
 
     def self.permitted_params
       %w[
         status
+        other_status
       ]
     end
   end
