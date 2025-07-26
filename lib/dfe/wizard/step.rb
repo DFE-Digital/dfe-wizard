@@ -31,26 +31,6 @@ module DfE
         end
       end
 
-      def reviewable_answers
-        return {} unless self.class.respond_to?(:attribute_types)
-
-        self.class.attribute_types.keys.each_with_object({}) do |attr, answers|
-          value = public_send(attr)
-          next if value.blank?
-
-          formatted = case self.class.attribute_types[attr]
-          when ActiveModel::Type::Boolean
-            value ? "Yes" : "No"
-          when ActiveModel::Type::Date
-            I18n.l(value, format: :long)  # e.g. "4 October 1989"
-          else
-            Array(value).compact_blank.join(', ')
-          end
-
-          answers[attr.to_s.humanize] = formatted
-        end
-      end
-
       def self.model_name
         original_i18n_key = super.i18n_key
         model_name = ActiveModel::Name.new(self, nil, formatted_name.demodulize)

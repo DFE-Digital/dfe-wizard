@@ -51,9 +51,10 @@ RSpec.feature 'Personal information wizard', type: :feature do
       "First name" => "John",
       "Last name" => "Smith",
       "Date of birth" => "1 November 1975",
-      "Nationalities" => "Other - Italian",
+      "Nationalities" => "Other",
+      "Other nationality" => "Italian",
       "Right to work or study?" => "Yes",
-      "Immigration status" => "Skilled Worker visa"
+      "Immigration status" => "Skilled worker visa"
     )
   end
 
@@ -72,7 +73,8 @@ RSpec.feature 'Personal information wizard', type: :feature do
       "First name" => "John",
       "Last name" => "Smith",
       "Date of birth" => "1 November 1975",
-      "Nationalities" => "Other - Italian",
+      "Nationalities" => "Other",
+      "Other nationality" => "Italian",
       "Right to work or study?" => "No"
     )
   end
@@ -140,5 +142,4 @@ RSpec.feature 'Personal information wizard', type: :feature do
       end
     end
   end
-
 end
