@@ -1,0 +1,31 @@
+<% content_for :page_title, "Who will mentor Peter Davison" %>
+
+<%= govuk_back_link href: @wizard.previous_step_path || wizards_path %>
+
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+
+  <%= form_with model: @wizard.current_step,
+              url: @wizard.current_step_path do |form| %>
+  <%= form.govuk_error_summary %>
+
+  <%= form.govuk_radio_buttons_fieldset :mentor_id,
+                                        legend: { text: "Who will mentor Peter Davison?",
+                                                  tag: 'h1',
+                                                  size: 'l' } do %>
+  <% Steps::WhoWillBeTheMentor.eligible_mentors.each_with_index do |mentor, i| %>
+    <%= form.govuk_radio_button :mentor_id, mentor.id,
+                                label: { text: mentor.teacher.full_name },
+                                link_errors: i == 0 %>
+  <% end %>
+    <%= form.govuk_radio_divider %>
+    <%= form.govuk_radio_button :mentor_id, 0, label: { text: "Register a new mentor" } %>
+  <% end %>
+
+  <%= form.govuk_submit "Continue" %>
+<% end %>
+
+  </div>
+</div>
+

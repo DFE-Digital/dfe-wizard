@@ -12,7 +12,13 @@ class WizardsController < ApplicationController
         namespace: 'get_funding',
         name: 'Get Funding Wizard',
         start_path: :personal_details
-      )
+      ),
+      WizardInfo.new(
+        klass: AssignMentorWizard,
+        namespace: 'assign_mentor',
+        name: 'Assign Mentor Wizard',
+        start_path: :who_will_be_the_mentor,
+      ),
     ]
   end
 end

@@ -1,0 +1,19 @@
+<% content_for :page_title, "Peter Davison can receive mentor training" %>
+
+<%= govuk_back_link href: @wizard.previous_step_path || wizards_path %>
+
+<h1 class="govuk-heading-l">Peter Davison can receive mentor training</h1>
+
+<p class="govuk-body">Our records show that
+  Peter Davison can get up to 20 hours of ECTE mentor training as your school is working with
+  a DfE-funded training provider.</p>
+
+<p class="govuk-body">We'll pass on their details to
+  DfE Training Provider
+  who will contact them to arrange the training.</p>
+
+<%= form_with(model: @wizard.current_step, url: @wizard.current_step_path) do |f| %>
+  <%= f.govuk_submit "Continue" %>
+<% end %>
+
+<%= govuk_link_to "DfE Training Provider will not be providing mentor training to Peter Davison", '#' %>
