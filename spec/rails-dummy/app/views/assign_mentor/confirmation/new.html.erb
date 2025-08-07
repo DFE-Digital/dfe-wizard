@@ -1,0 +1,17 @@
+<% content_for :page_title, "You've assigned #{@wizard.current_step.mentor_name} as a mentor" %>
+
+<%= govuk_panel(title_text: "You've assigned #{@wizard.current_step.mentor_name} as a mentor") do %>
+  for<br>
+  <strong><%= @wizard.current_step.ect_name %></strong>
+<% end %>
+
+<p class="govuk-body">
+  <%= @wizard.current_step.mentor_name %> is now <%= @wizard.current_step.ect_name %>'s mentor, and this completes <%= @wizard.current_step.ect_name %>'s registration as an ECT at your school.
+</p>
+
+<h2 class="govuk-heading-m">What happens next</h2>
+<p class="govuk-body">
+  They do not need to give us any more information.
+</p>
+
+<%= govuk_link_to "Back to your ECTs", wizards_path %>
