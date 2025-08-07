@@ -28,5 +28,11 @@ Rails.application.routes.draw do
 
     get  '/can-receive-mentor-training', to: 'can_receive_mentor_training#new', as: :can_receive_mentor_training
     post '/can-receive-mentor-training', to: 'can_receive_mentor_training#create'
+
+    get  '/which-lead-provider', to: 'which_lead_provider#new', as: :which_lead_provider
+    post '/which-lead-provider', to: 'which_lead_provider#create'
+
+    get  '/confirmation', to: 'confirmation#new', as: :confirmation
+    post '/confirmation', to: 'confirmation#create'
   end
 end
