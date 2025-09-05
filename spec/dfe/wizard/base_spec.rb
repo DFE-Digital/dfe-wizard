@@ -180,6 +180,53 @@ RSpec.describe DfE::Wizard::Base do
     end
   end
 
+  describe '#current_step_path_arguments' do
+    let(:default_path_arguments) { { arg: 123 } }
+
+    context 'when defaults are defined' do
+      before do
+        allow(wizard).to receive(:default_path_arguments).and_return(default_path_arguments)
+      end
+
+      it 'returns defaults' do
+        expect(wizard.current_step_path_arguments).to eq(default_path_arguments)
+      end
+    end
+
+    context 'when defaults are undefined' do
+      it { expect(wizard.current_step_path_arguments).to be_nil }
+    end
+  end
+
+  describe '#current_step_path' do
+    let(:current_step) { :test_go_to_find }
+
+    context 'when default arguments are defined' do
+      before do
+        without_partial_double_verification do
+          allow(wizard).to receive(:default_path_arguments).and_return({ arg: 123 })
+          allow(url_helpers).to receive(:test_wizard_test_go_to_find_path).with({ arg: 123 }).and_return('/current-path?arg=123')
+        end
+      end
+
+      it 'includes default_path_arguments' do
+        expect(wizard.current_step_path).to eq('/current-path?arg=123')
+      end
+    end
+
+    context 'when default arguments are not defined' do
+      before do
+        without_partial_double_verification do
+          allow(url_helpers).to receive(:test_wizard_test_go_to_find_path).with(nil).and_return('/current-path')
+        end
+      end
+
+      it 'has no arguments' do
+        expect(wizard.current_step_path).to eq('/current-path')
+      end
+    end
+  end
+
   describe '#previous_step_path' do
     let(:current_step) { :test_do_you_know_which_course }
 
