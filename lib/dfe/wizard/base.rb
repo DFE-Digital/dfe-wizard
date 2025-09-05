@@ -114,8 +114,12 @@ module DfE
         end
       end
 
-      def current_step_path(args = nil)
+      def current_step_path(args = current_step_path_arguments)
         url_helpers.public_send("#{current_step.class.route_name}_path", args)
+      end
+
+      def current_step_path_arguments
+        default_path_arguments if respond_to?(:default_path_arguments)
       end
 
       def url_helpers
