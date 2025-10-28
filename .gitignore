@@ -12,3 +12,8 @@
 Gemfile.lock
 spec/rails-dummy/node_modules/
 .DS_Store
+
+# Rails asset builds
+/spec/rails-dummy/public/assets/
+/spec/rails-dummy/app/assets/builds/*
+!/spec/rails-dummy/app/assets/builds/.keep
