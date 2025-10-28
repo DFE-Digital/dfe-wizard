@@ -16,4 +16,10 @@
   <%= f.govuk_submit "Continue" %>
 <% end %>
 
-<%= govuk_link_to "DfE Training Provider will not be providing mentor training to Peter Davison", '#' %>
+<%= button_to(
+  "DfE Training Provider will not be providing mentor training to Peter Davison",
+  assign_mentor_can_receive_mentor_training_path,
+  method: :post,
+  params: { step: { lp_will_provide: "yes" } },
+  class: "govuk-link-button"
+) %>
