@@ -11,3 +11,25 @@ $mobile-small-end: 401px;
 $mobile-big-start: 500px;
 $mobile-big-end: 501px;
 $git-brand-colour: govuk-colour("orange");
+
+.govuk-link-button {
+  padding: 0;
+  font-size: inherit;
+  color: $govuk-link-colour;
+  cursor: pointer;
+  background: none;
+  border: none;
+  text-decoration: underline;
+
+  &:hover {
+    color: $govuk-link-hover-colour;
+  }
+
+  &:focus {
+    @include govuk-focused-text; // GOV.UK mixin for focus outline
+  }
+}
+
+form:has(.govuk-link-button) {
+  display: contents;
+}
