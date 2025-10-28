@@ -11,15 +11,19 @@
 <p class="govuk-body">We'll pass on their details to
   DfE Training Provider
   who will contact them to arrange the training.</p>
+<%= form_with(model: @wizard.current_step, url: @wizard.current_step_path, scope: :can_receive_mentor_training) do %>
+  <%= button_tag "Continue",
+        type: "submit",
+        name: "can_receive_mentor_training[lp_will_provide]",
+        value: "yes",
+        class: "govuk-button" %>
 
-<%= form_with(model: @wizard.current_step, url: @wizard.current_step_path) do |f| %>
-  <%= f.govuk_submit "Continue" %>
+  <p class="govuk-body">
+    <%= button_tag "DfE Training Provider will not be providing mentor training to Peter Davison",
+          type: "submit",
+          name: "can_receive_mentor_training[lp_will_provide]",
+          value: "no",
+          class: "govuk-link-button" %>
+  </p>
 <% end %>
 
-<%= button_to(
-  "DfE Training Provider will not be providing mentor training to Peter Davison",
-  assign_mentor_can_receive_mentor_training_path,
-  method: :post,
-  params: { step: { lp_will_provide: "yes" } },
-  class: "govuk-link-button"
-) %>
