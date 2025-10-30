@@ -4,7 +4,7 @@ RSpec.describe GetFundingWizard do
   subject(:wizard) do
     described_class.new(
       current_step: current_step,
-      state_store: StateStores::GetFundingWizardStore.new(application_form)
+      state_store: StateStores::GetFundingWizardStore.new(application_form),
     )
   end
 
@@ -17,11 +17,11 @@ RSpec.describe GetFundingWizard do
 
       it 'goes through academic_background, visa_requirement, and reaches review' do
         expect(wizard.path_traversal).to eq(%i[
-          personal_details
-          academic_background
-          visa_requirement
-          review
-        ])
+                                              personal_details
+                                              academic_background
+                                              visa_requirement
+                                              review
+                                            ])
       end
     end
 
@@ -33,10 +33,10 @@ RSpec.describe GetFundingWizard do
 
         it 'includes the funding step in traversal' do
           expect(wizard.path_traversal).to eq(%i[
-            personal_details
-            academic_background
-            get_funding
-          ])
+                                                personal_details
+                                                academic_background
+                                                get_funding
+                                              ])
         end
       end
 
@@ -45,11 +45,11 @@ RSpec.describe GetFundingWizard do
 
         it 'includes get_funding step and skips visa_requirement if all complete' do
           expect(wizard.path_traversal).to eq(%i[
-            personal_details
-            academic_background
-            get_funding
-            review
-          ])
+                                                personal_details
+                                                academic_background
+                                                get_funding
+                                                review
+                                              ])
         end
       end
     end
@@ -62,8 +62,8 @@ RSpec.describe GetFundingWizard do
           steps: {
             academic_background: { needs_funding: true },
             get_funding: { complete: true },
-            visa_requirement: { needs_support: false }
-          }
+            visa_requirement: { needs_support: false },
+          },
         }
       end
 

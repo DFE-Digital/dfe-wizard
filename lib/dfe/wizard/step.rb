@@ -5,14 +5,14 @@ module DfE
     class Step
       include ActiveModel::Model
       include ActiveModel::Attributes
-      attr_accessor :wizard
+      attr_accessor :wizard, :step_id
 
       delegate :store, :url_helpers, to: :wizard
 
       def initialize(step_attributes = {})
         super
 
-        @step_attributes = step_attributes.except(:wizard)
+        @step_attributes = step_attributes.except(:wizard, :step_id)
       end
 
       def serializable_data

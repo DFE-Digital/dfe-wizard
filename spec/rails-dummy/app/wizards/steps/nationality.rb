@@ -11,11 +11,15 @@ module Steps
       end
     end
 
+    def nationalities=(list)
+      super(Array(list).reject(&:blank?))
+    end
+
     def self.permitted_params
-       [
+      [
         { nationalities: [] },
-        :other_nationality
-       ]
+        :other_nationality,
+      ]
     end
   end
 end

@@ -102,8 +102,29 @@ module DfE
           )
         end
 
+        def before_next_step(method = nil, &block)
+          @next_step_before_callbacks ||= []
+
+          @next_step_before_callbacks << if block_given?
+                                           block
+                                         else
+                                           @wizard.method(method)
+                                         end
+        end
+
         # Returns the next step (symbol), given current step and data.
         def next_step(current_step = nil, data = nil)
+          if @next_step_before_callbacks&.any?
+            @next_step_before_callbacks.each do |callback|
+              result = callback.call
+              return result unless result.nil?
+            end
+          end
+
+          next_step_without_callbacks(current_step, data)
+        end
+
+        def next_step_without_callbacks(current_step, data)
           current_step ||= @wizard.current_step_name
           data ||= @wizard.data
 
@@ -144,7 +165,7 @@ module DfE
           depth_limit = @nodes.size
 
           while current && current != target_step && steps.size < depth_limit
-            n = next_step(current, data)
+            n = next_step_without_callbacks(current, data)
             break if n.nil? || steps.include?(n)
 
             steps << n

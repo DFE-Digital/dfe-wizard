@@ -1,0 +1,12 @@
+<% content_for :page_title, "Name and date of birth" %>
+
+<%= form.govuk_text_field :first_name, label: { text: "First name" }, autocomplete: "off" %>
+
+<%= form.govuk_text_field :last_name, label: { text: "Last name" }, autocomplete: "off" %>
+
+<%= form.govuk_date_field :date_of_birth,
+    label: { text: "Date of birth" },
+    hint: { text: "For example, 31 3 1980" },
+    day_method: :date_of_birth_day,
+    month_method: :date_of_birth_month,
+    year_method: :date_of_birth_year, autocomplete: "off" %>

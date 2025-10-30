@@ -15,7 +15,7 @@ module StateStores
             date_of_birth: application_form.date_of_birth,
           },
           nationality: {
-            nationalities: application_form.nationalities.map { |nationality| nationality.downcase },
+            nationalities: application_form.nationalities.map(&:downcase),
             other_nationalities: application_form.other_nationalities,
           },
           right_to_work_or_study: {
@@ -28,6 +28,8 @@ module StateStores
       }
     end
 
+    # args = { name_and_date_of_birth: => { first_name: 'Tomas', last_name: 'Stefano' } }
+    #
     def write(args)
       @application_form.update!(args)
     end

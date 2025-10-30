@@ -36,7 +36,7 @@ FactoryBot.define do
     nationalities        { ['British'] }
     other_nationalities  { [] }
     right_to_work_or_study { 'yes' }
-    immigration_status   { nil }
+    immigration_status { nil }
 
     # Get Funding Wizard defaults
     highest_qualification      { 'Bachelor' }
