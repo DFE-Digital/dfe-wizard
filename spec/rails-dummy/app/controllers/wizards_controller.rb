@@ -11,7 +11,7 @@ class WizardsController < ApplicationController
         klass: GetFundingWizard,
         namespace: 'get_funding',
         name: 'Get Funding Wizard',
-        start_path: :personal_details
+        start_path: :personal_details,
       ),
       WizardInfo.new(
         klass: AssignMentorWizard,
