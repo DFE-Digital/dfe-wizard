@@ -7,6 +7,7 @@
 # )
 #
 class RegisterECTWizard < DfE::Wizard::Base
+  include Steps
   delegate :in_trs?,
            :matches_trs_dob?,
            :active_at_school?,
@@ -56,7 +57,7 @@ class RegisterECTWizard < DfE::Wizard::Base
       )
 
       # This method does not exist yet.
-      #graph.add_conditional_edges(
+      # graph.add_conditional_edges(
       #  from: :national_insurance_number,
       #  transitions: [
       #    {
@@ -74,7 +75,7 @@ class RegisterECTWizard < DfE::Wizard::Base
       #  ],
       #  else: :review_ect_details,
       #  label: 'Review ECT details',
-      #)
+      # )
 
       # Or the above you can do as below:
       graph.add_custom_branching_edge(
@@ -126,7 +127,7 @@ class RegisterECTWizard < DfE::Wizard::Base
       graph.before_next_step(:next_step_override)
 
       # stil implementing the override
-#      graph.before_previous_step(:previous_step_override)
+      #      graph.before_previous_step(:previous_step_override)
     end
   end
 
@@ -167,7 +168,7 @@ class RegisterECTWizard < DfE::Wizard::Base
   def next_step_override
     target = step_params[:return_to_review]
 
-    return target if user_up_to_check_answers? && target.present?
+    target if user_up_to_check_answers? && target.present?
   end
 
   # return_to_review="B" B is the page that the user click "Change"
@@ -188,7 +189,7 @@ class RegisterECTWizard < DfE::Wizard::Base
   def previous_step_overrride
     target = step_params[:return_to_review]
 
-    return target if user_up_to_check_answers? && full_traversal.include?(target)
+    target if user_up_to_check_answers? && full_traversal.include?(target)
   end
 
   def user_up_to_check_answers?
@@ -199,7 +200,7 @@ class RegisterECTWizard < DfE::Wizard::Base
     path_traversal(:check_answers)
   end
 
-  def find_ect_transitions(data)
+  def find_ect_transitions(_data)
     return :trn_not_found unless in_trs?
     return :national_insurance_number unless matches_trs_dob?
     return :already_active_at_school if active_at_school?
@@ -210,7 +211,7 @@ class RegisterECTWizard < DfE::Wizard::Base
     :review_ect_details
   end
 
-  def national_insurance_number_transitions(data)
+  def national_insurance_number_transitions(_data)
     return :not_found unless in_trs?
     return :induction_completed if induction_completed?
     return :induction_exempt if induction_exempt?
@@ -220,7 +221,7 @@ class RegisterECTWizard < DfE::Wizard::Base
 end
 
 # 0.1.1
-#module Schools
+# module Schools
 #  module RegisterECTWizard
 #    class Wizard < DfE::Wizard::Base
 #      attr_accessor :store, :school
@@ -280,4 +281,4 @@ end
 #      end
 #    end
 #  end
-#end
+# end

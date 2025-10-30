@@ -2,6 +2,7 @@ DummyNode = Struct.new(:id, :klass)
 
 class LegacyStep < DfE::Wizard::Step
   attr_accessor :first_name, :last_name
+
   validates :first_name, presence: true
 end
 
@@ -13,6 +14,7 @@ end
 
 class DummyStep < DfE::Wizard::Step
   attr_accessor :name
+
   validates :name, presence: true
 end
 
@@ -71,7 +73,7 @@ module TestWizard
     end
 
     def exit_path
-      "/wizard/complete"
+      '/wizard/complete'
     end
   end
 
@@ -98,7 +100,7 @@ module TestWizard
         { verify_step: VerifyStep },
         { profile_step: ProfileStep },
         { confirm_step: ConfirmStep },
-        { finished_step: FinishedStep }
+        { finished_step: FinishedStep },
       ]
     end
 

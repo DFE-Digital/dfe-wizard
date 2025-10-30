@@ -1,0 +1,9 @@
+<% content_for :page_title, "Name and date of birth" %>
+
+<%= form.govuk_check_boxes_fieldset :nationalities, legend: { text: "What is your nationality?" } do %>
+  <%= form.govuk_check_box :nationalities, :british, label: { text: "British" }, link_errors: true %>
+  <%= form.govuk_check_box :nationalities, :irish, label: { text: "Irish" } %>
+  <%= form.govuk_check_box :nationalities, :other, label: { text: "Other" }, checked: form.object.nationalities.include?('other') do %>
+    <%= form.govuk_text_field :other_nationality, label: { text: "Enter your nationality" } %>
+  <% end %>
+<% end %>

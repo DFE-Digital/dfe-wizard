@@ -2,8 +2,7 @@ module PersonalInformation
   class WizardController < ApplicationController
     before_action :assign_wizard
 
-    def new
-    end
+    def new; end
 
     def create
       if @wizard.valid_step?
@@ -18,7 +17,7 @@ module PersonalInformation
       @wizard = PersonalInformationWizard.new(
         current_step:,
         state_store: StateStores::SessionStore.new(session, 'personal_information'),
-        step_params: params
+        step_params: params,
       )
     end
 

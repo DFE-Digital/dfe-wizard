@@ -17,17 +17,17 @@ class GetFundingWizard < DfE::Wizard::Base
         when: :needs_funding_options?,
         then: :get_funding,
         else: :visa_requirement,
-        label: "Needs funding?"
+        label: 'Needs funding?',
       )
 
       graph.add_custom_branching_edge(
         from: :visa_requirement,
         conditional: :visa_branching_logic,
         potential_transitions: [
-          { label: "Requires support", nodes: [:additional_support] },
-          { label: "Funding incomplete", nodes: [:get_funding] },
-          { label: "All done", nodes: [:review] }
-        ]
+          { label: 'Requires support', nodes: [:additional_support] },
+          { label: 'Funding incomplete', nodes: [:get_funding] },
+          { label: 'All done', nodes: [:review] },
+        ],
       )
 
       graph.add_edge from: :additional_support, to: :review

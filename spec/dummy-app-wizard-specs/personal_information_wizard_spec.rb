@@ -3,8 +3,10 @@ RSpec.describe PersonalInformationWizard do
     described_class.new(
       current_step:,
       state_store: StateStores::PersonalInformation.new(application_form),
+      step_params: ActionController::Parameters.new(step_params),
     )
   end
+  let(:step_params) { {} }
 
   describe '#path_traversal' do
     context 'when British national' do
@@ -191,6 +193,26 @@ RSpec.describe PersonalInformationWizard do
       it 'proceeds to review' do
         expect(wizard.next_step).to eq(:review)
         expect(wizard.next_step_path).to eq('/personal-information/review')
+      end
+    end
+
+    context 'when return to review and wizard is complete' do
+      let(:current_step) { :name_and_date_of_birth }
+      let(:application_form) { build(:application_form, :without_right_to_work) }
+      let(:step_params) { { return_to_review: 'name_and_date_of_birth' } }
+
+      it 'returns review if return_to_review param given and path_traversal includes everything' do
+        expect(wizard.next_step).to eq(:review)
+      end
+    end
+
+    context 'when return to review but invalid step' do
+      let(:current_step) { :name_and_date_of_birth }
+      let(:application_form) { build(:application_form, :without_right_to_work) }
+      let(:step_params) { { return_to_review: 'this_step_does_not_exist' } }
+
+      it 'returns review if return_to_review param given and path_traversal includes everything' do
+        expect(wizard.next_step).to eq(:nationality)
       end
     end
   end

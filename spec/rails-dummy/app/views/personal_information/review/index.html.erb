@@ -17,9 +17,10 @@
             <% else %>
               <%= row.with_value(text: Array(value).compact_blank.map(&:humanize).join(', ')) %>
             <% end %>
+
             <%= row.with_action(
                   text: "Change",
-                  href: @wizard.resolve_step_path(step.class.model_name.param_key.to_sym),
+                  href: @wizard.resolve_step_path(step.step_id, return_to_review: step.step_id),
                   visually_hidden_text: label.humanize
                 ) %>
           <% end %>

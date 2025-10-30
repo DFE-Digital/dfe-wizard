@@ -79,7 +79,7 @@ module DfE
         @current_step_instance ||= begin
           klass = step_object_class
           params = fetch_step_attributes
-          klass.new(params.merge(wizard: self))
+          klass.new(params.merge(wizard: self, step_id: current_step_name))
         end
       end
 
@@ -157,11 +157,11 @@ module DfE
       #
       # @param step [Symbol]
       # @return [String]
-      def resolve_step_path(step)
+      def resolve_step_path(step, options = {})
         raise MissingStepError, "Step path cannot be resolved: #{step.inspect}" unless step
 
         if route_strategy
-          route_strategy.resolve(step: step, data: data)
+          route_strategy.resolve(step:, data:, options:)
         else
           warn_deprecation('route helpers (use route_strategy instead)')
           '#'
@@ -276,7 +276,7 @@ module DfE
 
       def current_step_path(args = nil)
         if route_strategy.present?
-          resolve_step_path(current_step_name)
+          resolve_step_path(current_step_name, args)
         else
           warn_deprecation('Define #route_strategy on wizard class')
           url_helpers.public_send("#{current_step.class.route_name}_path", args)
@@ -294,11 +294,11 @@ module DfE
       def summary_steps
         traversal = path_traversal(:review, data)
 
-        traversal.map do |step_name|
-          klass = find_step(step_name)
-          step_data = data.dig(:steps, step_name) || {}
+        traversal.map do |step_id|
+          klass = find_step(step_id)
+          step_data = data.dig(:steps, step_id) || {}
 
-          klass.new(step_data.merge(wizard: self))
+          klass.new(step_data.merge(wizard: self, step_id:))
         end
       end
 

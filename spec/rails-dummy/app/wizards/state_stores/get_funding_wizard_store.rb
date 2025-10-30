@@ -31,8 +31,8 @@ module StateStores
           additional_support: {
             requires_accessibility: application_form.requires_accessibility,
             support_notes: application_form.support_notes,
-          }
-        }
+          },
+        },
       }
     end
 
@@ -45,8 +45,8 @@ module StateStores
           application_form.assign_attributes(attributes.slice(:first_name, :last_name, :date_of_birth))
         when :academic_background
           application_form.assign_attributes(attributes.slice(
-            :highest_qualification, :institution_name, :needs_funding
-          ))
+                                               :highest_qualification, :institution_name, :needs_funding
+                                             ))
         when :get_funding
           application_form.assign_attributes(attributes.slice(
             :funding_type, :amount_requested, :complete

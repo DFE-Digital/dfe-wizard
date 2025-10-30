@@ -29,6 +29,8 @@ class PersonalInformationWizard < DfE::Wizard::Base
       )
 
       graph.add_edge from: :immigration_status, to: :review
+
+      graph.before_next_step(:next_step_before_callback)
     end
   end
 
@@ -40,6 +42,28 @@ class PersonalInformationWizard < DfE::Wizard::Base
 
   def logger
     DfE::Wizard::Logger.new(Rails.logger) if Rails.env.local?
+  end
+
+  def next_step_before_callback
+    target = step_params[:return_to_review]
+
+    :review if target && path_traversal(:review).map(&:to_s).include?(target) && completed?
+  end
+
+  def previous_step_before_callback
+    target = step_params[:return_to_review]
+
+    :review if target &&
+               path_traversal(:review).map(&:to_s).include?(target) &&
+               current_step_name.to_s == target &&
+               completed?
+  end
+
+  # if wizard is "complete" then the path traversal from the start to end
+  # will include the review step
+  #
+  def completed?
+    steps_processor.path_traversal(:review).include?(:review)
   end
 
   def needs_permission_to_work_or_study?(data)

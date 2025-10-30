@@ -5,7 +5,7 @@ class WizardsController < ApplicationController
         klass: PersonalInformationWizard,
         namespace: 'personal_information',
         name: 'Personal Information Wizard',
-        start_path: :name_and_date_of_birth
+        start_path: :name_and_date_of_birth,
       ),
       WizardInfo.new(
         klass: GetFundingWizard,

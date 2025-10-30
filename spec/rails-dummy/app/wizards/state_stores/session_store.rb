@@ -9,7 +9,7 @@ module StateStores
 
     def read
       {
-        steps: @session.dig(@wizard_name, 'steps').deep_dup
+        steps: @session.dig(@wizard_name, 'steps').deep_dup,
       }.deep_symbolize_keys
     end
 
