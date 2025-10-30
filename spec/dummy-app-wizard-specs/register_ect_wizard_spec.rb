@@ -7,7 +7,7 @@ RSpec.describe RegisterECTWizard do
   subject(:wizard) do
     described_class.new(
       current_step: current_step,
-      state_store: StateStores::SessionStore.new(session, 'register_ect'),
+      state_store: StateStores::RegisterECTStore.new(session, 'register_ect'),
       step_params: ActionController::Parameters.new(step_params),
     )
   end
