@@ -31,10 +31,37 @@ RSpec.feature 'Assign mentor wizard', type: :feature do
     and_i_see_the_confirmation_summary
   end
 
+  scenario 'skipping steps' do
+    when_i_go_to_the_training_step_directly
+    then_i_see_a_404
+
+    when_i_go_to_the_lead_provider_step_directly
+    then_i_see_a_404
+
+    when_i_go_to_the_confirmation_step_directly
+    then_i_see_a_404
+  end
+
   def given_i_start_the_assign_mentor_wizard
     visit root_path
     click_link_or_button 'Wizards'
     click_link_or_button 'Assign Mentor Wizard'
+  end
+
+  def when_i_go_to_the_lead_provider_step_directly
+    visit assign_mentor_which_lead_provider_path
+  end
+
+  def when_i_go_to_the_training_step_directly
+    visit assign_mentor_can_receive_mentor_training_path
+  end
+
+  def when_i_go_to_the_confirmation_step_directly
+    visit assign_mentor_confirmation_path
+  end
+
+  def then_i_see_a_404
+    expect(page.status_code).to eq(404)
   end
 
   def then_i_should_be_on_the_choose_mentor_step
