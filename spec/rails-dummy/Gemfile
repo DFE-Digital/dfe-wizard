@@ -18,7 +18,6 @@ group :development, :test do
   gem 'faker'
   gem 'foreman'
   gem 'pry'
-  gem 'pry'
   gem 'railties'
   gem 'rake', '~> 13.0'
   gem 'rspec', '~> 3.0'

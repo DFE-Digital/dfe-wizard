@@ -1,37 +1,27 @@
 module StateStores
-  class PersonalInformation
+  class PersonalInformation < DfE::Wizard::StateStore::Base
     attr_reader :application_form
 
     def initialize(application_form)
       @application_form = application_form
+      @state_key = SecureRandom.uuid
     end
 
     def read
-      {
-        steps: {
-          name_and_date_of_birth: {
-            first_name: application_form.first_name,
-            last_name: application_form.last_name,
-            date_of_birth: application_form.date_of_birth,
-          },
-          nationality: {
-            nationalities: application_form.nationalities.map(&:downcase),
-            other_nationalities: application_form.other_nationalities,
-          },
-          right_to_work_or_study: {
-            right_to_work_or_study: application_form.right_to_work_or_study,
-          },
-          immigration_status: {
-            status: application_form.immigration_status,
-          },
-        },
-      }
+      JSON.parse(application_form.wizard_state || '{}')
     end
 
-    # args = { name_and_date_of_birth: => { first_name: 'Tomas', last_name: 'Stefano' } }
-    #
-    def write(args)
-      @application_form.update!(args)
+    def write(updates)
+      current = read
+      application_form.wizard_state = current.deep_merge(updates).to_json
+    end
+
+    def clear
+      application_form.wizard_state = '{}'
+    end
+
+    def state_key
+      @state_key
     end
   end
 end

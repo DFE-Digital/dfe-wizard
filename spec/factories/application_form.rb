@@ -1,28 +1,41 @@
 class ApplicationForm
   include ActiveModel::Model
+  include ActiveModel::Attributes
 
-  # Shared
-  attr_accessor :first_name,
-                :last_name,
-                :date_of_birth
+  attribute :id, :integer, default: -> { SecureRandom.uuid }
+  attribute :first_name, :string
+  attribute :last_name, :string
+  attribute :date_of_birth, :date
+  attribute :nationality, :string
+  attribute :other_nationality, :string
+  attribute :right_to_work, :string
+  attribute :visa_type, :string
+  attribute :visa_expiry, :date
+  attribute :immigration_status, :string
+  attribute :wizard_state, :string, default: '{}'
 
-  # Personal Information wizard
-  attr_accessor :nationalities,
-                :other_nationalities,
-                :right_to_work_or_study,
-                :immigration_status
+  validates :first_name, :last_name, :date_of_birth, presence: true
 
-  # Get Funding Wizard
-  attr_accessor :highest_qualification,
-                :institution_name,
-                :needs_funding,
-                :funding_type,
-                :amount_requested,
-                :funding_section_complete,
-                :has_visa,
-                :needs_support,
-                :requires_accessibility,
-                :support_notes
+  attribute :highest_qualification, :string
+  attribute :institution_name, :string
+  attribute :needs_funding, :boolean
+  attribute :funding_type, :string
+  attribute :amount_requested, :float
+  attribute :funding_section_complete, :boolean
+  attribute :has_visa, :boolean
+  attribute :needs_support, :boolean
+  attribute :requires_accessibility, :boolean
+  attribute :support_notes, :boolean
+
+
+  alias_method :nationalities=, :nationality=
+  alias_method :other_nationalities=, :other_nationality=
+  alias_method :right_to_work_or_study=, :right_to_work=
+
+  def update!(attrs)
+    assign_attributes(attrs)
+    self
+  end
 end
 
 FactoryBot.define do

@@ -112,6 +112,16 @@ module DfE
                                          end
         end
 
+        def before_previous_step(method = nil, &block)
+          @previous_step_before_callbacks ||= []
+
+          @previous_step_before_callbacks << if block_given?
+                                               block
+                                             else
+                                               @wizard.method(method)
+                                             end
+        end
+
         # Returns the next step (symbol), given current step and data.
         def next_step(current_step = nil, data = nil)
           if @next_step_before_callbacks&.any?
@@ -142,8 +152,18 @@ module DfE
           edge&.to
         end
 
-        # Returns the previous step symbol, or nil if at root.
         def previous_step(current_step = nil, data = nil)
+          if @previous_step_before_callbacks&.any?
+            @previous_step_before_callbacks.each do |callback|
+              result = callback.call
+              return result unless result.nil?
+            end
+          end
+
+          previous_step_without_callbacks(current_step, data)
+        end
+
+        def previous_step_without_callbacks(current_step, data)
           current_step ||= @wizard.current_step_name
           data ||= @wizard.data
 
@@ -175,45 +195,16 @@ module DfE
           steps.include?(target_step) ? steps : []
         end
 
-        # Builds a Graphviz graph for visualization.
-        def to_doc
-          require 'ruby-graphviz'
-          g = GraphViz.new(@wizard.class.name, rankdir: 'LR', fontname: 'Arial')
-          g.node[:style] = 'rounded,filled'
-          g.node[:shape] = 'rect'
-          g.node[:color] = '#666666'
-          g.node[:fillcolor] = '#f9f9f9'
-
-          start_id = @root_node
-          g.add_nodes(start_id.to_s, fillcolor: '#d2f7ef', color: '#00703c', penwidth: 2) if start_id
-          last_step = @nodes.keys.last
-          g.add_nodes(last_step.to_s, shape: 'doublecircle', color: '#aaaaaa', fillcolor: '#f5e7e7')
-
-          @nodes.each_key do |node|
-            next if node == start_id || node == last_step
-
-            g.add_nodes(node.to_s, label: node.to_s.humanize.titleize)
-          end
-
-          @edges.each { |e| g.add_edges(e.from.to_s, e.to.to_s, style: 'bold', color: '#222222') }
-
-          @conditional_edges.each do |ce|
-            g.add_edges(ce.from.to_s, ce.then.to_s,
-                        label: ce.label || 'Yes', color: '#00703c', fontcolor: '#00703c', penwidth: 2)
-            g.add_edges(ce.from.to_s, ce.else.to_s,
-                        label: 'Else', color: '#d4351c', fontcolor: '#d4351c', style: 'dashed')
-          end
-
-          @custom_branching_edges.each do |cbe|
-            cbe.potential_transitions.each do |pt|
-              Array(pt[:nodes]).each do |dest|
-                g.add_edges(cbe.from.to_s, dest.to_s,
-                            label: pt[:label], color: '#3366cc', style: 'dotted')
-              end
-            end
-          end
-
-          g
+        # Generate GraphViz visualization
+        #
+        # @param theme [Symbol] :minimal, :detailed, :semantic
+        # @return [GraphViz]
+        #
+        # @example
+        #   graph.to_doc(:semantic, title: 'Some Wizard').output(svg: 'wizard.svg')
+        #
+        def to_doc(title:, theme: :semantic)
+          ::DfE::Wizard::Documentation::GraphRenderer.new(graph: self, theme:, title:).render
         end
 
         private
