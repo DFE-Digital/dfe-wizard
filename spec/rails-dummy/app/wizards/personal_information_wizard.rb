@@ -22,7 +22,7 @@ class PersonalInformationWizard
 
       graph.add_conditional_edge(
         from: :right_to_work_or_study,
-        when: lambda { |step| step.right_to_work_or_study? },
+        when: ->(step, _) { step.right_to_work_or_study? },
         then: :immigration_status,
         else: :review,
         label: 'Right to work or study?',
@@ -41,17 +41,22 @@ class PersonalInformationWizard
     )
   end
 
-  def logger
-#    DfE::Wizard::Logger::Base.new(Rails.logger) if Rails.env.local?
-  end
+  def logger; end
 
   def next_step_before_callback
+    handle_return_to_check_your_answers(:review) if return_to_review?
   end
 
   def previous_step_before_callback
+    handle_back_in_check_your_answers(:review, return_to_review) if return_to_review?
   end
 
-  def completed?
+  def return_to_review?
+    return_to_review.present?
+  end
+
+  def return_to_review
+    step_params[:return_to_review]
   end
 
   def needs_permission_to_work_or_study?(step)

@@ -140,12 +140,13 @@ module DfE
 
           custom_edge = @custom_branching_edges.find { |e| e.from == current_step }
           if custom_edge
-            return custom_edge.conditional.call(data)
+            return call_predicate(custom_edge.conditional, current_step, data)
           end
 
           cond_edge = @conditional_edges.find { |e| e.from == current_step }
           if cond_edge
-            return cond_edge.when.call(data) ? cond_edge.then : cond_edge.else
+            result = call_predicate(cond_edge.when, current_step, data)
+            return result ? cond_edge.then : cond_edge.else
           end
 
           edge = @edges.find { |e| e.from == current_step }
@@ -209,14 +210,26 @@ module DfE
 
         private
 
-        # Returns a proc for a given conditional expression (symbol or proc).
         def build_predicate(raw)
           if raw.is_a?(Symbol) && @wizard.respond_to?(raw)
-            proc { |data| @wizard.send(raw, data) }
+            proc { |step, _wizard| @wizard.send(raw, step) }
           elsif raw.respond_to?(:call)
             raw
           else
-            proc { |_data| false }
+            proc { |_step, _wizard| false }
+          end
+        end
+
+        def call_predicate(predicate, current_step, _data)
+          arity = predicate.arity
+
+          step_obj = @wizard.step(current_step)
+
+          case arity
+          when 2
+            predicate.call(step_obj, @wizard)
+          else
+            predicate.call(step_obj)
           end
         end
       end

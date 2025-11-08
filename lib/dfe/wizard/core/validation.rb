@@ -156,6 +156,40 @@ module DfE
           path_validator.valid_to?(target_step)
         end
 
+        # Get validated path to target
+        #
+        # Returns array of step IDs in path, but only if ALL steps are visited AND valid.
+        # Same interface as path_traversal, but with validation built-in.
+        #
+        # @param target_step [Symbol, nil] The target step (nil = current path)
+        # @return [Array<Symbol>, nil] Path array if valid, nil if invalid
+        #
+        # @example Valid path
+        #   wizard.validated_path_to(:review)  # => [:name, :email, :review]
+        #
+        # @example Invalid path
+        #   wizard.validated_path_to(:review)  # => []
+        def validated_path_to(target_step = nil)
+          target = target_step || current_step_name
+          return [] unless path_complete_to?(target) && path_valid_to?(target)
+
+          path_traversal(target)
+        end
+
+        # Check if path to target is valid
+        #
+        # Boolean version of validated_path_to.
+        # Returns true if all steps are visited and valid.
+        #
+        # @param target_step [Symbol, nil] The target step (nil = current path)
+        # @return [Boolean]
+        #
+        # @example
+        #   wizard.validated_path_to?(review)  # => true/false
+        def validated_path_to?(target_step = nil)
+          validated_path_to(target_step).include?(target_step)
+        end
+
         # Get detailed validation results for entire path
         #
         # Returns a ValidationResult for each step showing:

@@ -136,6 +136,10 @@ module DfE
       # @api public
       autoload :Base, 'dfe/wizard/state_store/base'
 
+      # In memory-based state store
+      # @api public
+      autoload :InMemory, 'dfe/wizard/state_store/in_memory'
+
       # Session-based state store
       # @api public
       autoload :SessionStore, 'dfe/wizard/state_store/session_store'

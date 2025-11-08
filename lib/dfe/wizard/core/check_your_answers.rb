@@ -58,9 +58,6 @@ module DfE
         #   # Path now requires more steps
         #   # => nil  (falls through to normal navigation)
         def handle_return_to_check_your_answers(target_step)
-          return unless target_step
-
-          # Return to review only if entire path is complete AND valid
           target_step if path_complete_to?(target_step) && path_valid_to?(target_step)
         end
 
@@ -107,8 +104,6 @@ module DfE
         #   # current_step != origin_step, so walk backward
         #   # => :email  (last visited step before review)
         def handle_back_in_check_your_answers(target_step, origin_step)
-          return unless target_step
-
           # If at the step user originally clicked "Change" on, return to review
           return target_step if current_step_name == origin_step
 

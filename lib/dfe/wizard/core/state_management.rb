@@ -93,6 +93,14 @@ module DfE
           read_step_data(step_id)
         end
 
+        # Read raw step data from storage (no filtering)
+        #
+        # @param step_id [Symbol]
+        # @return [Hash]
+        def read_step_data(step_id)
+          raw_steps[step_id] || {}
+        end
+
         # Read raw step data (including from unreachable branches)
         #
         # For internal use and debugging. Returns step data even if unreachable.
@@ -424,14 +432,6 @@ module DfE
         end
 
         private
-
-        # Read raw step data from storage (no filtering)
-        #
-        # @param step_id [Symbol]
-        # @return [Hash]
-        def read_step_data(step_id)
-          raw_steps[step_id] || {}
-        end
 
         # Extract the steps hash from any data structure
         #

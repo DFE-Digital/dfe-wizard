@@ -17,3 +17,4 @@ spec/rails-dummy/node_modules/
 /spec/rails-dummy/public/assets/
 /spec/rails-dummy/app/assets/builds/*
 !/spec/rails-dummy/app/assets/builds/.keep
+spec/rails-dummy/docs/*

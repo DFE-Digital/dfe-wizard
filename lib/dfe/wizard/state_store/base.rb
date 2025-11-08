@@ -1,6 +1,3 @@
-# lib/dfe/wizard/state_store/base.rb
-# frozen_string_literal: true
-
 module DfE
   module Wizard
     module StateStore
