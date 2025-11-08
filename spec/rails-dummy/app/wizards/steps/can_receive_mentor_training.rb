@@ -1,5 +1,7 @@
 module Steps
-  class CanReceiveMentorTraining < DfE::Wizard::Step
+  class CanReceiveMentorTraining
+    include DfE::Wizard::Step
+
     attribute :mentor_id, :integer
     attribute :lp_will_provide, :string
 

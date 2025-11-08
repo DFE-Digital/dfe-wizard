@@ -1,4 +1,5 @@
 module Steps
-  class ConfirmationStep < DfE::Wizard::Step
+  class ConfirmationStep
+    include DfE::Wizard::Step
   end
 end

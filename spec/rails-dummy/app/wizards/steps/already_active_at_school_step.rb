@@ -1,4 +1,5 @@
 module Steps
-  class AlreadyActiveAtSchoolStep < DfE::Wizard::Step
+  class AlreadyActiveAtSchoolStep
+    include DfE::Wizard::Step
   end
 end

@@ -1,5 +1,7 @@
 module Steps
-  class AdditionalSupport < DfE::Wizard::Step
+  class AdditionalSupport
+    include DfE::Wizard::Step
+
     attr_accessor :requires_accessibility, :support_notes
 
     def self.permitted_params

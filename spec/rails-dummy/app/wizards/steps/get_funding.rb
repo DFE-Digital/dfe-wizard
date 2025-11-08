@@ -1,5 +1,7 @@
 module Steps
-  class GetFunding < DfE::Wizard::Step
+  class GetFunding
+    include DfE::Wizard::Step
+
     attr_accessor :funding_type, :amount_requested, :complete
 
     def self.permitted_params

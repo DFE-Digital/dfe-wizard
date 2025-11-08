@@ -1,4 +1,5 @@
 module Steps
-  class LeadProviderStep < DfE::Wizard::Step
+  class LeadProviderStep
+    include DfE::Wizard::Step
   end
 end

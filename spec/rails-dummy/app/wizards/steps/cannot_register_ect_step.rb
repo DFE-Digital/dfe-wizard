@@ -1,4 +1,5 @@
 module Steps
-  class CannotRegisterECTStep < DfE::Wizard::Step
+  class CannotRegisterECTStep
+    include DfE::Wizard::Step
   end
 end

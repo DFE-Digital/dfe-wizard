@@ -1,4 +1,5 @@
 module Steps
-  class CantUseEmailStep < DfE::Wizard::Step
+  class CantUseEmailStep
+    include DfE::Wizard::Step
   end
 end

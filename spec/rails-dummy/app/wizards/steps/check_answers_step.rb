@@ -1,4 +1,5 @@
 module Steps
-  class CheckAnswersStep < DfE::Wizard::Step
+  class CheckAnswersStep
+    include DfE::Wizard::Step
   end
 end

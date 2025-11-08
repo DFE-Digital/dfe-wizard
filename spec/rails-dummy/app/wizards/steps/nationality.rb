@@ -1,5 +1,7 @@
 module Steps
-  class Nationality < DfE::Wizard::Step
+  class Nationality
+    include DfE::Wizard::Step
+
     attribute :nationalities, default: []
     attribute :other_nationality, :string
 

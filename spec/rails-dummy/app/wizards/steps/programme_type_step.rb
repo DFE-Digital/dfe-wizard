@@ -1,4 +1,5 @@
 module Steps
-  class ProgrammeTypeStep < DfE::Wizard::Step
+  class ProgrammeTypeStep
+    include DfE::Wizard::Step
   end
 end

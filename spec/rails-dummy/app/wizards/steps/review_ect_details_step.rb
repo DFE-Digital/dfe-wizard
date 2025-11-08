@@ -1,4 +1,5 @@
 module Steps
-  class ReviewECTDetailsStep < DfE::Wizard::Step
+  class ReviewECTDetailsStep
+    include DfE::Wizard::Step
   end
 end

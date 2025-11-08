@@ -1,4 +1,5 @@
 module Steps
-  class InductionCompletedStep < DfE::Wizard::Step
+  class InductionCompletedStep
+    include DfE::Wizard::Step
   end
 end

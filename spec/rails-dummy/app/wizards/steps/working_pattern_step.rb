@@ -1,4 +1,5 @@
 module Steps
-  class WorkingPatternStep < DfE::Wizard::Step
+  class WorkingPatternStep
+    include DfE::Wizard::Step
   end
 end

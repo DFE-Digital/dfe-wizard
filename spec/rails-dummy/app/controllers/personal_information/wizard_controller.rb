@@ -18,7 +18,7 @@ module PersonalInformation
         current_step:,
         state_store: StateStores::PersonalInformation.new(
           session:,
-          key: 'personal_information'
+          key: 'personal_information',
         ),
         step_params: params,
       )

@@ -1,5 +1,7 @@
 module Steps
-  class WhichLeadProvider < DfE::Wizard::Step
+  class WhichLeadProvider
+    include DfE::Wizard::Step
+
     attribute :lead_provider_id, :integer
 
     validates :lead_provider_id, presence: true

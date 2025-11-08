@@ -1,5 +1,7 @@
 module Steps
-  class Confirmation < DfE::Wizard::Step
+  class Confirmation
+    include DfE::Wizard::Step
+
     def self.permitted_params
       []
     end

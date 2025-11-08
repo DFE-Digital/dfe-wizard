@@ -1,4 +1,5 @@
 module Steps
-  class IndependentSchoolAppropriateBodyStep < DfE::Wizard::Step
+  class IndependentSchoolAppropriateBodyStep
+    include DfE::Wizard::Step
   end
 end

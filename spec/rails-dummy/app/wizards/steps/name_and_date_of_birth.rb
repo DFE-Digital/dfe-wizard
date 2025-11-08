@@ -1,5 +1,7 @@
 module Steps
-  class NameAndDateOfBirth < DfE::Wizard::Step
+  class NameAndDateOfBirth
+    include DfE::Wizard::Step
+
     attribute :first_name, :string
     attribute :last_name, :string
     attribute :date_of_birth, :date
