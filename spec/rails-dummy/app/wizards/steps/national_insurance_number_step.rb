@@ -1,4 +1,5 @@
 module Steps
-  class NationalInsuranceNumberStep < DfE::Wizard::Step
+  class NationalInsuranceNumberStep
+    include DfE::Wizard::Step
   end
 end

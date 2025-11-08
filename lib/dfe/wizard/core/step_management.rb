@@ -26,7 +26,7 @@ module DfE
           step(current_step_name)
         end
 
-        # Hydrate a step from repository data
+        # Hydrate a step from state store
         #
         # @param step_id [Symbol]
         # @return [Object] Instantiated step
@@ -34,7 +34,7 @@ module DfE
           step_class = steps_processor.find_step(step_id)
           data = state_store.step_data(step_id)
 
-          step_class.new(**data.symbolize_keys)
+          step_class.new(**data.symbolize_keys.merge(wizard: self, step_id: step_id))
         end
 
         # Find the step class for a given step ID

@@ -96,7 +96,7 @@ module DfE
         #   store.write_step(:email, { email: 'user@example.com', confirmed: true })
         #   # session now contains: { steps: { email: { email: '...', confirmed: true } } }
         def write_step(step_id, data)
-          steps = read.dig(:steps) || {}
+          steps = read[:steps] || {}
           write(steps: steps.merge(step_id => data))
         end
 

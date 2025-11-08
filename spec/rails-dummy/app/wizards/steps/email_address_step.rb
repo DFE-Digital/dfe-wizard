@@ -1,4 +1,5 @@
 module Steps
-  class EmailAddressStep < DfE::Wizard::Step
+  class EmailAddressStep
+    include DfE::Wizard::Step
   end
 end

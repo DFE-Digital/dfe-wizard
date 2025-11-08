@@ -1,7 +1,9 @@
 require 'ostruct'
 
 module Steps
-  class WhoWillBeTheMentor < DfE::Wizard::Step
+  class WhoWillBeTheMentor
+    include DfE::Wizard::Step
+
     attribute :mentor_id, :integer
 
     validates :mentor_id, presence: true

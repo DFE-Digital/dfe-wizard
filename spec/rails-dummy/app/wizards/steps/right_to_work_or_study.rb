@@ -1,5 +1,7 @@
 module Steps
-  class RightToWorkOrStudy < DfE::Wizard::Step
+  class RightToWorkOrStudy
+    include DfE::Wizard::Step
+
     attribute :right_to_work_or_study, :string
     attribute :visa_expiry, :string
     attribute :visa_type, :string

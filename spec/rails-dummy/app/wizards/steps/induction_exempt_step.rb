@@ -1,4 +1,5 @@
 module Steps
-  class InductionExemptStep < DfE::Wizard::Step
+  class InductionExemptStep
+    include DfE::Wizard::Step
   end
 end

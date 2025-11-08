@@ -1,4 +1,5 @@
 module Steps
-  class NotFoundStep < DfE::Wizard::Step
+  class NotFoundStep
+    include DfE::Wizard::Step
   end
 end

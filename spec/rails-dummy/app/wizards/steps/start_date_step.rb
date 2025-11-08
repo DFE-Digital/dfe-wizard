@@ -1,4 +1,5 @@
 module Steps
-  class StartDateStep < DfE::Wizard::Step
+  class StartDateStep
+    include DfE::Wizard::Step
   end
 end

@@ -1,4 +1,6 @@
-class PersonalInformation::NationalityStep < DfE::Wizard::Step
+class PersonalInformation::NationalityStep
+  include DfE::Wizard::Step
+
   attribute :nationalities, default: []
   attribute :other_nationalities, :string
 

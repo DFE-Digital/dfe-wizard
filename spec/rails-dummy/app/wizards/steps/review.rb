@@ -1,4 +1,5 @@
 module Steps
-  class Review < DfE::Wizard::Step
+  class Review
+    include DfE::Wizard::Step
   end
 end

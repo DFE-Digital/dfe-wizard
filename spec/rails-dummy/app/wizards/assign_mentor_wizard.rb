@@ -13,7 +13,7 @@ class AssignMentorWizard
 
       graph.add_conditional_edge(
         from: :can_receive_mentor_training,
-        when: lambda { |step| step.lp_will_provide == 'no' },
+        when: ->(step) { step.lp_will_provide == 'no' },
         then: :which_lead_provider,
         else: :confirmation,
         label: 'LP provides?',

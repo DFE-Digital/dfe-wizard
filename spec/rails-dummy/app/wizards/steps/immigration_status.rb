@@ -1,5 +1,7 @@
 module Steps
-  class ImmigrationStatus < DfE::Wizard::Step
+  class ImmigrationStatus
+    include DfE::Wizard::Step
+
     attribute :status, :string
     attribute :other_status, :string
 

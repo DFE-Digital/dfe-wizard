@@ -1,7 +1,6 @@
-
 ## frozen_string_literal: true
 #
-#module DfE
+# module DfE
 #  module Wizard
 #    class Logger
 #      attr_reader :logger, :options
@@ -20,4 +19,4 @@
 #      end
 #    end
 #  end
-#end
+# end
