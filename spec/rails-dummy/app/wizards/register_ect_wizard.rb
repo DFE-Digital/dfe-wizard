@@ -6,7 +6,9 @@
 # step_params: {}
 # )
 #
-class RegisterECTWizard < DfE::Wizard::Base
+class RegisterECTWizard
+  include DfE::Wizard
+
   include Steps
   delegate :in_trs?,
            :matches_trs_dob?,

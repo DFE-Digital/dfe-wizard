@@ -1,4 +1,6 @@
-class GetFundingWizard < DfE::Wizard::Base
+class GetFundingWizard
+  include DfE::Wizard
+
   def steps_processor
     DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
       graph.add_node :personal_details, Steps::PersonalDetails

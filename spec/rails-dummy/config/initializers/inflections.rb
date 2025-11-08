@@ -14,5 +14,6 @@
 ActiveSupport::Inflector.inflections(:en) do |inflect|
   inflect.acronym 'ECT'
   inflect.acronym 'ECTs'
+  inflect.acronym 'DfE'
   #   inflect.acronym "RESTful"
 end

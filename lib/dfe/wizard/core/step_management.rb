@@ -83,6 +83,8 @@ module DfE
         #
         def current_step_params
           @step_params.require(current_step_name).permit(permitted_params)
+        rescue ActionController::ParameterMissing
+          {}
         end
 
         # Returns the permitted parameter keys for the current step class.
@@ -104,7 +106,7 @@ module DfE
         #
         # @api public
         def permitted_params
-          step_object_class.permitted_params
+          find_step(current_step_name).permitted_params
         end
 
         # Extract step attributes from state store and request params
@@ -117,9 +119,8 @@ module DfE
         # @api public
         def fetch_step_attributes
           step_data = read_step_data(current_step_name)
-          form_params = step_params[current_step_name] || {}
 
-          step_data.deep_merge(form_params.to_h)
+          step_data.deep_merge(current_step_params)
         end
       end
     end

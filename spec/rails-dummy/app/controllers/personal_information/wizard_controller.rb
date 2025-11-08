@@ -16,7 +16,10 @@ module PersonalInformation
     def assign_wizard
       @wizard = PersonalInformationWizard.new(
         current_step:,
-        state_store: StateStores::SessionStore.new(session, 'personal_information'),
+        state_store: StateStores::PersonalInformation.new(
+          session:,
+          key: 'personal_information'
+        ),
         step_params: params,
       )
     end
