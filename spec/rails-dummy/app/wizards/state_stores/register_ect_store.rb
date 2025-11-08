@@ -1,5 +1,5 @@
 module StateStores
-  class RegisterECTStore < SessionStore
+  class RegisterECTStore < DfE::Wizard::StateStore::Session
     def in_trs?; end
 
     def matches_trs_dob?; end

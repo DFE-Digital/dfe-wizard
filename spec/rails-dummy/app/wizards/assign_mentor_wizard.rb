@@ -1,4 +1,6 @@
-class AssignMentorWizard < DfE::Wizard::Base
+class AssignMentorWizard
+  include DfE::Wizard
+
   def steps_processor
     DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
       graph.add_node :who_will_be_the_mentor, Steps::WhoWillBeTheMentor
@@ -11,9 +13,7 @@ class AssignMentorWizard < DfE::Wizard::Base
 
       graph.add_conditional_edge(
         from: :can_receive_mentor_training,
-        when: lambda { |data|
-          data.dig(:steps, :can_receive_mentor_training, :lp_will_provide) == 'no'
-        },
+        when: lambda { |step| step.lp_will_provide == 'no' },
         then: :which_lead_provider,
         else: :confirmation,
         label: 'LP provides?',

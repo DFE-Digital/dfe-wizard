@@ -9,8 +9,14 @@ RSpec.describe PersonalInformationWizard do
     )
   end
 
-  let(:state_store) { StateStores::PersonalInformation.new(build(:application_form)) }
+  let(:state_store) do
+    StateStores::PersonalInformation.new(
+      session:,
+      key: :personal_information_wizard,
+    )
+  end
   let(:step_params) { {} }
+  let(:session) { {} }
 
   describe '#path_traversal' do
     context 'when British national' do
@@ -407,8 +413,10 @@ RSpec.describe PersonalInformationWizard do
     context 'when path is incomplete' do
       let(:current_step) { :nationality }
       let(:state_store) {
-        StateStores::PersonalInformation.new(build(:application_form, first_name: nil, last_name: nil, date_of_birth: nil,
-                                                                      nationalities: nil))
+        StateStores::PersonalInformation.new(
+          session:,
+          key: :application_form,
+        )
       }
 
       it 'returns empty' do

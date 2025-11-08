@@ -90,6 +90,10 @@ module DfE
       # @api public
       autoload :Navigation, 'dfe/wizard/core/navigation'
 
+      # Define a step with attributes and validation
+      # @api public
+      autoload :Step, 'dfe/wizard/core/step'
+
       # Step and path validation
       # @api public
       autoload :Validation, 'dfe/wizard/core/validation'
@@ -142,7 +146,7 @@ module DfE
 
       # Session-based state store
       # @api public
-      autoload :SessionStore, 'dfe/wizard/state_store/session_store'
+      autoload :Session, 'dfe/wizard/state_store/session'
 
       # Redis-based state store
       # @api public
@@ -199,15 +203,13 @@ module DfE
     # @!endgroup
     # @!group Supporting Classes
 
-    autoload :Step, 'dfe/wizard/step'
-    autoload :Base, 'dfe/wizard/base'
-
     autoload :Version, 'dfe/wizard/version'
 
     # @!endgroup
     # @!group Main API
 
     # Include all core modules
+    include Core
     include Core::CheckYourAnswers
     include Core::Documentation
     include Core::Navigation
@@ -224,7 +226,7 @@ module DfE
     # @example
     #   wizard = MyWizard.new(
     #     current_step: :email,
-    #     state_store: DfE::Wizard::StateStore::SessionStore.new(session),
+    #     state_store: DfE::Wizard::StateStore::Session.new(session:, key: 'my_wizard'),
     #     step_params: params
     #   )
     #

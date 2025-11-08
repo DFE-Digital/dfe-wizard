@@ -23,7 +23,7 @@ module AssignMentor
     def assign_wizard
       @wizard = AssignMentorWizard.new(
         current_step: current_step,
-        state_store: StateStores::SessionStore.new(session, 'assign_mentor'),
+        state_store: DfE::Wizard::StateStore::Session.new(session:, key: 'assign_mentor'),
         step_params: params,
       )
     end
