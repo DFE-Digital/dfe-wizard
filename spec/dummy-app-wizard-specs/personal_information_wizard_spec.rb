@@ -5,16 +5,19 @@ RSpec.describe PersonalInformationWizard do
     described_class.new(
       current_step:,
       state_store:,
+      step_params:,
     )
   end
 
   let(:state_store) { StateStores::PersonalInformation.new(build(:application_form)) }
+  let(:step_params) { {} }
 
   describe '#path_traversal' do
     context 'when British national' do
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
-        state_store.write_step(:nationality, { nationality: 'uk' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
+        state_store.write_step(:nationality, { nationalities: 'british' })
       end
 
       context 'at nationality step' do
@@ -36,9 +39,11 @@ RSpec.describe PersonalInformationWizard do
 
     context 'when non-UK national with right to work' do
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'Jean', last_name: 'Dupont', date_of_birth: '1995-06-15' })
-        state_store.write_step(:nationality, { nationality: 'french' })
-        state_store.write_step(:right_to_work_or_study, { right_to_work: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'Jean', last_name: 'Dupont', date_of_birth: '1995-06-15' })
+        state_store.write_step(:nationality, { nationalities: 'french' })
+        state_store.write_step(:right_to_work_or_study,
+                               { right_to_work_or_study: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' })
         state_store.write_step(:immigration_status, { status: 'settled' })
       end
 
@@ -63,9 +68,10 @@ RSpec.describe PersonalInformationWizard do
 
     context 'when non-UK national without right to work' do
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'Maria', last_name: 'Garcia', date_of_birth: '1992-03-22' })
-        state_store.write_step(:nationality, { nationality: 'spanish' })
-        state_store.write_step(:right_to_work_or_study, { right_to_work: 'no' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'Maria', last_name: 'Garcia', date_of_birth: '1992-03-22' })
+        state_store.write_step(:nationality, { nationalities: 'spanish' })
+        state_store.write_step(:right_to_work_or_study, { right_to_work_or_study: 'no' })
       end
 
       context 'at right_to_work_or_study step' do
@@ -89,8 +95,9 @@ RSpec.describe PersonalInformationWizard do
 
     context 'with explicit target step' do
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
-        state_store.write_step(:nationality, { nationality: 'uk' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
+        state_store.write_step(:nationality, { nationalities: 'british' })
       end
 
       let(:current_step) { :name_and_date_of_birth }
@@ -107,8 +114,8 @@ RSpec.describe PersonalInformationWizard do
         {
           steps: {
             name_and_date_of_birth: { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' },
-            nationality: { nationality: 'french' },
-            right_to_work_or_study: { right_to_work: 'yes' },
+            nationality: { nationalities: 'french' },
+            right_to_work_or_study: { right_to_work_or_study: 'yes' },
           },
         }
       end
@@ -120,6 +127,7 @@ RSpec.describe PersonalInformationWizard do
           right_to_work_or_study
           immigration_status
         ]
+
         expect(wizard.path_traversal(:immigration_status, non_uk_data)).to eq(expected_path)
       end
     end
@@ -130,7 +138,8 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :name_and_date_of_birth }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
       end
 
       it 'moves to nationality' do
@@ -146,12 +155,13 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :nationality }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
-        state_store.write_step(:nationality, { nationality: nationality_value })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
+        state_store.write_step(:nationality, { nationalities: nationality_value })
       end
 
       context 'UK national' do
-        let(:nationality_value) { 'uk' }
+        let(:nationality_value) { 'british' }
 
         it 'skips to review' do
           expect(wizard.next_step).to eq(:review)
@@ -187,9 +197,12 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :right_to_work_or_study }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'Jean', last_name: 'Dupont', date_of_birth: '1995-06-15' })
-        state_store.write_step(:nationality, { nationality: 'french' })
-        state_store.write_step(:right_to_work_or_study, { right_to_work: has_right_to_work, visa_type: 'work', visa_expiry: '2026-12-31' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'Jean', last_name: 'Dupont', date_of_birth: '1995-06-15' })
+        state_store.write_step(:nationality, { nationalities: 'french' })
+        state_store.write_step(:right_to_work_or_study,
+                               { right_to_work_or_study: has_right_to_work, visa_type: 'work',
+                                 visa_expiry: '2026-12-31' })
       end
 
       context 'with right to work' do
@@ -221,9 +234,11 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :immigration_status }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' })
-        state_store.write_step(:nationality, { nationality: 'french' })
-        state_store.write_step(:right_to_work_or_study, { right_to_work: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' })
+        state_store.write_step(:nationality, { nationalities: 'french' })
+        state_store.write_step(:right_to_work_or_study,
+                               { right_to_work_or_study: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' })
         state_store.write_step(:immigration_status, { status: 'settled' })
       end
 
@@ -240,12 +255,15 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :name_and_date_of_birth }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
-        state_store.write_step(:nationality, { nationality: 'uk' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
+        state_store.write_step(:nationality, { nationalities: 'british' })
         state_store.write(return_to_review: :name_and_date_of_birth)
       end
 
       context 'with valid path to review' do
+        let(:step_params) { { return_to_review: :name_and_date_of_birt } }
+
         it 'returns review step' do
           expect(wizard.next_step).to eq(:review)
         end
@@ -268,9 +286,11 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :immigration_status }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' })
-        state_store.write_step(:nationality, { nationality: 'french' })
-        state_store.write_step(:right_to_work_or_study, { right_to_work: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' })
+        state_store.write_step(:nationality, { nationalities: 'french' })
+        state_store.write_step(:right_to_work_or_study,
+                               { right_to_work_or_study: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' })
       end
 
       it 'returns to right_to_work_or_study step' do
@@ -286,8 +306,9 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :right_to_work_or_study }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' })
-        state_store.write_step(:nationality, { nationality: 'french' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' })
+        state_store.write_step(:nationality, { nationalities: 'french' })
       end
 
       it 'returns to nationality step' do
@@ -303,7 +324,8 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :nationality }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' })
       end
 
       it 'returns to name_and_date_of_birth step' do
@@ -319,8 +341,9 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :review }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' })
-        state_store.write_step(:nationality, { nationality: 'uk' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' })
+        state_store.write_step(:nationality, { nationalities: 'british' })
       end
 
       it 'returns to nationality step' do
@@ -336,9 +359,11 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :review }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' })
-        state_store.write_step(:nationality, { nationality: 'french' })
-        state_store.write_step(:right_to_work_or_study, { right_to_work: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' })
+        state_store.write_step(:nationality, { nationalities: 'french' })
+        state_store.write_step(:right_to_work_or_study,
+                               { right_to_work_or_study: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' })
         state_store.write_step(:immigration_status, { status: 'settled' })
       end
 
@@ -364,25 +389,30 @@ RSpec.describe PersonalInformationWizard do
     end
   end
 
-  describe '#path_traversal_with_validation' do
+  describe '#validated_path_to' do
     context 'when all steps are valid' do
       let(:current_step) { :review }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
-        state_store.write_step(:nationality, { nationality: 'uk' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
+        state_store.write_step(:nationality, { nationalities: 'british' })
       end
 
-      it 'returns true' do
-        expect(wizard.path_traversal_with_validation).to be true
+      it 'returns all step identifiers' do
+        expect(wizard.validated_path_to).to eq(%i[name_and_date_of_birth nationality review])
       end
     end
 
     context 'when path is incomplete' do
       let(:current_step) { :nationality }
+      let(:state_store) {
+        StateStores::PersonalInformation.new(build(:application_form, first_name: nil, last_name: nil, date_of_birth: nil,
+                                                                      nationalities: nil))
+      }
 
-      it 'returns false' do
-        expect(wizard.path_traversal_with_validation).to be false
+      it 'returns empty' do
+        expect(wizard.validated_path_to).to eq([])
       end
     end
 
@@ -390,12 +420,13 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :nationality }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: '', last_name: 'Doe', date_of_birth: '1990-01-01' })
-        state_store.write_step(:nationality, { nationality: 'uk' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: '', last_name: 'Doe', date_of_birth: '1990-01-01' })
+        state_store.write_step(:nationality, { nationalities: 'british' })
       end
 
-      it 'returns false' do
-        expect(wizard.path_traversal_with_validation).to be false
+      it 'returns empty' do
+        expect(wizard.validated_path_to).to eq([])
       end
     end
 
@@ -403,12 +434,13 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :name_and_date_of_birth }
 
       before do
-        state_store.write_step(:name_and_date_of_birth, { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
-        state_store.write_step(:nationality, { nationality: 'uk' })
+        state_store.write_step(:name_and_date_of_birth,
+                               { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' })
+        state_store.write_step(:nationality, { nationalities: 'british' })
       end
 
       it 'validates path to target' do
-        expect(wizard.path_traversal_with_validation(:review)).to be true
+        expect(wizard.validated_path_to(:review)).to eq(%i[name_and_date_of_birth nationality review])
       end
     end
   end
@@ -417,13 +449,13 @@ RSpec.describe PersonalInformationWizard do
     let(:current_step) { :nationality }
 
     before do
-      state_store.write_step(:nationality, { nationality: 'french' })
+      state_store.write_step(:nationality, { nationalities: 'french' })
     end
 
     it 'returns hydrated step object' do
       step = wizard.step(:nationality)
       expect(step).to be_instance_of(Steps::Nationality)
-      expect(step.nationality).to eq('french')
+      expect(step.nationalities).to eq(['french'])
     end
 
     it 'caches step objects' do
@@ -445,13 +477,13 @@ RSpec.describe PersonalInformationWizard do
     let(:current_step) { :nationality }
 
     before do
-      state_store.write_step(:nationality, { nationality: 'uk' })
+      state_store.write_step(:nationality, { nationalities: 'british' })
     end
 
     it 'returns hydrated current step' do
       step = wizard.current_step_object
       expect(step).to be_instance_of(Steps::Nationality)
-      expect(step.nationality).to eq('uk')
+      expect(step.nationalities).to eq(['british'])
     end
   end
 

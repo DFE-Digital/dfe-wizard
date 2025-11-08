@@ -12,6 +12,7 @@ class ApplicationForm
   attribute :visa_type, :string
   attribute :visa_expiry, :date
   attribute :immigration_status, :string
+  attribute :other_status, :string
   attribute :wizard_state, :string, default: '{}'
 
   validates :first_name, :last_name, :date_of_birth, presence: true
@@ -27,10 +28,17 @@ class ApplicationForm
   attribute :requires_accessibility, :boolean
   attribute :support_notes, :boolean
 
+  alias nationalities nationality
+  alias nationalities= nationality=
+  alias other_nationalities= other_nationality=
+  alias other_nationalities other_nationality
+  alias right_to_work_or_study= right_to_work=
+  alias right_to_work_or_study right_to_work
 
-  alias_method :nationalities=, :nationality=
-  alias_method :other_nationalities=, :other_nationality=
-  alias_method :right_to_work_or_study=, :right_to_work=
+  alias status immigration_status
+  alias status= immigration_status=
+  alias other_status= immigration_status=
+  alias status= immigration_status=
 
   def update!(attrs)
     assign_attributes(attrs)

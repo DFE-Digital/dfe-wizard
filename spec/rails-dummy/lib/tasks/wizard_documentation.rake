@@ -46,7 +46,7 @@ end
 # @api private
 class WizardDocumentationGenerator
   THEMES = %i[minimal detailed semantic].freeze
-  OUTPUT_DIR = Rails.root.join('wizard-docs-generated-example')
+  OUTPUT_DIR = Rails.root.join('docs/wizards/')
 
   def initialize
     @loader = WizardDocumentationLoader.new
@@ -103,6 +103,8 @@ class WizardDocumentationGenerator
     FileUtils.mkdir_p(theme_dir)
 
     begin
+      return unless wizard.respond_to?(:to_doc)
+
       doc = wizard.to_doc(theme: theme)
       svg_path = File.join(theme_dir, "#{safe_name}.svg")
       png_path = File.join(theme_dir, "#{safe_name}.png")
@@ -128,21 +130,12 @@ class WizardDocumentationGenerator
       # Continue
     end
 
-    # Try with state_store
     begin
-      state_store = DfE::Wizard::StateStore::InMemoryStore.new
-      return wizard_class.new(state_store: state_store)
-    rescue ArgumentError
-      # Continue
-    end
-
-    # Try with current_step and state_store
-    begin
-      state_store = DfE::Wizard::StateStore::InMemoryStore.new
+      # Try with state_store
+      state_store = Object.new
       wizard_class.new(current_step: :start, state_store: state_store)
-    rescue StandardError => e
-      puts "    ⚠️  Could not instantiate: #{e.message}"
-      nil
+    rescue StandardError
+      # Continue
     end
   end
 end
@@ -198,24 +191,13 @@ class WizardDocumentationLoader
   #
   # @return [Array<Class>]
   def find_wizard_classes
-    Object.constants.select do |const_name|
-      const = Object.const_get(const_name)
-      wizard_class?(const)
-    end.map { |const_name| Object.const_get(const_name) }
+    results = Object.constants.select do |const_name|
+      const_name.to_s.downcase.include? 'wizard'
+    end
+
+    results.map { |const_name| Object.const_get(const_name) }
   rescue StandardError
     []
-  end
-
-  # Check if a class is a wizard
-  #
-  # @param klass [Class]
-  # @return [Boolean]
-  def wizard_class?(klass)
-    klass.is_a?(Class) &&
-      klass.name&.include?('Wizard') &&
-      klass.included_modules.include?(DfE::Wizard)
-  rescue StandardError
-    false
   end
 end
 

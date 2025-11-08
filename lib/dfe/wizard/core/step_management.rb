@@ -10,6 +10,33 @@ module DfE
       #
       # @api public
       module StepManagement
+        # Get a hydrated step object
+        #
+        # @param step_id [Symbol]
+        # @return [Object] Hydrated step instance
+        def step(step_id)
+          @cached_steps ||= {}
+          @cached_steps[step_id] ||= hydrate_step(step_id)
+        end
+
+        # Get current step object
+        #
+        # @return [Object] Hydrated current step instance
+        def current_step_object
+          step(current_step_name)
+        end
+
+        # Hydrate a step from repository data
+        #
+        # @param step_id [Symbol]
+        # @return [Object] Instantiated step
+        def hydrate_step(step_id)
+          step_class = steps_processor.find_step(step_id)
+          data = state_store.step_data(step_id)
+
+          step_class.new(**data.symbolize_keys)
+        end
+
         # Find the step class for a given step ID
         #
         # @param step_name [Symbol] The step identifier

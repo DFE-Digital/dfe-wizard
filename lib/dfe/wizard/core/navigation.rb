@@ -85,8 +85,8 @@ module DfE
         # @example
         #   wizard.path_traversal(:review)  # => [:name, :email, :review]
         #   wizard.path_traversal  # => [:name, :email, :review] (to end)
-        def path_traversal(target_step = nil)
-          steps_processor.path_traversal(target_step, data)
+        def path_traversal(target_step = nil, wizard_data = data)
+          steps_processor.path_traversal(target_step, wizard_data)
         end
 
         # Check if a PATH EXISTS in the graph to reach a target step
