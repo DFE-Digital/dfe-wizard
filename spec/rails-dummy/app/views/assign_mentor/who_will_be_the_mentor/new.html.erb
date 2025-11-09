@@ -7,7 +7,8 @@
   <div class="govuk-grid-column-two-thirds">
 
   <%= form_with model: @wizard.current_step,
-              url: @wizard.current_step_path do |form| %>
+    url: @wizard.current_step_path,
+    scope: @wizard.current_step_name do |form| %>
   <%= form.govuk_error_summary %>
 
   <%= form.govuk_radio_buttons_fieldset :mentor_id,

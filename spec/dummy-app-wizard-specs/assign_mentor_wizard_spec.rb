@@ -333,16 +333,19 @@ RSpec.describe AssignMentorWizard do
       # User clicks "Change" on training question, goes back to edit
       step_edit_training = described_class.new(
         current_step: :can_receive_mentor_training,
-        state_store: DfE::Wizard::StateStore::Session.new(session: session, key: 'assign_mentor'),
+        state_store: DfE::Wizard::StateStore::Session.new(session:, key: 'assign_mentor'),
         step_params: ActionController::Parameters.new(can_receive_mentor_training: { lp_will_provide: 'no' }),
       )
 
       # After editing, should now go to provider instead of confirmation
       expect(step_edit_training.next_step).to eq(:which_lead_provider)
 
-      # Path updates to include provider step
-      expect(step_edit_training.path_traversal).to eq(%i[who_will_be_the_mentor can_receive_mentor_training
-                                                         which_lead_provider])
+      # Path passed in argument is reachable now
+      expect(step_edit_training.path_traversal(:which_lead_provider)).to eq(%i[
+                                                                              who_will_be_the_mentor
+                                                                              can_receive_mentor_training
+                                                                              which_lead_provider
+                                                                            ])
     end
 
     it 'path changes when conditional branch changes' do

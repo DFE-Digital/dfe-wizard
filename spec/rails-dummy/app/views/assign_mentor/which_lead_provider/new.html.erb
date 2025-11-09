@@ -12,7 +12,7 @@
   We will let the lead provider know your school wants to work with them so they can arrange training. They’ll confirm which delivery partner they’ll be working with to deliver training events.
 </p>
 
-<%= form_with(model: @wizard.current_step, url: @wizard.current_step_path) do |f| %>
+<%= form_with(model: @wizard.current_step, url: @wizard.current_step_path, scope: @wizard.current_step_name) do |f| %>
   <%= f.govuk_error_summary %>
 
   <%= f.govuk_collection_radio_buttons(
