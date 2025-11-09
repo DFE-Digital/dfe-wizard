@@ -36,7 +36,6 @@ class ApplicationForm
   alias right_to_work_or_study right_to_work
 
   alias status immigration_status
-  alias status= immigration_status=
   alias other_status= immigration_status=
   alias status= immigration_status=
 
