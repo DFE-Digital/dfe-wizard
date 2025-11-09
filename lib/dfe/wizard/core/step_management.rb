@@ -32,9 +32,16 @@ module DfE
         # @return [Object] Instantiated step
         def hydrate_step(step_id)
           step_class = steps_processor.find_step(step_id)
-          data = state_store.step_data(step_id)
+          persisted_data = state_store.step_data(step_id)
 
-          step_class.new(**data.symbolize_keys.merge(wizard: self, step_id: step_id))
+          # ONLY merge current params if we're hydrating the CURRENT step
+          merged_data = if step_id == current_step_name
+                          persisted_data.merge(current_step_params)
+                        else
+                          persisted_data
+                        end
+
+          step_class.new(**merged_data.symbolize_keys.merge(wizard: self, step_id: step_id))
         end
 
         # Find the step class for a given step ID
@@ -82,8 +89,12 @@ module DfE
         #   # If there are no params for current step, returns {}
         #
         def current_step_params
-          @step_params.require(current_step_name).permit(permitted_params)
-        rescue ActionController::ParameterMissing
+          if @step_params.is_a?(ActionController::Parameters)
+            @step_params.fetch(current_step_name, {}).permit(permitted_params)
+          else
+            @step_params.fetch(current_step_name, {})
+          end
+        rescue ActionController::ParameterMissing, NotImplementedError
           {}
         end
 

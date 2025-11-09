@@ -1,13 +1,16 @@
 digraph AssignMentorWizard {
 rankdir = "LR";
 fontname = "Arial";
-node[ style  =  "rounded,filled" , shape  =  "rect" , color  =  "#666666" , fillcolor  =  "#f9f9f9"];
-who_will_be_the_mentor [fillcolor = "#d2f7ef", color = "#00703c", penwidth = "2", label = "who_will_be_the_mentor"];
-confirmation [shape = "doublecircle", color = "#aaaaaa", fillcolor = "#f5e7e7", label = "confirmation"];
-can_receive_mentor_training [label = "Can Receive Mentor Training"];
-which_lead_provider [label = "Which Lead Provider"];
-  who_will_be_the_mentor -> can_receive_mentor_training [style = "bold", color = "#222222"];
-  which_lead_provider -> confirmation [style = "bold", color = "#222222"];
-  can_receive_mentor_training -> which_lead_provider [label = "LP provides?", color = "#00703c", fontcolor = "#00703c", penwidth = "2"];
-  can_receive_mentor_training -> confirmation [label = "Else", color = "#d4351c", fontcolor = "#d4351c", style = "dashed"];
+fontsize = "11";
+bgcolor = "#fafafa";
+margin = "0.5";
+ranksep = "1.0";
+who_will_be_the_mentor [label = "Who Will Be The Mentor", shape = "ellipse", color = "#1976d2", fillcolor = "#e3f2fd", penwidth = "2.5"];
+can_receive_mentor_training [label = "Can Receive Mentor Training", color = "#546e7a", fillcolor = "#eceff1", penwidth = "1.5"];
+which_lead_provider [label = "Which Lead Provider", color = "#546e7a", fillcolor = "#eceff1", penwidth = "1.5"];
+confirmation [label = "Confirmation", shape = "ellipse", color = "#388e3c", fillcolor = "#e8f5e9", penwidth = "2.5"];
+  who_will_be_the_mentor -> can_receive_mentor_training [style = "bold", color = "#222222", penwidth = "1.5", arrowsize = "1.5"];
+  which_lead_provider -> confirmation [style = "bold", color = "#222222", penwidth = "1.5", arrowsize = "1.5"];
+  can_receive_mentor_training -> which_lead_provider [label = "LP provides?", color = "#388e3c", fontcolor = "#388e3c", penwidth = "2.5", style = "bold"];
+  can_receive_mentor_training -> confirmation [label = "Else", color = "#d32f2f", fontcolor = "#d32f2f", penwidth = "2.5", style = "dashed"];
 }

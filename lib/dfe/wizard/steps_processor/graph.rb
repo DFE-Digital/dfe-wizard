@@ -122,8 +122,7 @@ module DfE
                                              end
         end
 
-        # Returns the next step (symbol), given current step and data.
-        def next_step(current_step = nil, data = nil)
+        def next_step(current_step = nil)
           if @next_step_before_callbacks&.any?
             @next_step_before_callbacks.each do |callback|
               result = callback.call
@@ -131,21 +130,20 @@ module DfE
             end
           end
 
-          next_step_without_callbacks(current_step, data)
+          next_step_without_callbacks(current_step)
         end
 
-        def next_step_without_callbacks(current_step, data)
+        def next_step_without_callbacks(current_step)
           current_step ||= @wizard.current_step_name
-          data ||= @wizard.data
 
           custom_edge = @custom_branching_edges.find { |e| e.from == current_step }
           if custom_edge
-            return call_predicate(custom_edge.conditional, current_step, data)
+            return call_predicate(custom_edge.conditional, current_step)
           end
 
           cond_edge = @conditional_edges.find { |e| e.from == current_step }
           if cond_edge
-            result = call_predicate(cond_edge.when, current_step, data)
+            result = call_predicate(cond_edge.when, current_step)
             return result ? cond_edge.then : cond_edge.else
           end
 
@@ -153,7 +151,7 @@ module DfE
           edge&.to
         end
 
-        def previous_step(current_step = nil, data = nil)
+        def previous_step(current_step = nil)
           if @previous_step_before_callbacks&.any?
             @previous_step_before_callbacks.each do |callback|
               result = callback.call
@@ -161,32 +159,30 @@ module DfE
             end
           end
 
-          previous_step_without_callbacks(current_step, data)
+          previous_step_without_callbacks(current_step)
         end
 
-        def previous_step_without_callbacks(current_step, data)
+        def previous_step_without_callbacks(current_step)
           current_step ||= @wizard.current_step_name
-          data ||= @wizard.data
 
           return nil if current_step == @root_node
 
-          path = path_traversal(current_step, data)
+          path = path_traversal(current_step)
           return nil if path.size < 2
 
           path[-2]
         end
 
         # Returns a traversal path through the user's wizard so far.
-        def path_traversal(target_step = nil, data = nil)
+        def path_traversal(target_step = nil)
           target_step ||= @wizard.current_step_name
-          data ||= @wizard.data
           steps = []
           current = @root_node
           steps << current
           depth_limit = @nodes.size
 
           while current && current != target_step && steps.size < depth_limit
-            n = next_step_without_callbacks(current, data)
+            n = next_step_without_callbacks(current)
             break if n.nil? || steps.include?(n)
 
             steps << n
@@ -220,7 +216,7 @@ module DfE
           end
         end
 
-        def call_predicate(predicate, current_step, _data)
+        def call_predicate(predicate, current_step)
           arity = predicate.arity
 
           step_obj = @wizard.step(current_step)
