@@ -20,7 +20,7 @@ module DfE
         # @example
         #   wizard.next_step  # => :email
         def next_step
-          steps_processor.next_step(current_step_name, data)
+          steps_processor.next_step(current_step_name)
         end
 
         # Calculate the previous step
@@ -33,7 +33,7 @@ module DfE
         # @example
         #   wizard.previous_step  # => :name
         def previous_step
-          steps_processor.previous_step(current_step_name, data)
+          steps_processor.previous_step(current_step_name)
         end
 
         # Returns the URL/path for the current step
@@ -85,8 +85,8 @@ module DfE
         # @example
         #   wizard.path_traversal(:review)  # => [:name, :email, :review]
         #   wizard.path_traversal  # => [:name, :email, :review] (to end)
-        def path_traversal(target_step = nil, wizard_data = data)
-          steps_processor.path_traversal(target_step, wizard_data)
+        def path_traversal(target_step = nil)
+          steps_processor.path_traversal(target_step)
         end
 
         # Check if a PATH EXISTS in the graph to reach a target step

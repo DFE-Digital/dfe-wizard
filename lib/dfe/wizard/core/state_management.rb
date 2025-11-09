@@ -471,7 +471,7 @@ module DfE
         # @return [Hash] Filtered data with only reachable steps
         # @api private
         def filter_reachable_data
-          reachable_paths = steps_processor.path_traversal(nil, raw_data)
+          reachable_paths = steps_processor.path_traversal
 
           raw_data.transform_values do |value|
             value.is_a?(Hash) ? value.slice(*reachable_paths) : value

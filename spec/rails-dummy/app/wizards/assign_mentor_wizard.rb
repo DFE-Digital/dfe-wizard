@@ -30,7 +30,7 @@ class AssignMentorWizard
   end
 
   def current_step_accessible?
-    traversal = steps_processor.path_traversal(current_step_name, data)
+    traversal = steps_processor.path_traversal(current_step_name)
 
     steps = traversal[0..-2].map do |step_id|
       klass = find_step(step_id)

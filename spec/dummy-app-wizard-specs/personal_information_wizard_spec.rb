@@ -112,31 +112,6 @@ RSpec.describe PersonalInformationWizard do
         expect(wizard.path_traversal(:review)).to eq(%i[name_and_date_of_birth nationality review])
       end
     end
-
-    context 'with explicit data' do
-      let(:current_step) { :name_and_date_of_birth }
-
-      let(:non_uk_data) do
-        {
-          steps: {
-            name_and_date_of_birth: { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' },
-            nationality: { nationalities: 'french' },
-            right_to_work_or_study: { right_to_work_or_study: 'yes' },
-          },
-        }
-      end
-
-      it 'uses explicit data for traversal' do
-        expected_path = %i[
-          name_and_date_of_birth
-          nationality
-          right_to_work_or_study
-          immigration_status
-        ]
-
-        expect(wizard.path_traversal(:immigration_status, non_uk_data)).to eq(expected_path)
-      end
-    end
   end
 
   describe '#next_step' do
