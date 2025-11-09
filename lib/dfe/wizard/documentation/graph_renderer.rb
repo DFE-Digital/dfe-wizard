@@ -1,6 +1,3 @@
-# lib/dfe/wizard/documentation/renderer.rb
-# frozen_string_literal: true
-
 module DfE
   module Wizard
     module Documentation
@@ -24,24 +21,24 @@ module DfE
         def render
           require 'ruby-graphviz'
 
-          g = GraphViz.new(
+          graphviz = GraphViz.new(
             @title,
             type: :digraph,
             **@styles.graph_config,
           )
 
-          render_nodes(g)
-          render_edges(g)
+          render_nodes(graphviz)
+          render_edges(graphviz)
 
-          g
+          graphviz
         end
 
         private
 
         # Render all nodes with styling
         #
-        # @param g [GraphViz]
-        def render_nodes(g)
+        # @param graphviz [GraphViz]
+        def render_nodes(graphviz)
           first = @graph.root_node
           last = @graph.nodes.keys.last
 
@@ -52,31 +49,31 @@ module DfE
                            @styles.first_step
                          elsif node_id == last
                            @styles.final_step
-                         elsif has_outgoing_edge?(node_id)
+                         elsif outgoing_edge?(node_id)
                            @styles.regular_step
                          else
                            @styles.exit_step
                          end
 
-            g.add_nodes(node_id.to_s, label: label, **node_style)
+            graphviz.add_nodes(node_id.to_s, label: label, **node_style)
           end
         end
 
         # Render all edges with styling
         #
-        # @param g [GraphViz]
-        def render_edges(g)
-          render_simple_edges(g)
-          render_conditional_edges(g)
-          render_complex_edges(g)
+        # @param graphviz [GraphViz]
+        def render_edges(graphviz)
+          render_simple_edges(graphviz)
+          render_conditional_edges(graphviz)
+          render_complex_edges(graphviz)
         end
 
         # Render simple sequential transitions
         #
-        # @param g [GraphViz]
-        def render_simple_edges(g)
+        # @param graphviz [GraphViz]
+        def render_simple_edges(graphviz)
           @graph.edges.each do |edge|
-            g.add_edges(
+            graphviz.add_edges(
               edge.from.to_s,
               edge.to.to_s,
               **@styles.simple_transition,
@@ -86,18 +83,18 @@ module DfE
 
         # Render conditional if/else branching
         #
-        # @param g [GraphViz]
-        def render_conditional_edges(g)
+        # @param graphviz [GraphViz]
+        def render_conditional_edges(graphviz)
           @graph.conditional_edges.each do |cond|
             yes_style = @styles.conditional_transition[:yes]
             no_style = @styles.conditional_transition[:no]
 
-            g.add_edges(
+            graphviz.add_edges(
               cond.from.to_s, cond.then.to_s,
               label: cond.label || 'Yes',
               **yes_style
             )
-            g.add_edges(
+            graphviz.add_edges(
               cond.from.to_s, cond.else.to_s,
               label: 'Else',
               **no_style
@@ -107,12 +104,12 @@ module DfE
 
         # Render complex multi-option branching
         #
-        # @param g [GraphViz]
-        def render_complex_edges(g)
+        # @param graphviz [GraphViz]
+        def render_complex_edges(graphviz)
           @graph.custom_branching_edges.each do |branch|
             branch.potential_transitions.each do |transition|
               Array(transition[:nodes]).each do |dest|
-                g.add_edges(
+                graphviz.add_edges(
                   branch.from.to_s, dest.to_s,
                   label: transition[:label],
                   **@styles.complex_transition
@@ -126,10 +123,10 @@ module DfE
         #
         # @param node_id [Symbol]
         # @return [Boolean]
-        def has_outgoing_edge?(node_id)
-          @graph.edges.any? { |e| e.from == node_id } ||
-            @graph.conditional_edges.any? { |ce| ce.from == node_id } ||
-            @graph.custom_branching_edges.any? { |cbe| cbe.from == node_id }
+        def outgoing_edge?(node_id)
+          @graph.edges.any? { |edge| edge.from == node_id } ||
+            @graph.conditional_edges.any? { |cond_edge| cond_edge.from == node_id } ||
+            @graph.custom_branching_edges.any? { |branch_edge| branch_edge.from == node_id }
         end
 
         # Format node label for display
