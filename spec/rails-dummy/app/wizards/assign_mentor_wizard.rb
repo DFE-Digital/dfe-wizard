@@ -29,17 +29,4 @@ class AssignMentorWizard
       namespace: 'assign_mentor',
     )
   end
-
-  def current_step_accessible?
-    traversal = steps_processor.path_traversal(current_step_name)
-
-    steps = traversal[0..-2].map do |step_id|
-      klass = find_step(step_id)
-      step_data = data.dig(:steps, step_id) || {}
-
-      klass.new(step_data.merge(wizard: self, step_id:))
-    end
-
-    steps_processor.root_node == current_step_name || (steps.present? && steps.all?(&:valid?))
-  end
 end
