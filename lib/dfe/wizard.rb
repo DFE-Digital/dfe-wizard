@@ -74,33 +74,37 @@ module DfE
     #
     # @api public
     module Core
+      # Check-your-answers pattern support
+      # @api public
+      autoload :CheckYourAnswers, 'dfe/wizard/core/check_your_answers'
+
       # Auto generated documentation management
       # @api public
       autoload :Documentation, 'dfe/wizard/core/documentation'
 
-      # State store lifecycle management
+      # Logging capabilities
       # @api public
-      autoload :StateManagement, 'dfe/wizard/core/state_management'
-
-      # Step lifecycle management
-      # @api public
-      autoload :StepManagement, 'dfe/wizard/core/step_management'
+      autoload :LogManagement, 'dfe/wizard/core/log_management'
 
       # Navigation through wizard steps
       # @api public
       autoload :Navigation, 'dfe/wizard/core/navigation'
 
+      # State store lifecycle management
+      # @api public
+      autoload :StateManagement, 'dfe/wizard/core/state_management'
+
       # Define a step with attributes and validation
       # @api public
       autoload :Step, 'dfe/wizard/core/step'
 
+      # Step lifecycle management
+      # @api public
+      autoload :StepManagement, 'dfe/wizard/core/step_management'
+
       # Step and path validation
       # @api public
       autoload :Validation, 'dfe/wizard/core/validation'
-
-      # Check-your-answers pattern support
-      # @api public
-      autoload :CheckYourAnswers, 'dfe/wizard/core/check_your_answers'
     end
 
     # @!endgroup
@@ -113,17 +117,17 @@ module DfE
     #
     # @api public
     module Validators
-      # Immutable value object representing validation result
+      # Validates paths through the wizard
       # @api public
-      autoload :ValidationResult, 'dfe/wizard/validators/validation_result'
+      autoload :PathValidator, 'dfe/wizard/validators/path_validator'
 
       # Validates individual wizard steps
       # @api public
       autoload :StepValidator, 'dfe/wizard/validators/step_validator'
 
-      # Validates paths through the wizard
+      # Immutable value object representing validation result
       # @api public
-      autoload :PathValidator, 'dfe/wizard/validators/path_validator'
+      autoload :ValidationResult, 'dfe/wizard/validators/validation_result'
     end
 
     # @!endgroup
@@ -144,13 +148,13 @@ module DfE
       # @api public
       autoload :InMemory, 'dfe/wizard/state_store/in_memory'
 
-      # Session-based state store
-      # @api public
-      autoload :Session, 'dfe/wizard/state_store/session'
-
       # Redis-based state store
       # @api public
       autoload :RedisStore, 'dfe/wizard/state_store/redis_store'
+
+      # Session-based state store
+      # @api public
+      autoload :Session, 'dfe/wizard/state_store/session'
 
       # In-memory state store (testing only)
       # @api public
@@ -195,6 +199,10 @@ module DfE
       autoload :ConfigurableRoutes, 'dfe/wizard/route_strategy/configurable_routes'
     end
 
+    module Logging
+      autoload :Logger, 'dfe/wizard/logging/logger'
+    end
+
     module Documentation
       autoload :GraphRenderer, 'dfe/wizard/documentation/graph_renderer'
       autoload :Styles, 'dfe/wizard/documentation/styles'
@@ -212,14 +220,15 @@ module DfE
     # @!endgroup
     # @!group Main API
 
-    # Include all core modules
     include Core
     include Core::CheckYourAnswers
     include Core::Documentation
+    include Core::LogManagement
     include Core::Navigation
     include Core::StateManagement
     include Core::StepManagement
     include Core::Validation
+    include Logging
 
     # Initializes a new wizard instance
     #
