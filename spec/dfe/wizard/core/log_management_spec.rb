@@ -1,0 +1,321 @@
+require 'spec_helper'
+
+RSpec.describe DfE::Wizard::Core::LogManagement do
+  let(:session) do
+    {
+      'test_wizard' => {
+        'steps' => {
+          'name_and_date_of_birth' => {
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'date_of_birth' => '1990-01-01',
+          },
+          'nationality' => {
+            'nationalities' => ['british'],
+          },
+        },
+      },
+    }
+  end
+
+  let(:step_params) { ActionController::Parameters.new({}) }
+  let(:state_store) { DfE::Wizard::StateStore::Session.new(session: session, key: 'test_wizard') }
+
+  before do
+    @original = Rails.application.config.filter_parameters
+    Rails.application.config.filter_parameters = %i[password ssn date_of_birth]
+  end
+
+  after do
+    Rails.application.config.filter_parameters = @original
+  end
+
+  describe 'with logging enabled' do
+    let(:log_output) { StringIO.new }
+    let(:rails_logger) { ActiveSupport::TaggedLogging.new(ActiveSupport::Logger.new(log_output)) }
+    let(:wizard_logger) { DfE::Wizard::Logger.new(rails_logger) }
+
+    let(:wizard) do
+      PersonalInformationWizard.new(
+        current_step: :nationality,
+        state_store: state_store,
+        step_params: step_params,
+      ).tap do |w|
+        allow(w).to receive(:logger).and_return(wizard_logger)
+      end
+    end
+
+    describe '#log_step_transition' do
+      it 'logs navigation between steps' do
+        wizard.log_step_transition(from: :name_and_date_of_birth, to: :nationality, direction: :forward)
+
+        output = log_output.string
+        expect(output).to include('[PersonalInformationWizard]')
+        expect(output).to include('Step transition')
+        expect(output).to include('from=:name_and_date_of_birth')
+        expect(output).to include('to=:nationality')
+        expect(output).to include('direction=:forward')
+      end
+
+      it 'logs backward navigation' do
+        wizard.log_step_transition(from: :nationality, to: :name_and_date_of_birth, direction: :backward)
+
+        output = log_output.string
+        expect(output).to include('direction=:backward')
+      end
+    end
+
+    describe '#log_path_traversal' do
+      it 'logs path calculation at DEBUG level' do
+        rails_logger.level = Logger::DEBUG
+
+        wizard.log_path_traversal(target: :review, path: %i[name_and_date_of_birth nationality review])
+
+        output = log_output.string
+        expect(output).to include('Path traversal')
+        expect(output).to include('target=:review')
+        expect(output).to include('path=[:name_and_date_of_birth, :nationality, :review]')
+      end
+
+      it 'does not log at INFO level' do
+        rails_logger.level = Logger::INFO
+
+        wizard.log_path_traversal(target: :review, path: [])
+
+        expect(log_output.string).to be_empty
+      end
+    end
+
+    describe '#log_state_read' do
+      it 'logs step names at INFO level' do
+        data = { steps: { name_and_date_of_birth: {}, nationality: {} } }
+
+        wizard.log_state_read(data: data)
+
+        output = log_output.string
+        expect(output).to include('State read')
+        expect(output).to include('steps=[:name_and_date_of_birth, :nationality]')
+      end
+
+      it 'logs full data at DEBUG level' do
+        rails_logger.level = Logger::DEBUG
+        data = { steps: { email: { email: 'user@example.com' } } }
+
+        wizard.log_state_read(data: data)
+
+        output = log_output.string
+        expect(output).to include('State data')
+        expect(output).to include('email')
+      end
+    end
+
+    describe '#log_step_hydration' do
+      it 'logs field names at INFO level' do
+        wizard.log_step_hydration(
+          step_id: :nationality,
+          attributes: { nationalities: ['british'] },
+        )
+
+        output = log_output.string
+        expect(output).to include('Step hydrated')
+        expect(output).to include('step=:nationality')
+        expect(output).to include('fields=[:nationalities]')
+      end
+
+      it 'logs attribute values at DEBUG level' do
+        rails_logger.level = Logger::DEBUG
+
+        wizard.log_step_hydration(
+          step_id: :nationality,
+          attributes: { nationalities: ['british'] },
+        )
+
+        output = log_output.string
+        expect(output).to include('Step data')
+        expect(output).to include('british')
+      end
+    end
+
+    describe '#log_params_received' do
+      let(:raw_params) { { email: 'user@example.com', confirmed: 'true', extra: 'ignored' } }
+      let(:permitted_params) { { email: 'user@example.com', confirmed: 'true' } }
+
+      it 'logs param keys at INFO level' do
+        wizard.log_params_received(
+          step_id: :email,
+          raw_params: raw_params,
+          permitted_params: permitted_params,
+        )
+
+        output = log_output.string
+        expect(output).to include('Params received')
+        expect(output).to include('step=:email')
+        expect(output).to include('raw_keys=[:email, :confirmed, :extra]')
+        expect(output).to include('permitted_keys=[:email, :confirmed]')
+      end
+
+      it 'logs param values at DEBUG level' do
+        rails_logger.level = Logger::DEBUG
+
+        wizard.log_params_received(
+          step_id: :email,
+          raw_params: raw_params,
+          permitted_params: permitted_params,
+        )
+
+        output = log_output.string
+        expect(output).to include('Params data')
+        expect(output).to include('user@example.com')
+      end
+    end
+
+    describe '#log_validation' do
+      it 'logs successful validation' do
+        wizard.log_validation(type: :step, result: true, step: :nationality)
+
+        output = log_output.string
+        expect(output).to include('Validation')
+        expect(output).to include('type=:step')
+        expect(output).to include('result=true')
+      end
+
+      it 'logs failed validation with errors' do
+        errors = ["First name can't be blank", "Last name can't be blank"]
+
+        wizard.log_validation(type: :step, result: false, step: :name_and_date_of_birth, errors:)
+
+        output = log_output.string
+        expect(output).to include('result=false')
+        expect(output).to include('Validation errors')
+        expect(output).to include("First name can't be blank")
+      end
+    end
+
+    describe '#log_conditional' do
+      it 'logs conditional branch evaluation' do
+        wizard.log_conditional(
+          from: :nationality,
+          condition: 'needs_visa?',
+          result: true,
+          chosen: :immigration_status,
+        )
+
+        output = log_output.string
+        expect(output).to include('Conditional branch')
+        expect(output).to include('from=:nationality')
+        expect(output).to include('condition="needs_visa?"')
+        expect(output).to include('result=true')
+        expect(output).to include('chosen=:immigration_status')
+      end
+    end
+
+    describe '#log_step_save' do
+      it 'logs saved field names at INFO level' do
+        wizard.log_step_save(
+          step_id: :nationality,
+          data: { nationalities: ['british'] },
+        )
+
+        output = log_output.string
+        expect(output).to include('Step saved')
+        expect(output).to include('step=:nationality')
+        expect(output).to include('fields=[:nationalities]')
+      end
+
+      it 'logs saved data at DEBUG level' do
+        rails_logger.level = Logger::DEBUG
+
+        wizard.log_step_save(
+          step_id: :nationality,
+          data: { nationalities: ['british'] },
+        )
+
+        output = log_output.string
+        expect(output).to include('Saved data')
+        expect(output).to include('british')
+      end
+    end
+  end
+
+  describe 'with logging disabled' do
+    let(:wizard) do
+      PersonalInformationWizard.new(
+        current_step: :nationality,
+        state_store: state_store,
+        step_params: step_params,
+      )
+    end
+
+    it 'does not raise errors when logging' do
+      expect {
+        wizard.log_step_transition(from: :name, to: :email, direction: :forward)
+        wizard.log_params_received(step_id: :email, raw_params: {}, permitted_params: {})
+        wizard.log_step_save(step_id: :email, data: {})
+      }.not_to raise_error
+    end
+
+    it 'returns NullLogger' do
+      expect(wizard.log).to be_a(DfE::Wizard::NullLogger)
+    end
+  end
+
+  describe '#sanitize_data' do
+    let(:wizard) do
+      PersonalInformationWizard.new(
+        current_step: :nationality,
+        state_store: state_store,
+        step_params: step_params,
+      )
+    end
+
+    before do
+      # Configure Rails filter_parameters for testing
+      Rails.application.config.filter_parameters += %i[password ssn date_of_birth]
+    end
+
+    it 'filters sensitive data using Rails config' do
+      data = {
+        first_name: 'John',
+        last_name: 'Doe',
+        date_of_birth: '1990-01-01',
+        password: 'secret123',
+      }
+
+      result = wizard.sanitize_data(data)
+
+      expect(result[:first_name]).to eq('John')
+      expect(result[:last_name]).to eq('Doe')
+      expect(result[:date_of_birth]).to eq('[FILTERED]')
+      expect(result[:password]).to eq('[FILTERED]')
+    end
+
+    it 'filters nested sensitive data' do
+      data = {
+        user: {
+          email: 'user@example.com',
+          password: 'secret123',
+        },
+      }
+
+      result = wizard.sanitize_data(data)
+
+      expect(result[:user][:email]).to eq('user@example.com')
+      expect(result[:user][:password]).to eq('[FILTERED]')
+    end
+
+    it 'handles arrays with sensitive data' do
+      data = {
+        users: [
+          { name: 'John', ssn: '123-45-6789' },
+          { name: 'Jane', ssn: '987-65-4321' },
+        ],
+      }
+
+      result = wizard.sanitize_data(data)
+
+      expect(result[:users][0][:ssn]).to eq('[FILTERED]')
+      expect(result[:users][1][:ssn]).to eq('[FILTERED]')
+      expect(result[:users][0][:name]).to eq('John')
+    end
+  end
+end
