@@ -1,6 +1,3 @@
-# lib/dfe/wizard/core/logging.rb
-# frozen_string_literal: true
-
 module DfE
   module Wizard
     module Core
