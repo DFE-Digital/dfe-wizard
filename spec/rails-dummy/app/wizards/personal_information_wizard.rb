@@ -37,6 +37,7 @@ class PersonalInformationWizard
 
   def route_strategy
     DfE::Wizard::RouteStrategy::NamedRoutes.new(
+      wizard: self,
       namespace: 'personal-information',
     )
   end

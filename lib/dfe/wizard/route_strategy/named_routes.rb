@@ -16,16 +16,16 @@ module DfE
       # @api public
       #
       # @example Standard usage
-      #   strategy = NamedRoutes.new(namespace: 'personal-information')
-      #   strategy.resolve(step: :email, data: {}, options: {})
+      #   strategy = NamedRoutes.new(wizard: self, namespace: 'personal-information')
+      #   strategy.resolve(step_id: :email, options: {})
       #   # Calls: personal_information_email_path()
       #
       # @example With custom override
       #   class CustomRouteStrategy < NamedRoutes
-      #     def resolve(step:, data:, options: {})
+      #     def resolve(step_id:, options: {})
       #       case step
       #       when :email
-      #         url_helpers.user_email_path(data.dig(:steps, :user, :id), options)
+      #         url_helpers.user_email_path(wizard.step(:user).id), options)
       #       else
       #         super
       #       end
@@ -37,9 +37,10 @@ module DfE
         # @param namespace [String, Symbol] The namespace for route names
         #
         # @example
-        #   strategy = NamedRoutes.new(namespace: 'personal-information')
-        def initialize(namespace:)
+        #   strategy = NamedRoutes.new(wizard: self, namespace: 'personal-information')
+        def initialize(namespace:, wizard:)
           @namespace = namespace.to_s.underscore
+          @wizard = wizard
         end
 
         # Resolve a step to a URL path
@@ -54,25 +55,23 @@ module DfE
         # Can be overridden in subclasses to customize routing for specific steps.
         #
         # @param step [Symbol] The step identifier
-        # @param data [Hash] The wizard data (available for conditional routing)
         # @param options [Hash] Additional options to pass to route helper
         # @return [String] The generated URL path
         #
         # @example Basic usage
-        #   strategy.resolve(step: :email, data: {}, options: {})
+        #   strategy.resolve(step_id: :email, options: {})
         #   # => "/personal-information/email"
         #
         # @example With parameters
         #   strategy.resolve(
-        #     step: :email,
-        #     data: {},
+        #     step_id: :email,
         #     options: { return_to_review: :review }
         #   )
         #   # => "/personal-information/email?return_to_review=review"
         #
         # @api public
-        def resolve(step:, data:, options: {})
-          route_name = route_name_for(step)
+        def resolve(step_id:, options: {})
+          route_name = route_name_for(step_id)
 
           url_helpers.public_send("#{route_name}_path", options)
         end
@@ -111,6 +110,11 @@ module DfE
         #
         # @api public
         attr_reader :namespace
+
+        # Get the wizard
+        #
+        # @api public
+        attr_reader :wizard
       end
     end
   end

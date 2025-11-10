@@ -49,7 +49,7 @@ module DfE
         #     path_builder: ->(step, state_key, opts) {
         #       Rails.application.routes.url_helpers.some_wizard_step_path(
         #         state_key: state_key,
-        #         step: step,
+        #         step_id: step,
         #         **opts
         #       )
         #     }
@@ -64,15 +64,14 @@ module DfE
         # Includes state key from state store in the URL.
         #
         # @param step [Symbol] The step identifier
-        # @param data [Hash] The wizard data (unused, for interface compatibility)
         # @param options [Hash] Additional URL options
         # @return [String] The generated URL path with state key
         #
         # @example
-        #   strategy.resolve(step: :email, data: {}, options: {})
+        #   strategy.resolve(step_id: :email, options: {})
         #   # => "/wizards/abc-123-def/email"
-        def resolve(step:, data:, options: {})
-          @path_builder.call(step, state_key, options)
+        def resolve(step_id:, options: {})
+          @path_builder.call(step_id, state_key, options)
         end
 
         # Get state key from state store
