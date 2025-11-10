@@ -156,6 +156,77 @@ module DfE
           path_validator.valid_to?(target_step)
         end
 
+        # Check if current step is accessible
+        #
+        # A step is accessible if:
+        # - It's the root step, OR
+        # - All previous steps in the path are both visited AND valid
+        #
+        # This prevents users from jumping to steps without completing
+        # required previous steps. Used by controllers to show 404 for
+        # unauthorized direct access.
+        #
+        # @return [Boolean] true if current step can be accessed
+        #
+        # @example Check if step is accessible
+        #   wizard = MyWizard.new(current_step: :confirmation, state_store: store)
+        #   wizard.current_step_accessible?  # => false (missing previous steps)
+        #
+        # @example At root step
+        #   wizard = MyWizard.new(current_step: :name, state_store: store)
+        #   wizard.current_step_accessible?  # => true (always accessible)
+        #
+        # @example In controller
+        #   def show
+        #     return render_404 unless @wizard.current_step_accessible?
+        #     render :new
+        #   end
+        #
+        # @api public
+        def current_step_accessible?
+          step_accessible?(current_step_name)
+        end
+
+        # Check if a specific step is accessible
+        #
+        # A step is accessible if:
+        # - It's the root step, OR
+        # - It's in the current path AND all previous steps are visited and valid
+        #
+        # @param step_id [Symbol] Step to check
+        # @return [Boolean] true if step is accessible
+        #
+        # @example Root step is always accessible
+        #   wizard.step_accessible?(:name)  # => true
+        #
+        # @example Step not in path (unreachable)
+        #   wizard.step_accessible?(:immigration_status)  # => false
+        #   # (if nationality = UK, immigration_status is skipped)
+        #
+        # @example Step in path but previous step invalid
+        #   # Data: { name: {first_name: ''}, email: {...} }
+        #   wizard.step_accessible?(:review)  # => false
+        #   # (name is invalid, can't reach review)
+        #
+        # @example Step in path and all previous steps valid
+        #   # Data: { name: {...}, email: {...} }
+        #   wizard.step_accessible?(:review)  # => true
+        #
+        # @api public
+        def step_accessible?(step_id)
+          return true if step_id == steps_processor.root_node
+
+          path = path_traversal(step_id)
+          return false unless path.include?(step_id)
+
+          # Check all previous steps are visited and valid
+          previous_steps = path[0...-1]
+
+          previous_steps.all? do |prev_step_id|
+            step_visited?(prev_step_id) && step_valid?(prev_step_id)
+          end
+        end
+
         # Get validated path to target
         #
         # Returns array of step IDs in path, but only if ALL steps are visited AND valid.

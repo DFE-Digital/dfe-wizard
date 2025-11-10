@@ -200,6 +200,10 @@ module DfE
       autoload :Styles, 'dfe/wizard/documentation/styles'
     end
 
+    module Test
+      autoload :RSpecMatchers, 'dfe/wizard/test/r_spec_matchers'
+    end
+
     # @!endgroup
     # @!group Supporting Classes
 
