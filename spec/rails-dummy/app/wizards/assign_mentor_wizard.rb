@@ -25,6 +25,7 @@ class AssignMentorWizard
 
   def route_strategy
     DfE::Wizard::RouteStrategy::NamedRoutes.new(
+      wizard: self,
       namespace: 'assign_mentor',
     )
   end

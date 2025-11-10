@@ -14,11 +14,11 @@ module DfE
       #
       # @example Basic usage
       #   strategy = ConfigurableRoutes.new(namespace: 'personal-info') do |config|
-      #     config.map_step :email, to: ->(data, options, h) {
-      #       h.user_email_path(data.dig(:steps, :user, :id), options)
+      #     config.map_step :email, to: ->(wizard, options, h) {
+      #       h.user_email_path(wizard.step(:user).id), options)
       #     }
-      #     config.map_step :payment, to: ->(data, options, h) {
-      #       h.payment_path(data.dig(:steps, :order, :id), options)
+      #     config.map_step :payment, to: ->(wizard, options, h) {
+      #       h.payment_path(wizard.step(:order).id), options)
       #     }
       #   end
       #
@@ -35,13 +35,15 @@ module DfE
       #
       #     private
       #
-      #     def email_route(data, options, url_helpers)
-      #       user_id = data.dig(:steps, :user, :id)
+      #     def email_route(wizard, options, url_helpers)
+      #       user_id = wizard.step(:user).id
+      #
       #       url_helpers.user_email_path(user_id, options)
       #     end
       #
-      #     def payment_route(data, options, url_helpers)
-      #       order_id = data.dig(:steps, :order, :id)
+      #     def payment_route(wizard, options, url_helpers)
+      #       order_id = wizard.step(:order).id)
+      #
       #       url_helpers.payment_path(order_id, options)
       #     end
       #   end
@@ -52,13 +54,13 @@ module DfE
         # @param block [Proc] Optional block to configure routes
         #
         # @example
-        #   strategy = ConfigurableRoutes.new(namespace: 'app') do |config|
-        #     config.map_step :email, to: ->(data, opts, h) { ... }
+        #   strategy = ConfigurableRoutes.new(wizard: self, namespace: 'app') do |config|
+        #     config.map_step :email, to: ->(opts, h) { ... }
         #   end
         #
         # @api public
-        def initialize(namespace:, &)
-          super(namespace: namespace)
+        def initialize(namespace:, wizard:, &)
+          super(namespace:, wizard:)
           @routes = {}
           configure(&) if block_given?
         end
@@ -74,7 +76,7 @@ module DfE
         # @example
         #   strategy = ConfigurableRoutes.new(namespace: 'app')
         #   strategy.configure do |config|
-        #     config.map_step :email, to: ->(data, opts, h) { ... }
+        #     config.map_step :email, to: ->(opts, h) { ... }
         #   end
         #
         # @api public
@@ -86,17 +88,17 @@ module DfE
         # Map a step to a routing callable
         #
         # The callable can be:
-        # - A lambda: `{ |data, options, url_helpers| ... }`
+        # - A lambda: `{ |wizard, options, url_helpers| ... }`
         # - A method: `method(:my_route_method)`
-        # - Any object responding to `call(data, options, url_helpers)`
+        # - Any object responding to `call(wizard, options, url_helpers)`
         #
         # @param step [Symbol] The step identifier
         # @param to [Proc, Object] The callable that generates the route
         # @return [self]
         #
         # @example With lambda
-        #   config.map_step :email, to: ->(data, options, h) {
-        #     h.user_email_path(data.dig(:steps, :user, :id), options)
+        #   config.map_step :email, to: ->(wizard, options, h) {
+        #     h.user_email_path(wizard.step(:user).id), options)
         #   }
         #
         # @example With method
@@ -117,21 +119,20 @@ module DfE
         # to parent {NamedRoutes} default behavior.
         #
         # @param step [Symbol] The step identifier
-        # @param data [Hash] The wizard data
         # @param options [Hash] Additional URL options
         # @return [String] The generated URL path
         #
         # @example
-        #   strategy.resolve(step: :email, data: {...}, options: {})
+        #   strategy.resolve(step: :email, options: {})
         #   # Uses mapped route if configured, otherwise default naming
         #
         # @api public
-        def resolve(step:, data:, options: {})
+        def resolve(step:, options: {})
           callable = @routes[step.to_sym]
           return super unless callable
 
-          # Call the routing lambda/method with data and url helpers
-          callable.call(data, options, url_helpers)
+          # Call the routing lambda/method with url helpers
+          callable.call(wizard, options, url_helpers)
         end
 
         # Get all configured routes

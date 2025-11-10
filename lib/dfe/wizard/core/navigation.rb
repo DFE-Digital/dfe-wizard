@@ -70,8 +70,8 @@ module DfE
         # @param step [Symbol]
         # @param options [Hash]
         # @return [String]
-        def resolve_step_path(step, options = {})
-          route_strategy.resolve(step:, data:, options: options)
+        def resolve_step_path(step_id, options = {})
+          route_strategy.resolve(step_id:, options:)
         end
 
         # Calculate the complete path to a target step
