@@ -16,8 +16,8 @@ module PersonalInformation
 
     def assign_wizard
       state_store = StateStores::PersonalInformation.new(
-          session:,
-          key: 'personal_information',
+        session:,
+        key: 'personal_information',
       )
 
       @wizard = PersonalInformationWizard.new(
