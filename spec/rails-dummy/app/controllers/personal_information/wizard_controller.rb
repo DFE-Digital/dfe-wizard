@@ -7,6 +7,7 @@ module PersonalInformation
     def create
       if @wizard.valid_step?
         @wizard.save
+
         redirect_to @wizard.next_step_path
       else
         render :new
@@ -14,12 +15,14 @@ module PersonalInformation
     end
 
     def assign_wizard
-      @wizard = PersonalInformationWizard.new(
-        current_step:,
-        state_store: StateStores::PersonalInformation.new(
+      state_store = StateStores::PersonalInformation.new(
           session:,
           key: 'personal_information',
-        ),
+      )
+
+      @wizard = PersonalInformationWizard.new(
+        current_step:,
+        state_store:,
         step_params: params,
       )
     end

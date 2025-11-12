@@ -1,6 +1,8 @@
 module StateStores
   class RegisterECTStore < DfE::Wizard::StateStore::Session
-    def in_trs?; end
+    def in_trs?
+      data[:trn][:attribute] == :foo
+    end
 
     def matches_trs_dob?; end
 

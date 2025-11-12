@@ -97,8 +97,6 @@ RSpec.feature 'Personal information wizard', type: :feature do
     then_i_should_be_on_the_nationality_step
   end
 
-  # -------------------- NEW CHANGE CONTEXTS --------------------
-
   context 'Return to review/change flows' do
     scenario 'British flow: change name and date of birth from review, return to review' do
       when_i_select_nationality('British')
@@ -181,7 +179,6 @@ RSpec.feature 'Personal information wizard', type: :feature do
       end
 
       scenario 'change right to work, switch to No (skips immigration), return to review' do
-        skip
         when_i_change_answer('Right to work or study?')
         then_i_should_be_on_the_right_to_work_or_study_step(return_to_review: 'right_to_work_or_study')
         when_i_answer_right_to_work_or_study('No')
@@ -197,16 +194,13 @@ RSpec.feature 'Personal information wizard', type: :feature do
           'Right to work or study?' => 'No',
         )
 
-        click_back_link
-        then_i_should_be_on_the_immigration_status_step(return_to_review: 'immigration_status')
-        click_back_link
+        when_i_change_answer('Right to work or study?')
         then_i_should_be_on_the_right_to_work_or_study_step(return_to_review: 'right_to_work_or_study')
         click_back_link
         then_i_should_be_on_the_review_step
       end
 
       scenario 'change right to work from Yes to No and walk forward' do
-        skip
         when_i_change_answer('Right to work or study?')
         then_i_should_be_on_the_right_to_work_or_study_step(return_to_review: 'right_to_work_or_study')
         when_i_answer_right_to_work_or_study('No')
@@ -227,37 +221,41 @@ RSpec.feature 'Personal information wizard', type: :feature do
         click_back_link
         then_i_should_be_on_the_nationality_step
       end
+    end
 
-      scenario 'change right to work from No to Yes, fill immigration status, then review' do
-        skip
-        # Start with No path to review
-        when_i_change_answer('Right to work or study?')
-        then_i_should_be_on_the_right_to_work_or_study_step(return_to_review: 'right_to_work_or_study')
-        when_i_answer_right_to_work_or_study('Yes')
-        and_i_continue
+    scenario 'change right to work from No to Yes, fill immigration status, then review' do
+      when_i_select_other_nationality('Italian')
+      and_i_continue
+      when_i_answer_right_to_work_or_study('No')
+      and_i_continue
+      then_i_should_be_on_the_review_step
 
-        then_i_should_be_on_the_immigration_status_step(return_to_review: 'immigration_status')
-        when_i_select_immigration_status('Skilled Worker visa')
-        and_i_continue
+      when_i_change_answer('Right to work or study?')
+      then_i_should_be_on_the_right_to_work_or_study_step(return_to_review: 'right_to_work_or_study')
+      when_i_answer_right_to_work_or_study('Yes')
+      and_i_continue
 
-        then_i_should_be_on_the_review_step
-        review_summary_check_for(
-          'First name' => 'John',
-          'Last name' => 'Smith',
-          'Date of birth' => '1 November 1975',
-          'Nationalities' => 'Other',
-          'Other nationality' => 'Italian',
-          'Right to work or study?' => 'Yes',
-          'Immigration status' => 'Skilled worker visa',
-        )
+      then_i_should_be_on_the_immigration_status_step
+      when_i_select_immigration_status('Skilled Worker visa')
+      and_i_continue
 
-        click_back_link
-        then_i_should_be_on_the_immigration_status_step
-        click_back_link
-        then_i_should_be_on_the_right_to_work_or_study_step
-        click_back_link
-        then_i_should_be_on_the_nationality_step
-      end
+      then_i_should_be_on_the_review_step
+      review_summary_check_for(
+        'First name' => 'John',
+        'Last name' => 'Smith',
+        'Date of birth' => '1 November 1975',
+        'Nationalities' => 'Other',
+        'Other nationality' => 'Italian',
+        'Right to work or study?' => 'Yes',
+        'Immigration status' => 'Skilled worker visa',
+      )
+
+      click_back_link
+      then_i_should_be_on_the_immigration_status_step
+      click_back_link
+      then_i_should_be_on_the_right_to_work_or_study_step
+      click_back_link
+      then_i_should_be_on_the_nationality_step
     end
   end
 

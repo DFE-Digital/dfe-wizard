@@ -16,11 +16,6 @@ Rails.application.routes.draw do
     get '/review', to: 'review#index', as: :review
   end
 
-  # Get Funding Wizard
-  namespace :get_funding, path: 'get-funding' do
-    get '/personal-details', to: 'personal_details#new', as: :personal_details
-  end
-
   # Assign Mentor Wizard
   namespace :assign_mentor, path: 'assign-mentor' do
     get  '/who-will-be-the-mentor', to: 'who_will_be_the_mentor#new', as: :who_will_be_the_mentor
