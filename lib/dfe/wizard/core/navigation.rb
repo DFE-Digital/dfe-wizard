@@ -20,7 +20,9 @@ module DfE
         # @example
         #   wizard.next_step  # => :email
         def next_step
-          steps_processor.next_step(current_step_name)
+          steps_processor.next_step(current_step_name).tap do |next_step_id|
+            log_step_transition(from: current_step_name, to: next_step_id, direction: :forward)
+          end
         end
 
         # Calculate the previous step
@@ -33,7 +35,9 @@ module DfE
         # @example
         #   wizard.previous_step  # => :name
         def previous_step
-          steps_processor.previous_step(current_step_name)
+          steps_processor.previous_step(current_step_name).tap do |previous_step_id|
+            log_step_transition(from: current_step_name, to: previous_step_id, direction: :backward)
+          end
         end
 
         # Returns the URL/path for the current step
@@ -71,7 +75,9 @@ module DfE
         # @param options [Hash]
         # @return [String]
         def resolve_step_path(step_id, options = {})
-          route_strategy.resolve(step_id:, options:)
+          route_strategy.resolve(step_id:, options:).tap do |path|
+            log.debug('Route resolved', step: step_id, path:)
+          end
         end
 
         # Calculate the complete path to a target step
@@ -86,7 +92,9 @@ module DfE
         #   wizard.path_traversal(:review)  # => [:name, :email, :review]
         #   wizard.path_traversal  # => [:name, :email, :review] (to end)
         def path_traversal(target_step = nil)
-          steps_processor.path_traversal(target_step)
+          steps_processor.path_traversal(target_step).tap do |path|
+            log_path_traversal(target: target_step || current_step_name, path:)
+          end
         end
 
         # Check if a PATH EXISTS in the graph to reach a target step

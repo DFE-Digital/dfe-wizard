@@ -30,7 +30,10 @@ module DfE
         #   wizard.current_step.assign_attributes(email: "")
         #   wizard.valid_step?  # => false
         def valid_step?
-          current_step.valid?
+          current_step.valid?.tap do |result|
+            errors = current_step.errors.full_messages
+            log_validation(type: :step, result:, step: current_step_name, errors:)
+          end
         end
 
         # Check if a specific step is valid
@@ -122,7 +125,9 @@ module DfE
         #   wizard.path_complete_to?(:review)  # => true - all visited
         #   wizard.path_valid_to?(:review)     # => false - email invalid
         def path_complete_to?(target_step)
-          path_validator.complete_to?(target_step)
+          path_validator.complete_to?(target_step).tap do |result|
+            log_validation(type: :path_complete, result:, target: target_step)
+          end
         end
 
         # Check if all visited steps UP TO a target are valid
@@ -153,7 +158,9 @@ module DfE
         #   # Data: { name: {...} }  - email never visited
         #   wizard.path_valid_to?(:review)  # => true (no invalid data)
         def path_valid_to?(target_step)
-          path_validator.valid_to?(target_step)
+          path_validator.valid_to?(target_step).tap do |result|
+            log_validation(type: :path_valid, result:, target: target_step)
+          end
         end
 
         # Check if current step is accessible

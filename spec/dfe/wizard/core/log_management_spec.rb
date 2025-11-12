@@ -243,7 +243,10 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         current_step: :nationality,
         state_store: state_store,
         step_params: step_params,
-      )
+      ).tap do |wizard|
+        # Override logger to return nil (disable logging)
+        allow(wizard).to receive(:logger).and_return(nil)
+      end
     end
 
     it 'does not raise errors when logging' do

@@ -43,7 +43,9 @@ module DfE
         #
         # @api public
         def raw_data
-          state_store.read
+          state_store.read.tap do |data|
+            log_state_read(data:)
+          end
         end
 
         # Read the complete wizard data, filtered to only reachable steps
@@ -63,7 +65,9 @@ module DfE
         #
         # @api public
         def data
-          filter_reachable_data
+          filter_reachable_data.tap do |data|
+            log_filtered_data(data:)
+          end
         end
 
         # Read data for a specific step from the reachable path
@@ -218,7 +222,10 @@ module DfE
         #   end
         def save
           step_data = current_step.serializable_data
-          state_store.write_step(current_step_name, step_data)
+
+          state_store.write_step(current_step_name, step_data).tap do
+            log_step_save(step_id: current_step_name, data: step_data)
+          end
         end
 
         # Write arbitrary data to state store
@@ -234,7 +241,9 @@ module DfE
         # @example Store submission metadata
         #   wizard.write_state(submitted_at: Time.current, by_user_id: user.id)
         def write_state(updates)
-          state_store.write(updates)
+          state_store.write(updates).tap do
+            log_state_write(updates: updates)
+          end
         end
 
         # Clear all wizard data from state store
@@ -249,7 +258,9 @@ module DfE
         #   wizard.complete!
         #   wizard.clear_state
         def clear_state
-          state_store.clear
+          state_store.clear.tap do
+            log_clear_state
+          end
         end
 
         # Mark wizard as completed without destroying data
@@ -268,7 +279,11 @@ module DfE
         #   wizard.mark_completed
         #   wizard.data[:completed_at]  # => Time.current
         def mark_completed
-          state_store.write(completed: true, completed_at: Time.current)
+          completed_at = Time.current
+
+          state_store.write(completed: true, completed_at:).tap do
+            log_completion(completed_at:)
+          end
         end
 
         # Check if wizard has been marked as completed
