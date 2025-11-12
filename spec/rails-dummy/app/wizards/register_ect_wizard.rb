@@ -202,7 +202,7 @@ class RegisterECTWizard
     path_traversal(:check_answers)
   end
 
-  def find_ect_transitions(_data)
+  def find_ect_transitions
     return :trn_not_found unless in_trs?
     return :national_insurance_number unless matches_trs_dob?
     return :already_active_at_school if active_at_school?

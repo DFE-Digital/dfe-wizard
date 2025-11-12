@@ -61,8 +61,9 @@ module DfE
         # @param fallback [String, nil] Fallback URL if no previous step
         # @param options [Hash]
         # @return [String, nil]
-        def previous_step_path(fallback: nil, **options)
+        def previous_step_path(**options)
           step = previous_step
+          fallback = options.delete(:fallback)
 
           return fallback unless step && step != current_step_name
 
