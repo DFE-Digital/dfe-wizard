@@ -41,6 +41,8 @@ module DfE
                           persisted_data
                         end
 
+          log_step_hydration(step_id:, attributes: merged_data)
+
           step_class.new(**merged_data.symbolize_keys.merge(wizard: self, step_id: step_id))
         end
 
@@ -89,10 +91,20 @@ module DfE
         #   # If there are no params for current step, returns {}
         #
         def current_step_params
-          if @step_params.is_a?(ActionController::Parameters)
-            @step_params.fetch(current_step_name, {}).permit(permitted_params)
-          else
-            @step_params.fetch(current_step_name, {})
+          params = if @step_params.is_a?(ActionController::Parameters)
+                     @step_params.require(current_step_name).permit(permitted_params)
+                   else
+                     @step_params.fetch(current_step_name, {})
+                   end
+
+          params.tap do
+            if @step_params.present?
+              log_params_received(
+                step_id: current_step_name,
+                raw_params: @step_params.to_unsafe_h,
+                permitted_params: params,
+              )
+            end
           end
         rescue ActionController::ParameterMissing, NotImplementedError
           {}

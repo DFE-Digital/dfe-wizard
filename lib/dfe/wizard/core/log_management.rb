@@ -112,6 +112,40 @@ module DfE
           log.debug('State data', data: sanitize_data(data))
         end
 
+        # Log filtered state read operation (ignore non traversed stale paths)
+        #
+        # Records when state is loaded from store.
+        # INFO level shows step names, DEBUG shows full data (filtered).
+        #
+        # @param data [Hash] State data read
+        #
+        # @example
+        #   log_filtered_data(data: {steps: {name: {...}, email: {...}}})
+        #   # DEBUG: [MyWizard] Filtered data data={steps: {...}}
+        #
+        # @api public
+        def log_filtered_data(data:)
+          log.debug('Filtered data', data: sanitize_data(data))
+        end
+
+        # Log the wizard instance is completed
+        #
+        # @param completed_at [Time] the time user completed
+        #
+        # @example
+        # log_completion(completed_at: Time.current)
+        #
+        # @api public
+        def log_completion(completed_at:)
+          log.info('Wizard marked completed', completed_at:)
+        end
+
+        # Log clearing of state
+        #
+        def log_clear_state
+          log.info('State cleared')
+        end
+
         # Log state write operation
         #
         # Records when state is saved to store.

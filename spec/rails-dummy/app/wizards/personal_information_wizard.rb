@@ -42,7 +42,9 @@ class PersonalInformationWizard
     )
   end
 
-  def logger; end
+  def logger
+    DfE::Wizard::Logger.new(Rails.logger)
+  end
 
   def next_step_before_callback
     handle_return_to_check_your_answers(:review) if return_to_review?

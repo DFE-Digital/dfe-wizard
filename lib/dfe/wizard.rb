@@ -201,6 +201,7 @@ module DfE
 
     module Logging
       autoload :Logger, 'dfe/wizard/logging/logger'
+      autoload :NullLogger, 'dfe/wizard/logging/null_logger'
     end
 
     module Documentation
