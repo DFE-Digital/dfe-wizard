@@ -29,10 +29,9 @@ RSpec.describe DfE::Wizard::Logging::Logger do
 
         output = log_output.string
         expect(output).to include('[PersonalInformationWizard]')
-        expect(output).to include('Step transition')
+        expect(output).to include('Next step transition')
         expect(output).to include('from=:name_and_date_of_birth')
         expect(output).to include('to=:nationality')
-        expect(output).to include('direction=:forward')
       end
     end
 
@@ -65,10 +64,9 @@ RSpec.describe DfE::Wizard::Logging::Logger do
         wizard.previous_step
 
         output = log_output.string
-        expect(output).to include('Step transition')
-        expect(output).to include('from=:nationality')
-        expect(output).to include('to=:name_and_date_of_birth')
-        expect(output).to include('direction=:backward')
+        expect(output).to include('Previous step transition')
+        expect(output).to include('previous=:name_and_date_of_birth')
+        expect(output).to include('current=:nationality')
       end
     end
 
@@ -337,7 +335,10 @@ RSpec.describe DfE::Wizard::Logging::Logger do
 
       # Navigate to next step
       wizard_flow.next_step
-      expect(log_output.string).to include('Step transition')
+      expect(log_output.string).to include('Next step transition')
+
+      wizard_flow.previous_step
+      expect(log_output.string).to include('Previous step transition')
     end
   end
 end

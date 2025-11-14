@@ -21,7 +21,7 @@ module DfE
         #   wizard.next_step  # => :email
         def next_step
           steps_processor.next_step(current_step_name).tap do |next_step_id|
-            log_step_transition(from: current_step_name, to: next_step_id, direction: :forward)
+            log_next_step_transition(from: current_step_name, to: next_step_id)
           end
         end
 
@@ -36,7 +36,7 @@ module DfE
         #   wizard.previous_step  # => :name
         def previous_step
           steps_processor.previous_step(current_step_name).tap do |previous_step_id|
-            log_step_transition(from: current_step_name, to: previous_step_id, direction: :backward)
+            log_previous_step_transition(current: current_step_name, previous: previous_step_id)
           end
         end
 
@@ -86,15 +86,18 @@ module DfE
         # Returns the sequence of steps from root to target based on
         # current wizard state. Returns empty array if target unreachable.
         #
+        # **This path traversal does not validate the steps neither uses
+        # callbacks!**
+        #
         # @param target_step [Symbol, nil] The target step (default: current path)
         # @return [Array<Symbol>] Sequence of steps in the path
         #
         # @example
         #   wizard.path_traversal(:review)  # => [:name, :email, :review]
         #   wizard.path_traversal  # => [:name, :email, :review] (to end)
-        def path_traversal(target_step = nil)
+        def path_traversal(target_step = current_step_name)
           steps_processor.path_traversal(target_step).tap do |path|
-            log_path_traversal(target: target_step || current_step_name, path:)
+            log_path_traversal(target: target_step, path:)
           end
         end
 
