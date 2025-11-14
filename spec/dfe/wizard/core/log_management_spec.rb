@@ -1,5 +1,3 @@
-require 'spec_helper'
-
 RSpec.describe DfE::Wizard::Core::LogManagement do
   let(:session) do
     {
@@ -33,7 +31,7 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
   describe 'with logging enabled' do
     let(:log_output) { StringIO.new }
     let(:rails_logger) { ActiveSupport::TaggedLogging.new(ActiveSupport::Logger.new(log_output)) }
-    let(:wizard_logger) { DfE::Wizard::Logger.new(rails_logger) }
+    let(:wizard_logger) { DfE::Wizard::Logging::Logger.new(rails_logger) }
 
     let(:wizard) do
       PersonalInformationWizard.new(
@@ -55,6 +53,13 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         expect(output).to include('from=:name_and_date_of_birth')
         expect(output).to include('to=:nationality')
       end
+
+      it 'respects navigation exclusion' do
+        wizard_logger.exclude(:navigation)
+        wizard.log_next_step_transition(from: :name_and_date_of_birth, to: :nationality)
+
+        expect(log_output.string).to be_empty
+      end
     end
 
     describe '#log_previous_step_transition' do
@@ -63,9 +68,16 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
 
         output = log_output.string
         expect(output).to include('[PersonalInformationWizard]')
-        expect(output).to include('Previous step transition')
+        expect(output).to include('Previous step')
         expect(output).to include('previous=:name_and_date_of_birth')
         expect(output).to include('current=:nationality')
+      end
+
+      it 'respects navigation exclusion' do
+        wizard_logger.exclude(:navigation)
+        wizard.log_previous_step_transition(current: :nationality, previous: :name_and_date_of_birth)
+
+        expect(log_output.string).to be_empty
       end
     end
 
@@ -85,6 +97,15 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         rails_logger.level = Logger::INFO
 
         wizard.log_path_traversal(target: :review, path: [])
+
+        expect(log_output.string).to be_empty
+      end
+
+      it 'respects navigation exclusion' do
+        rails_logger.level = Logger::DEBUG
+        wizard_logger.exclude(:navigation)
+
+        wizard.log_path_traversal(target: :review, path: %i[a b])
 
         expect(log_output.string).to be_empty
       end
@@ -110,6 +131,15 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         output = log_output.string
         expect(output).to include('State data')
         expect(output).to include('email')
+      end
+
+      it 'respects state exclusion' do
+        wizard_logger.exclude(:state)
+        data = { steps: { email: {} } }
+
+        wizard.log_state_read(data: data)
+
+        expect(log_output.string).to be_empty
       end
     end
 
@@ -137,6 +167,17 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         output = log_output.string
         expect(output).to include('Step data')
         expect(output).to include('british')
+      end
+
+      it 'respects state exclusion' do
+        wizard_logger.exclude(:state)
+
+        wizard.log_step_hydration(
+          step_id: :nationality,
+          attributes: { nationalities: ['british'] },
+        )
+
+        expect(log_output.string).to be_empty
       end
     end
 
@@ -171,6 +212,18 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         expect(output).to include('Params data')
         expect(output).to include('user@example.com')
       end
+
+      it 'respects state exclusion' do
+        wizard_logger.exclude(:state)
+
+        wizard.log_params_received(
+          step_id: :email,
+          raw_params: raw_params,
+          permitted_params: permitted_params,
+        )
+
+        expect(log_output.string).to be_empty
+      end
     end
 
     describe '#log_validation' do
@@ -186,12 +239,20 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
       it 'logs failed validation with errors' do
         errors = ["First name can't be blank", "Last name can't be blank"]
 
-        wizard.log_validation(type: :step, result: false, step: :name_and_date_of_birth, errors:)
+        wizard.log_validation(type: :step, result: false, step: :name_and_date_of_birth, errors: errors)
 
         output = log_output.string
         expect(output).to include('result=false')
         expect(output).to include('Validation errors')
         expect(output).to include("First name can't be blank")
+      end
+
+      it 'respects validation exclusion' do
+        wizard_logger.exclude(:validation)
+
+        wizard.log_validation(type: :step, result: true, step: :nationality)
+
+        expect(log_output.string).to be_empty
       end
     end
 
@@ -210,6 +271,19 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         expect(output).to include('condition="needs_visa?"')
         expect(output).to include('result=true')
         expect(output).to include('chosen=:immigration_status')
+      end
+
+      it 'respects navigation exclusion' do
+        wizard_logger.exclude(:navigation)
+
+        wizard.log_conditional(
+          from: :nationality,
+          condition: 'test',
+          result: true,
+          chosen: :next,
+        )
+
+        expect(log_output.string).to be_empty
       end
     end
 
@@ -238,6 +312,78 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         expect(output).to include('Saved data')
         expect(output).to include('british')
       end
+
+      it 'respects state exclusion' do
+        wizard_logger.exclude(:state)
+
+        wizard.log_step_save(
+          step_id: :nationality,
+          data: { nationalities: ['british'] },
+        )
+
+        expect(log_output.string).to be_empty
+      end
+    end
+
+    describe '#log_route_resolved' do
+      it 'logs route resolution at DEBUG level' do
+        rails_logger.level = Logger::DEBUG
+
+        wizard.log_route_resolved(step: :email, path: '/wizard/email')
+
+        output = log_output.string
+        expect(output).to include('Route resolved')
+        expect(output).to include('step=:email')
+        expect(output).to include('path="/wizard/email"')
+      end
+
+      it 'respects routing exclusion' do
+        rails_logger.level = Logger::DEBUG
+        wizard_logger.exclude(:routing)
+
+        wizard.log_route_resolved(step: :email, path: '/wizard/email')
+
+        expect(log_output.string).to be_empty
+      end
+    end
+
+    describe '#log_callback' do
+      it 'logs callback execution' do
+        wizard.log_callback(name: :before_save, result: true)
+
+        output = log_output.string
+        expect(output).to include('Callback executed')
+        expect(output).to include('name=:before_save')
+        expect(output).to include('returned="TrueClass"')
+      end
+
+      it 'respects callbacks exclusion' do
+        wizard_logger.exclude(:callbacks)
+
+        wizard.log_callback(name: :before_save, result: true)
+
+        expect(log_output.string).to be_empty
+      end
+    end
+
+    describe 'Multiple exclusions' do
+      it 'excludes multiple categories simultaneously' do
+        wizard_logger.exclude(:navigation, :routing, :state)
+
+        wizard.log_next_step_transition(from: :a, to: :b)
+        wizard.log_route_resolved(step: :email, path: '/email')
+        wizard.log_state_read(data: { steps: {} })
+
+        expect(log_output.string).to be_empty
+      end
+
+      it 'allows non-excluded categories through' do
+        wizard_logger.exclude(:navigation, :routing)
+
+        wizard.log_validation(type: :step, result: true, step: :email)
+
+        expect(log_output.string).to include('Validation')
+      end
     end
   end
 
@@ -259,11 +405,13 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         wizard.log_previous_step_transition(previous: :name, current: :email)
         wizard.log_params_received(step_id: :email, raw_params: {}, permitted_params: {})
         wizard.log_step_save(step_id: :email, data: {})
+        wizard.log_validation(type: :step, result: true, step: :email)
+        wizard.log_callback(name: :test, result: true)
       }.not_to raise_error
     end
 
     it 'returns NullLogger' do
-      expect(wizard.log).to be_a(DfE::Wizard::NullLogger)
+      expect(wizard.log).to be_a(DfE::Wizard::Logging::NullLogger)
     end
   end
 
@@ -277,7 +425,6 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
     end
 
     before do
-      # Configure Rails filter_parameters for testing
       Rails.application.config.filter_parameters += %i[password ssn date_of_birth]
     end
 
@@ -321,9 +468,14 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
 
       result = wizard.sanitize_data(data)
 
-      expect(result[:users][0][:ssn]).to eq('[FILTERED]')
-      expect(result[:users][1][:ssn]).to eq('[FILTERED]')
-      expect(result[:users][0][:name]).to eq('John')
+      expect(result).to eq(
+        {
+          users: [
+            { name: 'John', ssn: '[FILTERED]' },
+            { name: 'Jane', ssn: '[FILTERED]' },
+          ],
+        },
+      )
     end
   end
 end

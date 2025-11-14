@@ -77,7 +77,7 @@ module DfE
         # @return [String]
         def resolve_step_path(step_id, options = {})
           route_strategy.resolve(step_id:, options:).tap do |path|
-            log.debug('Route resolved', step: step_id, path:)
+            log_route_resolved(step: step_id, path:)
           end
         end
 
