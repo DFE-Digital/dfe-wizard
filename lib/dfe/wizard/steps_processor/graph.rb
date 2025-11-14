@@ -31,8 +31,12 @@ module DfE
         #     graph.add_edge :a, to: :b
         #   end
         def self.draw(wizard)
+          raise ArgumentError, 'A block must be given to Graph.draw' unless block_given?
+
           graph = new(wizard)
           yield(graph) if block_given?
+          raise ArgumentError, 'Graph must have a root node set. graph.root :some_step' unless graph.root_node
+
           graph
         end
 
@@ -133,9 +137,7 @@ module DfE
           next_step_without_callbacks(current_step)
         end
 
-        def next_step_without_callbacks(current_step)
-          current_step ||= @wizard.current_step_name
-
+        def next_step_without_callbacks(current_step = @wizard.current_step_name)
           custom_edge = @custom_branching_edges.find { |e| e.from == current_step }
           if custom_edge
             return call_predicate(custom_edge.conditional, current_step)
@@ -148,6 +150,7 @@ module DfE
           end
 
           edge = @edges.find { |e| e.from == current_step }
+
           edge&.to
         end
 
@@ -162,30 +165,32 @@ module DfE
           previous_step_without_callbacks(current_step)
         end
 
-        def previous_step_without_callbacks(current_step)
-          current_step ||= @wizard.current_step_name
-
+        def previous_step_without_callbacks(current_step = @wizard.current_step_name)
           return nil if current_step == @root_node
 
           path = path_traversal(current_step)
-          return nil if path.size < 2
 
-          path[-2]
+          path[-2] if path.present?
         end
 
         # Returns a traversal path through the user's wizard so far.
+        #
         def path_traversal(target_step = nil)
           target_step ||= @wizard.current_step_name
-          steps = []
+
           current = @root_node
-          steps << current
+
+          steps = [current]
+
           depth_limit = @nodes.size
 
           while current && current != target_step && steps.size < depth_limit
             n = next_step_without_callbacks(current)
+
             break if n.nil? || steps.include?(n)
 
             steps << n
+
             current = n
           end
 
