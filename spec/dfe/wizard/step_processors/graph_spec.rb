@@ -837,4 +837,361 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       end
     end
   end
+
+  describe '#add_multiple_conditional_edges' do
+    let(:wizard) { build_test_wizard(:step_a, {}, {}) }
+
+    context 'validation' do
+      it 'raises ArgumentError if from node does not exist' do
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node(:step_a, step_a_class)
+            g.add_multiple_conditional_edges(
+              from: :nonexistent,
+              branches: [{ when: :check?, then: :step_a }],
+            )
+            g.root(:step_a)
+          end
+        }.to raise_error(ArgumentError, /Cannot add branches from non-existent node/)
+      end
+
+      it 'raises ArgumentError if branches array is empty' do
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node(:step_a, step_a_class)
+            g.add_multiple_conditional_edges(from: :step_a, branches: [])
+            g.root(:step_a)
+          end
+        }.to raise_error(ArgumentError, /branches array cannot be empty/)
+      end
+
+      it 'raises ArgumentError if branches is nil' do
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node(:step_a, step_a_class)
+            g.add_multiple_conditional_edges(from: :step_a, branches: nil)
+            g.root(:step_a)
+          end
+        }.to raise_error(ArgumentError, /branches array cannot be empty/)
+      end
+
+      it 'raises ArgumentError if branch is not a Hash' do
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node(:step_a, step_a_class)
+            g.add_multiple_conditional_edges(
+              from: :step_a,
+              branches: [:not_a_hash],
+            )
+            g.root(:step_a)
+          end
+        }.to raise_error(ArgumentError, /Branch at index 0 must be a Hash/)
+      end
+
+      it 'raises ArgumentError if branch missing :when key' do
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node(:step_a, step_a_class)
+            g.add_node(:step_b, step_b_class)
+            g.add_multiple_conditional_edges(
+              from: :step_a,
+              branches: [{ then: :step_b }],
+            )
+            g.root(:step_a)
+          end
+        }.to raise_error(ArgumentError, /Branch at index 0 from :step_a is missing required key :when/)
+      end
+
+      it 'raises ArgumentError if branch missing :then key' do
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node(:step_a, step_a_class)
+            g.add_multiple_conditional_edges(
+              from: :step_a,
+              branches: [{ when: :check? }],
+            )
+            g.root(:step_a)
+          end
+        }.to raise_error(ArgumentError, /Branch at index 0 from :step_a is missing required key :then/)
+      end
+
+      it 'raises if target node does not exist' do
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node(:step_a, step_a_class)
+            g.add_multiple_conditional_edges(
+              from: :step_a,
+              branches: [{ when: :check?, then: :nonexistent }],
+            )
+            g.root(:step_a)
+          end
+        }.to raise_error(ArgumentError, /points to non-existent node/)
+      end
+    end
+
+    context 'structure' do
+      it 'creates a multiple-side conditional edge' do
+        graph = described_class.draw(wizard) do |g|
+          g.add_node(:step_a, step_a_class)
+          g.add_node(:step_b, step_b_class)
+          g.add_node(:step_c, step_c_class)
+          g.add_node(:step_d, step_d_class)
+          g.add_multiple_conditional_edges(
+            from: :step_a,
+            branches: [
+              { when: :check_b?, then: :step_b },
+              { when: :check_c?, then: :step_c },
+            ],
+            default: :step_d,
+            label: 'Multi-way routing',
+          )
+          g.root(:step_a)
+        end
+
+        expect(graph.multiple_conditional_edges.size).to eq(1)
+        edge = graph.multiple_conditional_edges.first
+        expect(edge.from).to eq(:step_a)
+        expect(edge.branches.size).to eq(2)
+        expect(edge.default).to eq(:step_d)
+        expect(edge.label).to eq('Multi-way routing')
+      end
+
+      it 'stores branch metadata' do
+        graph = described_class.draw(wizard) do |g|
+          g.add_node(:step_a, step_a_class)
+          g.add_node(:step_b, step_b_class)
+          g.add_multiple_conditional_edges(
+            from: :step_a,
+            branches: [
+              { when: :check?, then: :step_b, label: 'Check passed' },
+            ],
+          )
+          g.root(:step_a)
+        end
+
+        branch = graph.multiple_conditional_edges.first.branches.first
+        expect(branch[:then]).to eq(:step_b)
+        expect(branch[:label]).to eq('Check passed')
+        expect(branch[:when]).to be_a(Proc)
+      end
+    end
+
+    context 'navigation' do
+      it 'follows first matching branch' do
+        wizard = build_test_wizard(:visa_selection, {}, {
+                                     student_visa?: false,
+                                     work_visa?: true,
+                                     family_visa?: false,
+                                   })
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node(:visa_selection, step_a_class)
+          g.add_node(:student, step_b_class)
+          g.add_node(:work, step_c_class)
+          g.add_node(:family, step_d_class)
+          g.add_node(:other, step_review_class)
+
+          g.add_multiple_conditional_edges(
+            from: :visa_selection,
+            branches: [
+              { when: :student_visa?, then: :student },
+              { when: :work_visa?, then: :work },
+              { when: :family_visa?, then: :family },
+            ],
+            default: :other,
+          )
+          g.root(:visa_selection)
+        end
+
+        expect(graph.next_step_without_callbacks(:visa_selection)).to eq(:work)
+      end
+
+      it 'uses default when no branches match' do
+        wizard = build_test_wizard(:visa_selection, {}, {
+                                     student_visa?: false,
+                                     work_visa?: false,
+                                     family_visa?: false,
+                                   })
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node(:visa_selection, step_a_class)
+          g.add_node(:student, step_b_class)
+          g.add_node(:work, step_c_class)
+          g.add_node(:other, step_d_class)
+
+          g.add_multiple_conditional_edges(
+            from: :visa_selection,
+            branches: [
+              { when: :student_visa?, then: :student },
+              { when: :work_visa?, then: :work },
+            ],
+            default: :other,
+          )
+          g.root(:visa_selection)
+        end
+
+        expect(graph.next_step_without_callbacks(:visa_selection)).to eq(:other)
+      end
+
+      it 'returns nil when no match and no default' do
+        wizard = build_test_wizard(:step_a, {}, { check?: false })
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node(:step_a, step_a_class)
+          g.add_node(:step_b, step_b_class)
+
+          g.add_multiple_conditional_edges(
+            from: :step_a,
+            branches: [{ when: :check?, then: :step_b }],
+          )
+          g.root(:step_a)
+        end
+
+        expect(graph.next_step_without_callbacks(:step_a)).to be_nil
+      end
+
+      it 'evaluates branches in order (first match wins)' do
+        wizard = build_test_wizard(:step_a, {}, {
+                                     always_true?: true,
+                                     also_true?: true,
+                                   })
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node(:step_a, step_a_class)
+          g.add_node(:step_b, step_b_class)
+          g.add_node(:step_c, step_c_class)
+
+          g.add_multiple_conditional_edges(
+            from: :step_a,
+            branches: [
+              { when: :always_true?, then: :step_b },
+              { when: :also_true?, then: :step_c }, # Never reached
+            ],
+          )
+          g.root(:step_a)
+        end
+
+        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_b)
+      end
+
+      it 'handles proc predicates' do
+        wizard = build_test_wizard(:step_a, {}, {})
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node(:step_a, step_a_class)
+          g.add_node(:step_b, step_b_class)
+          g.add_node(:step_c, step_c_class)
+
+          g.add_multiple_conditional_edges(
+            from: :step_a,
+            branches: [
+              { when: ->(_step) { false }, then: :step_b },
+              { when: ->(_step) { true }, then: :step_c },
+            ],
+          )
+          g.root(:step_a)
+        end
+
+        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_c)
+      end
+    end
+
+    context 'priority in next_step_without_callbacks' do
+      it 'prioritizes multiple-side over conditional edges' do
+        wizard = build_test_wizard(:step_a, {}, { check?: true })
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node(:step_a, step_a_class)
+          g.add_node(:step_b, step_b_class)
+          g.add_node(:step_c, step_c_class)
+          g.add_node(:step_d, step_d_class)
+
+          # Add both types from same node
+          g.add_conditional_edge(from: :step_a, when: :check?, then: :step_b, else: :step_c)
+          g.add_multiple_conditional_edges(
+            from: :step_a,
+            branches: [{ when: :check?, then: :step_d }],
+          )
+          g.root(:step_a)
+        end
+
+        # Many-side takes precedence
+        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_d)
+      end
+
+      it 'prioritizes multiple-side over simple edges' do
+        wizard = build_test_wizard(:step_a, {}, { check?: true })
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node(:step_a, step_a_class)
+          g.add_node(:step_b, step_b_class)
+          g.add_node(:step_c, step_c_class)
+
+          g.add_edge(from: :step_a, to: :step_b)
+          g.add_multiple_conditional_edges(
+            from: :step_a,
+            branches: [{ when: :check?, then: :step_c }],
+          )
+          g.root(:step_a)
+        end
+
+        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_c)
+      end
+    end
+
+    context 'real-world scenarios' do
+      it 'handles visa type selection (4-way)' do
+        wizard = build_test_wizard(:visa_type, {}, {
+                                     student?: false,
+                                     work?: false,
+                                     family?: true,
+                                     tourist?: false,
+                                   })
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node(:visa_type, step_a_class)
+          g.add_node(:student_path, step_b_class)
+          g.add_node(:work_path, step_c_class)
+          g.add_node(:family_path, step_d_class)
+          g.add_node(:tourist_path, step_review_class)
+
+          g.add_multiple_conditional_edges(
+            from: :visa_type,
+            branches: [
+              { when: :student?, then: :student_path },
+              { when: :work?, then: :work_path },
+              { when: :family?, then: :family_path },
+              { when: :tourist?, then: :tourist_path },
+            ],
+          )
+          g.root(:visa_type)
+        end
+
+        expect(graph.next_step_without_callbacks(:visa_type)).to eq(:family_path)
+      end
+
+      it 'handles age-based routing with ranges' do
+        wizard = build_test_wizard(:age_check, {}, {})
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node(:age_check, step_a_class)
+          g.add_node(:child, step_b_class)
+          g.add_node(:adult, step_c_class)
+          g.add_node(:senior, step_d_class)
+
+          g.add_multiple_conditional_edges(
+            from: :age_check,
+            branches: [
+              { when: ->(step) { step.respond_to?(:age) && step.age < 18 }, then: :child },
+              { when: ->(step) { step.respond_to?(:age) && step.age >= 65 }, then: :senior },
+              { when: ->(step) { step.respond_to?(:age) && step.age >= 18 }, then: :adult },
+            ],
+          )
+          g.root(:age_check)
+        end
+
+        expect(graph.multiple_conditional_edges.first.branches.size).to eq(3)
+      end
+    end
+  end
 end

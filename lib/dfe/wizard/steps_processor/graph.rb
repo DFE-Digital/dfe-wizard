@@ -15,8 +15,14 @@ module DfE
         Edge = Struct.new(:from, :to, keyword_init: true)
         ConditionalEdge = Struct.new(:from, :when, :then, :else, :label, keyword_init: true)
         CustomBranchingEdge = Struct.new(:from, :conditional, :potential_transitions, keyword_init: true)
+        MultipleConditionalEdge = Struct.new(:from, :branches, :default, :label, keyword_init: true)
 
-        attr_reader :nodes, :edges, :conditional_edges, :custom_branching_edges, :root_node
+        attr_reader :nodes,
+                    :edges,
+                    :conditional_edges,
+                    :custom_branching_edges,
+                    :multiple_conditional_edges,
+                    :root_node
 
         # Builds a wizard graph, yielding the instance so the caller can add nodes/edges.
         #
@@ -47,6 +53,7 @@ module DfE
           @edges = []
           @conditional_edges = []
           @custom_branching_edges = []
+          @multiple_conditional_edges = []
           @root_node = nil
         end
 
@@ -57,6 +64,17 @@ module DfE
           @nodes[node_id] = Node.new(id: node_id, klass: klass)
         end
 
+        # Finds the step class for a given node
+        #
+        # Returns the class associated with a node identifier.
+        # Used internally by the wizard to instantiate step objects.
+        #
+        # @param node_id [Symbol] The node identifier
+        # @return [Class, nil] The step class, or nil if node doesn't exist
+        #
+        # @example
+        #   graph.find_step(:name) # => Steps::Name
+        #   graph.find_step(:missing) # => nil
         def find_step(node_id)
           nodes[node_id]&.klass
         end
@@ -90,6 +108,116 @@ module DfE
             then: options[:then],
             else: options[:else],
             label: options[:label],
+          )
+        end
+
+        # Adds multiple conditional branches from a single node (N-way branching).
+        #
+        # Branches are evaluated in order; the first matching condition wins.
+        # If no conditions match, routes to the `default` node (if specified).
+        #
+        # Use this when you have 2+ mutually exclusive conditions from one step.
+        # For binary decisions (yes/no), use `add_conditional_edge` instead.
+        #
+        # @param from [Symbol] The source node identifier
+        # @param branches [Array<Hash>] Ordered array of condition-target pairs. Each hash must contain:
+        #   - `:when` [Symbol, Proc] Predicate to evaluate (should return truthy/falsy)
+        #   - `:then` [Symbol] Target node identifier if condition matches
+        #   - `:label` [String] (optional) Human-readable description for graph visualization
+        # @param default [Symbol, nil] Fallback target node when no branch conditions match
+        # @param label [String, nil] Overall description of this branching point for documentation
+        #
+        # @raise [ArgumentError] if branches array is empty
+        # @raise [ArgumentError] if any branch is missing required :when or :then keys
+        # @raise [ArgumentError] if :from node doesn't exist in the graph
+        #
+        # @note Branches are evaluated **in the order specified**. Order matters when conditions overlap.
+        # @note Always place more specific conditions before more general ones to avoid unreachable branches.
+        # @note Avoid unconditional branches in the middle of the array (they make subsequent branches unreachable).
+        #
+        # @example Visa type routing
+        #   graph.add_many_conditional_edges(
+        #     from: :visa_selection,
+        #     branches: [
+        #       { when: :student_visa?, then: :student_details },
+        #       { when: :work_visa?, then: :work_details },
+        #       { when: :family_visa?, then: :family_details }
+        #     ],
+        #     default: :other_visa
+        #   )
+        #
+        # @example Age-based routing with overlapping conditions (specific first)
+        #   graph.add_many_conditional_edges(
+        #     from: :age_check,
+        #     branches: [
+        #       { when: ->(step) { step.age < 18 }, then: :minor_path },
+        #       { when: ->(step) { step.age >= 65 }, then: :senior_path },
+        #       { when: ->(step) { step.age >= 18 }, then: :adult_path }
+        #     ]
+        #   )
+        #
+        # @example With safety check first
+        #   graph.add_many_conditional_edges(
+        #     from: :payment,
+        #     branches: [
+        #       { when: :payment_failed?, then: :error_page },
+        #       { when: :full_payment?, then: :receipt },
+        #       { when: :partial_payment?, then: :payment_plan }
+        #     ],
+        #     default: :manual_review
+        #   )
+        #
+        def add_multiple_conditional_edges(from:, branches:, default: nil, label: nil)
+          unless @nodes.key?(from)
+            raise ArgumentError,
+                  "Cannot add branches from non-existent node :#{from}. " \
+                  "Available nodes: #{@nodes.keys.inspect}. " \
+                  "Did you forget to call add_node(:#{from}, StepClass)?"
+          end
+
+          if branches.nil? || branches.empty?
+            raise ArgumentError,
+                  "branches array cannot be empty for add_multiple_conditional_edges from :#{from}. " \
+                  'Provide at least one branch with :when and :then keys, or use add_edge for unconditional routing.'
+          end
+
+          processed_branches = branches.map.each_with_index do |branch, index|
+            unless branch.is_a?(Hash)
+              raise ArgumentError,
+                    "Branch at index #{index} must be a Hash, got #{branch.class}. " \
+                    'Expected format: { when: :predicate, then: :target_node }'
+            end
+
+            unless branch.key?(:when)
+              raise ArgumentError,
+                    "Branch at index #{index} from :#{from} is missing required key :when. " \
+                    "Expected format: { when: :predicate, then: :target_node, label: 'optional for doc' }"
+            end
+
+            unless branch.key?(:then)
+              raise ArgumentError,
+                    "Branch at index #{index} from :#{from} is missing required key :then. " \
+                    "Expected format: { when: :predicate, then: :target_node, label: 'optional for doc' }"
+            end
+
+            unless @nodes.key?(branch[:then])
+              raise ArgumentError,
+                    "Branch #{index} from :#{from} points to non-existent node :#{branch[:then]}. " \
+                    "Available nodes: #{@nodes.keys.inspect}. This may cause wizard navigation bugs."
+            end
+
+            {
+              when: build_predicate(branch[:when]),
+              then: branch[:then],
+              label: branch[:label],
+            }
+          end
+
+          @multiple_conditional_edges << MultipleConditionalEdge.new(
+            from: from,
+            branches: processed_branches,
+            default: default,
+            label: label,
           )
         end
 
@@ -141,6 +269,18 @@ module DfE
           custom_edge = @custom_branching_edges.find { |e| e.from == current_step }
           if custom_edge
             return call_predicate(custom_edge.conditional, current_step)
+          end
+
+          multiple_edge = @multiple_conditional_edges.find { |e| e.from == current_step }
+          if multiple_edge
+            # Evaluate branches in order, return first match
+            multiple_edge.branches.each do |branch|
+              if call_predicate(branch[:when], current_step)
+                return branch[:then]
+              end
+            end
+            # No branch matched, use default
+            return multiple_edge.default
           end
 
           cond_edge = @conditional_edges.find { |e| e.from == current_step }
