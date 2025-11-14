@@ -45,23 +45,27 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
       end
     end
 
-    describe '#log_step_transition' do
+    describe '#log_next_step_transition' do
       it 'logs navigation between steps' do
-        wizard.log_step_transition(from: :name_and_date_of_birth, to: :nationality, direction: :forward)
+        wizard.log_next_step_transition(from: :name_and_date_of_birth, to: :nationality)
 
         output = log_output.string
         expect(output).to include('[PersonalInformationWizard]')
-        expect(output).to include('Step transition')
+        expect(output).to include('Next step transition')
         expect(output).to include('from=:name_and_date_of_birth')
         expect(output).to include('to=:nationality')
-        expect(output).to include('direction=:forward')
       end
+    end
 
-      it 'logs backward navigation' do
-        wizard.log_step_transition(from: :nationality, to: :name_and_date_of_birth, direction: :backward)
+    describe '#log_previous_step_transition' do
+      it 'logs navigation between steps' do
+        wizard.log_previous_step_transition(current: :nationality, previous: :name_and_date_of_birth)
 
         output = log_output.string
-        expect(output).to include('direction=:backward')
+        expect(output).to include('[PersonalInformationWizard]')
+        expect(output).to include('Previous step transition')
+        expect(output).to include('previous=:name_and_date_of_birth')
+        expect(output).to include('current=:nationality')
       end
     end
 
@@ -251,7 +255,8 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
 
     it 'does not raise errors when logging' do
       expect {
-        wizard.log_step_transition(from: :name, to: :email, direction: :forward)
+        wizard.log_next_step_transition(from: :name, to: :email)
+        wizard.log_previous_step_transition(previous: :name, current: :email)
         wizard.log_params_received(step_id: :email, raw_params: {}, permitted_params: {})
         wizard.log_step_save(step_id: :email, data: {})
       }.not_to raise_error

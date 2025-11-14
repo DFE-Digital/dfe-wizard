@@ -60,21 +60,36 @@ module DfE
           end
         end
 
-        # Log step transition
+        # Log next step transition
         #
         # Records when user navigates between steps.
         #
         # @param from [Symbol] Source step
         # @param to [Symbol] Destination step
-        # @param direction [Symbol] :forward or :backward
         #
         # @example
         #   log_step_transition(from: :name, to: :email, direction: :forward)
         #   # => [MyWizard] Step transition from=:name to=:email direction=:forward
         #
         # @api public
-        def log_step_transition(from:, to:, direction:)
-          log.info('Step transition', from:, to:, direction:)
+        def log_next_step_transition(from:, to:)
+          log.info('Next step transition', from:, to:)
+        end
+
+        # Log previous step transition
+        #
+        # Records when user navigates between steps.
+        #
+        # @param current [Symbol] Source step
+        # @param previous [Symbol] Previous step
+        #
+        # @example
+        #   log_step_transition(current: :name, previous: :email)
+        #   # => [MyWizard] Previous step transition previous=:email current=:name
+        #
+        # @api public
+        def log_previous_step_transition(current:, previous:)
+          log.info('Previous step transition', previous:, current:)
         end
 
         # Log path traversal calculation
