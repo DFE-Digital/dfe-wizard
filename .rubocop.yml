@@ -19,7 +19,7 @@ Lint/RaiseException:
   Enabled: true
 
 Lint/StructNewOverride:
-  Enabled: true
+  Enabled: false
 
 Lint/EmptyFile:
   Enabled: true
@@ -167,7 +167,10 @@ Style/ExplicitBlockArgument:
   Enabled: false
 
 Style/OptionalBooleanParameter:
-  AllowedMethods:
-    - perform
+  Enabled: false
+
 Style/FetchEnvVar:
+  Enabled: false
+
+Style/OpenStructUse:
   Enabled: false
