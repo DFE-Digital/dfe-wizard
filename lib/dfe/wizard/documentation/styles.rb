@@ -63,6 +63,36 @@ module DfE
           { color: '#666666', fillcolor: '#f9f9f9', penwidth: 1 }
         end
 
+        # Style for multiple conditional edges (N-way branching)
+        #
+        # Used when rendering branches from add_multiple_conditional_edges.
+        # Distinguishes N-way branching from binary conditionals with solid blue lines.
+        #
+        # @return [Hash] GraphViz edge attributes
+        def multiple_conditional_transition
+          {
+            color: '#2563eb',
+            fontcolor: '#2563eb',
+            style: 'solid',
+            penwidth: 1.5,
+          }
+        end
+
+        # Style for default/fallback edges in multiple conditional branching
+        #
+        # Used when a multiple conditional edge has a default target.
+        # Rendered as dashed gray lines to indicate fallback/catch-all behavior.
+        #
+        # @return [Hash] GraphViz edge attributes
+        def default_transition
+          {
+            color: '#6b7280', # Gray for default path
+            fontcolor: '#6b7280',
+            style: 'dashed',
+            penwidth: 1.5,
+          }
+        end
+
         # Style for wizard exit/final step
         # @return [Hash]
         def final_step

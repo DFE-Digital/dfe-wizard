@@ -65,6 +65,7 @@ module DfE
         def render_edges(graphviz)
           render_simple_edges(graphviz)
           render_conditional_edges(graphviz)
+          render_multiple_conditional_edges(graphviz)
           render_complex_edges(graphviz)
         end
 
@@ -102,6 +103,35 @@ module DfE
           end
         end
 
+        # Render multiple conditional branching (N-way)
+        #
+        # Shows each branch with its label and a dashed default edge if present.
+        #
+        # @param graphviz [GraphViz]
+        def render_multiple_conditional_edges(graphviz)
+          @graph.multiple_conditional_edges.each do |multi_edge|
+            multi_edge.branches.each_with_index do |branch, index|
+              branch_label = branch[:label] || "Branch #{index + 1}"
+
+              graphviz.add_edges(
+                multi_edge.from.to_s,
+                branch[:then].to_s,
+                label: branch_label,
+                **@styles.multiple_conditional_transition,
+              )
+            end
+
+            next unless multi_edge.default
+
+            graphviz.add_edges(
+              multi_edge.from.to_s,
+              multi_edge.default.to_s,
+              label: 'Default',
+              **@styles.default_transition,
+            )
+          end
+        end
+
         # Render complex multi-option branching
         #
         # @param graphviz [GraphViz]
@@ -126,7 +156,8 @@ module DfE
         def outgoing_edge?(node_id)
           @graph.edges.any? { |edge| edge.from == node_id } ||
             @graph.conditional_edges.any? { |cond_edge| cond_edge.from == node_id } ||
-            @graph.custom_branching_edges.any? { |branch_edge| branch_edge.from == node_id }
+            @graph.custom_branching_edges.any? { |branch_edge| branch_edge.from == node_id } ||
+            @graph.multiple_conditional_edges.any? { |multi_edge| multi_edge.from == node_id }
         end
 
         # Format node label for display
