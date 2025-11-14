@@ -8,11 +8,30 @@ module DfE
       #
       # @api public
       class NullLogger
-        def tagged(*) = self
+        def tagged(*)
+          self
+        end
+
         def info(*); end
         def debug(*); end
         def warn(*); end
         def error(*); end
+
+        def exclude(*)
+          self
+        end
+
+        def reset_exclusions
+          self
+        end
+
+        def excluded?(_category)
+          false
+        end
+
+        def excluded_categories
+          []
+        end
       end
     end
   end

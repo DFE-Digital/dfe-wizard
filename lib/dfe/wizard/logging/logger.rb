@@ -15,10 +15,48 @@ module DfE
       #     end
       #   end
       #
+      # @example Enable logging with exclusions
+      #   class MyWizard
+      #     include DfE::Wizard
+      #
+      #     def logger
+      #       DfE::Wizard::Logger.new(Rails.logger)
+      #         .exclude(:navigation)
+      #         .exclude(:routing)
+      #     end
+      #   end
+      #
       # @api public
       class Logger
+        # Available logging categories
+        CATEGORIES = %i[navigation routing state validation callbacks].freeze
+
         def initialize(rails_logger)
           @logger = rails_logger
+          @excluded = Set.new
+        end
+
+        # Exclude one or more logging categories
+        #
+        # @param categories [Array<Symbol>] Categories to exclude
+        # @return [self] Returns self for method chaining
+        # @raise [ArgumentError] if unknown category provided
+        #
+        # @example
+        #   logger.exclude(:navigation).exclude(:routing)
+        #
+        # @api public
+        def exclude(*categories)
+          categories.each do |category|
+            unless CATEGORIES.include?(category)
+              raise ArgumentError,
+                    "Unknown category: #{category}. Valid categories: #{CATEGORIES.join(', ')}"
+            end
+          end
+
+          @excluded.merge(categories)
+
+          self
         end
 
         # Create tagged logger scope
@@ -26,7 +64,33 @@ module DfE
         # @param tag [String] Tag to prefix all log messages
         # @return [TaggedLogger]
         def tagged(tag)
-          TaggedLogger.new(@logger, tag)
+          TaggedLogger.new(@logger, tag, @excluded)
+        end
+
+        # Reset all exclusions
+        #
+        # @return [self]
+        # @api public
+        def reset_exclusions
+          @excluded.clear
+          self
+        end
+
+        # Check if category is excluded
+        #
+        # @param category [Symbol] Category to check
+        # @return [Boolean]
+        # @api public
+        def excluded?(category)
+          @excluded.include?(category)
+        end
+
+        # Get list of excluded categories
+        #
+        # @return [Array<Symbol>]
+        # @api public
+        def excluded_categories
+          @excluded.to_a
         end
       end
 
@@ -36,31 +100,34 @@ module DfE
       #
       # @api private
       class TaggedLogger
-        def initialize(logger, tag)
+        def initialize(logger, tag, excluded)
           @logger = logger
           @tag = tag
+          @excluded = excluded
         end
 
-        def info(message, **context)
-          log(:info, message, **context)
+        def info(message, category: nil, **context)
+          log(:info, message, category:, **context)
         end
 
-        def debug(message, **context)
-          log(:debug, message, **context)
+        def debug(message, category: nil, **context)
+          log(:debug, message, category:, **context)
         end
 
-        def warn(message, **context)
-          log(:warn, message, **context)
+        def warn(message, category: nil, **context)
+          log(:warn, message, category:, **context)
         end
 
-        def error(message, **context)
-          log(:error, message, **context)
+        def error(message, category: nil, **context)
+          log(:error, message, category:, **context)
         end
 
         private
 
-        def log(level, message, **context)
+        def log(level, message, category: nil, **context)
           return unless @logger
+
+          return if category&.in?(@excluded)
 
           context_string = context.map { |k, v| "#{k}=#{format_value(v)}" }.join(' ')
           full_message = context_string.empty? ? message : "#{message} #{context_string}"
