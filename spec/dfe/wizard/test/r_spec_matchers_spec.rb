@@ -1,15 +1,23 @@
 RSpec.describe DfE::Wizard::Test::RSpecMatchers do
   let(:wizard) do
     PersonalInformationWizard.new(
-      current_step: current_step,
-      state_store: DfE::Wizard::StateStore::Session.new(session: session, key: 'test_wizard'),
-      step_params: ActionController::Parameters.new(step_params),
+      current_step:,
+      state_store:
     )
   end
 
-  let(:session) { {} }
-  let(:step_params) { {} }
+  let(:state_store) do
+    StateStores::PersonalInformation.new(
+      repository: DfE::Wizard::Repository::InMemory.new,
+    )
+  end
+
+  let(:steps_data) { {} }
   let(:current_step) { :name_and_date_of_birth }
+
+  before do
+    state_store.save_steps(steps_data)
+  end
 
   describe '#be_at_step' do
     context 'when wizard is at expected step' do
@@ -46,13 +54,12 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
   describe '#have_visited' do
     context 'when wizard has visited all expected steps' do
       let(:current_step) { :nationality }
-      let(:session) do
+      let(:steps_data) do
         {
-          'test_wizard' => {
-            'steps' => {
-              'name_and_date_of_birth' => { 'first_name' => 'John', 'last_name' => 'Doe',
-                                            'date_of_birth' => '1990-01-01' },
-            },
+          'name_and_date_of_birth' => {
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'date_of_birth' => '1990-01-01'
           },
         }
       end
@@ -109,16 +116,12 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
   describe '#have_valid_path_to' do
     context 'when all steps in path are valid' do
       let(:current_step) { :name_and_date_of_birth }
-      let(:session) do
+      let(:steps_data) do
         {
-          'test_wizard' => {
-            'steps' => {
-              'name_and_date_of_birth' => {
-                'first_name' => 'John',
-                'last_name' => 'Doe',
-                'date_of_birth' => '1990-01-01',
-              },
-            },
+          'name_and_date_of_birth' => {
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'date_of_birth' => '1990-01-01',
           },
         }
       end
@@ -130,16 +133,12 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
 
     context 'when a step in path is invalid' do
       let(:current_step) { :nationality }
-      let(:session) do
+      let(:steps_data) do
         {
-          'test_wizard' => {
-            'steps' => {
-              'name_and_date_of_birth' => {
-                'first_name' => '',  # Invalid!
-                'last_name' => 'Doe',
-                'date_of_birth' => '1990-01-01',
-              },
-            },
+          'name_and_date_of_birth' => {
+            'first_name' => '',  # Invalid!
+            'last_name' => 'Doe',
+            'date_of_birth' => '1990-01-01',
           },
         }
       end
@@ -193,16 +192,12 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
   describe '#be_accessible' do
     context 'when step is accessible with valid previous steps' do
       let(:current_step) { :nationality }
-      let(:session) do
+      let(:steps_data) do
         {
-          'test_wizard' => {
-            'steps' => {
-              'name_and_date_of_birth' => {
-                'first_name' => 'John',
-                'last_name' => 'Doe',
-                'date_of_birth' => '1990-01-01',
-              },
-            },
+          'name_and_date_of_birth' => {
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'date_of_birth' => '1990-01-01',
           },
         }
       end
@@ -214,14 +209,10 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
 
     context 'when step is not accessible due to invalid previous step' do
       let(:current_step) { :review }
-      let(:session) do
+      let(:steps_data) do
         {
-          'test_wizard' => {
-            'steps' => {
-              'name_and_date_of_birth' => {
-                'first_name' => '',  # Invalid
-              },
-            },
+          'name_and_date_of_birth' => {
+            'first_name' => '',  # Invalid
           },
         }
       end
@@ -241,19 +232,15 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
   end
 
   describe 'integration with real wizard flow' do
-    let(:session) do
+    let(:steps_data) do
       {
-        'test_wizard' => {
-          'steps' => {
-            'name_and_date_of_birth' => {
-              'first_name' => 'Jane',
-              'last_name' => 'Smith',
-              'date_of_birth' => '1985-05-15',
-            },
-            'nationality' => {
-              'nationalities' => ['british'],
-            },
-          },
+        'name_and_date_of_birth' => {
+          'first_name' => 'Jane',
+          'last_name' => 'Smith',
+          'date_of_birth' => '1985-05-15',
+        },
+        'nationality' => {
+          'nationalities' => ['british'],
         },
       }
     end

@@ -156,8 +156,8 @@ module DfE
 
           path.map do |step_id|
             klass = find_step(step_id)
-            step_data = read_step_data(step_id)
-            klass.new(step_data.merge(wizard: self, step_id: step_id))
+
+            klass.new(step_data(step_id).merge(wizard: self, step_id: step_id))
           end
         end
       end
