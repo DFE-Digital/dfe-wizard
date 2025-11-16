@@ -63,7 +63,7 @@ module DfE
         #
         # @api public
         def call(step_id)
-          step_data = @wizard.read_step_data(step_id)
+          step_data = @wizard.step_data(step_id)
           step_klass = @wizard.find_step(step_id)
 
           # No data = unvisited
