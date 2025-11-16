@@ -58,7 +58,8 @@ module DfE
         #   # Path now requires more steps
         #   # => nil  (falls through to normal navigation)
         def handle_return_to_check_your_answers(target_step)
-          target_step if path_complete_to?(target_step) && path_valid_to?(target_step)
+          # Check if all steps in path are accessible (visited AND valid)
+          target_step if step_accessible?(target_step)
         end
 
         # Navigate back through visited steps in edit mode
@@ -142,30 +143,10 @@ module DfE
           idx = path.index(current_step_name)
           return nil unless idx&.positive?
 
-          # Walk backward to find first visited step
-          path[0...idx].reverse.find { |step_id| step_visited?(step_id) }
-        end
-
-        # Check if a step exists in the current path
-        #
-        # Useful for determining if a step is possible given current wizard state
-        # and conditional branching logic.
-        #
-        # Does NOT check if step is visited or valid - only if it's reachable.
-        # (Equivalent to {Navigation#completed_to?} but in this module for clarity)
-        #
-        # @param step_id [Symbol] The step to check
-        # @param target [Symbol, nil] End point for path (nil = current path)
-        # @return [Boolean] true if step exists in current path
-        #
-        # @example
-        #   # Path: name -> email -> review
-        #   wizard.step_in_path?(:email)   # => true
-        #   wizard.step_in_path?(:phone)   # => false
-        #
-        # @api public
-        def step_in_path?(step_id, target: nil)
-          path_traversal(target).include?(step_id)
+          # Walk backward to find first visited step (has data in state store)
+          path[0...idx].reverse.find do |step_id|
+            state_store.read_step(step_id).present?
+          end
         end
       end
     end

@@ -32,7 +32,7 @@ module DfE
         # @return [Object] Instantiated step
         def hydrate_step(step_id)
           step_class = steps_processor.find_step(step_id)
-          persisted_data = state_store.step_data(step_id)
+          persisted_data = state_store.read_step(step_id)
 
           # ONLY merge current params if we're hydrating the CURRENT step
           merged_data = if step_id == current_step_name
@@ -91,17 +91,23 @@ module DfE
         #   # If there are no params for current step, returns {}
         #
         def current_step_params
-          params = if @step_params.is_a?(ActionController::Parameters)
-                     @step_params.require(current_step_name).permit(permitted_params)
+          params = if @current_step_params.is_a?(ActionController::Parameters)
+                     @current_step_params.require(current_step_name).permit(permitted_params)
                    else
-                     @step_params.fetch(current_step_name, {})
+                     @current_step_params.fetch(current_step_name, {})
                    end
 
+          raw_params = if @current_step_params.respond_to?(:to_unsafe_h)
+                         @current_step_params.to_unsafe_h
+                       else
+                         @current_step_params
+                       end
+
           params.tap do
-            if @step_params.present?
+            if @current_step_params.present?
               log_params_received(
                 step_id: current_step_name,
-                raw_params: @step_params.to_unsafe_h,
+                raw_params:,
                 permitted_params: params,
               )
             end

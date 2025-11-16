@@ -77,7 +77,7 @@ module DfE
         #
         # @see StateAccess#raw_step_data For unfiltered reads
         # @api public
-        def step_data(step_id)
+        def read_step_data(step_id)
           return {} unless path_traversal.include?(step_id)
 
           raw_step_data(step_id)

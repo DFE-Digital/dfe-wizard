@@ -7,7 +7,6 @@ module DfE
       #
       # This module provides:
       # - Reading/writing step data from repository
-      # - Managing current_step_params
       # - Dynamically generating accessors from ActiveModel step attributes
       #
       # ## Usage
@@ -18,7 +17,6 @@ module DfE
       #
       #   state_store = PersonalInformationStateStore.new(
       #     repository: DfE::Wizard::Repository::InMemory.new,
-      #     current_step_params: params
       #   )
       #
       #   # Later, wizard calls:
@@ -42,11 +40,9 @@ module DfE
         # Initialize state store
         #
         # @param repository [DfE::Wizard::Repository::*] Backend storage adapter
-        # @param current_step_params [Hash] Parameters for the current step (from request)
         # @return [void]
-        def initialize(repository:, current_step_params: {})
+        def initialize(repository:)
           @repository = repository
-          @current_step_params = current_step_params
           @accessor_cache = {}
         end
 
@@ -54,11 +50,6 @@ module DfE
         #
         # @return [DfE::Wizard::Repository::*]
         attr_reader :repository
-
-        # Parameters for the current step being processed
-        #
-        # @return [Hash]
-        attr_reader :current_step_params
 
         # Define dynamic accessors from wizard's step schema
         #
@@ -257,21 +248,6 @@ module DfE
           steps = current[:steps] || {}
           steps.delete(step_id)
           write(current.merge(steps: steps))
-        end
-
-        # Update current step params (deep merge)
-        #
-        # @param new_params [Hash] Params to merge
-        # @return [Hash] Updated params
-        def update_current_step_params(new_params)
-          @current_step_params = @current_step_params.deep_merge(new_params)
-        end
-
-        # Clear current step params
-        #
-        # @return [void]
-        def clear_current_step_params
-          @current_step_params = {}
         end
       end
     end
