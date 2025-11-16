@@ -1,27 +1,28 @@
 RSpec.describe DfE::Wizard::Core::LogManagement do
-  let(:session) do
-    {
-      'test_wizard' => {
-        'steps' => {
-          'name_and_date_of_birth' => {
-            'first_name' => 'John',
-            'last_name' => 'Doe',
-            'date_of_birth' => '1990-01-01',
-          },
-          'nationality' => {
-            'nationalities' => ['british'],
-          },
-        },
-      },
-    }
+  let(:current_step_params) { ActionController::Parameters.new({}) }
+  let(:state_store) do
+    StateStores::PersonalInformation.new(
+      repository: DfE::Wizard::Repository::InMemory.new,
+      current_step_params:,
+    )
   end
-
-  let(:step_params) { ActionController::Parameters.new({}) }
-  let(:state_store) { DfE::Wizard::StateStore::Session.new(session: session, key: 'test_wizard') }
 
   before do
     @original = Rails.application.config.filter_parameters
     Rails.application.config.filter_parameters = %i[password ssn date_of_birth]
+
+    state_store.save_steps(
+      {
+        'name_and_date_of_birth' => {
+          'first_name' => 'John',
+          'last_name' => 'Doe',
+          'date_of_birth' => '1990-01-01',
+        },
+        'nationality' => {
+          'nationalities' => ['british'],
+        },
+      },
+    )
   end
 
   after do
@@ -36,8 +37,7 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
     let(:wizard) do
       PersonalInformationWizard.new(
         current_step: :nationality,
-        state_store: state_store,
-        step_params: step_params,
+        state_store:,
       ).tap do |w|
         allow(w).to receive(:logger).and_return(wizard_logger)
       end
@@ -115,7 +115,7 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
       it 'logs step names at INFO level' do
         data = { steps: { name_and_date_of_birth: {}, nationality: {} } }
 
-        wizard.log_state_read(data: data)
+        wizard.log_state_read(data:)
 
         output = log_output.string
         expect(output).to include('State read')
@@ -126,7 +126,7 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         rails_logger.level = Logger::DEBUG
         data = { steps: { email: { email: 'user@example.com' } } }
 
-        wizard.log_state_read(data: data)
+        wizard.log_state_read(data:)
 
         output = log_output.string
         expect(output).to include('State data')
@@ -137,7 +137,7 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         wizard_logger.exclude(:state)
         data = { steps: { email: {} } }
 
-        wizard.log_state_read(data: data)
+        wizard.log_state_read(data:)
 
         expect(log_output.string).to be_empty
       end
@@ -188,8 +188,8 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
       it 'logs param keys at INFO level' do
         wizard.log_params_received(
           step_id: :email,
-          raw_params: raw_params,
-          permitted_params: permitted_params,
+          raw_params:,
+          permitted_params:,
         )
 
         output = log_output.string
@@ -204,8 +204,8 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
 
         wizard.log_params_received(
           step_id: :email,
-          raw_params: raw_params,
-          permitted_params: permitted_params,
+          raw_params:,
+          permitted_params:,
         )
 
         output = log_output.string
@@ -218,8 +218,8 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
 
         wizard.log_params_received(
           step_id: :email,
-          raw_params: raw_params,
-          permitted_params: permitted_params,
+          raw_params:,
+          permitted_params:,
         )
 
         expect(log_output.string).to be_empty
@@ -392,7 +392,6 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
       PersonalInformationWizard.new(
         current_step: :nationality,
         state_store: state_store,
-        step_params: step_params,
       ).tap do |wizard|
         # Override logger to return nil (disable logging)
         allow(wizard).to receive(:logger).and_return(nil)
@@ -420,7 +419,6 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
       PersonalInformationWizard.new(
         current_step: :nationality,
         state_store: state_store,
-        step_params: step_params,
       )
     end
 
