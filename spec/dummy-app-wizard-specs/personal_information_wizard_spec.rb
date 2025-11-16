@@ -1,35 +1,17 @@
-# frozen_string_literal: true
-
-require 'spec_helper'
-
 RSpec.describe PersonalInformationWizard do
-  include DfE::Wizard::Test::RSpecMatchers
-
   subject(:wizard) do
     described_class.new(
       current_step:,
       state_store:,
+      current_step_params:,
     )
   end
 
+  let(:current_step_params) { {} }
   let(:state_store) do
     StateStores::PersonalInformation.new(repository: DfE::Wizard::Repository::InMemory.new)
   end
-  let(:session) { {} }
-  let(:step_params) { {} }
   let(:url_helpers) { Rails.application.routes.url_helpers }
-
-  RSpec::Matchers.define :have_next_step_path do |expected|
-    match { |wiz| wiz.next_step_path == expected }
-    failure_message { |wiz| "expected next_step_path to be #{expected.inspect} but got #{wiz.next_step_path.inspect}" }
-  end
-
-  RSpec::Matchers.define :have_previous_step_path do |expected|
-    match { |wiz| wiz.previous_step_path == expected }
-    failure_message { |wiz|
-      "expected previous_step_path to be #{expected.inspect} but got #{wiz.previous_step_path.inspect}"
-    }
-  end
 
   describe '#path_traversal' do
     context 'when British national' do
@@ -214,8 +196,7 @@ RSpec.describe PersonalInformationWizard do
         state_store.save_steps(
           name_and_date_of_birth: { first_name: 'Jean', last_name: 'Dupont', date_of_birth: '1995-06-15' },
           nationality: { nationalities: 'french' },
-          right_to_work_or_study: { right_to_work_or_study: has_right_to_work, visa_type: 'work',
-                                    visa_expiry: '2026-12-31' },
+          right_to_work_or_study: { right_to_work_or_study: has_right_to_work, visa_type: 'work', visa_expiry: '2026-12-31' },
         )
       end
 
@@ -282,22 +263,13 @@ RSpec.describe PersonalInformationWizard do
           name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
           nationality: { nationalities: 'british' },
         )
-        state_store.write(return_to_review: :name_and_date_of_birth)
       end
 
       context 'with valid path to review' do
-        let(:step_params) { { return_to_review: :name_and_date_of_birth } }
+        let(:current_step_params) { { return_to_review: 'name_and_date_of_birth' } }
 
         it 'returns review step' do
           expect(wizard.next_step).to eq(:review)
-        end
-      end
-
-      context 'with invalid step in return_to_review' do
-        before { state_store.write(return_to_review: :nonexistent_step) }
-
-        it 'returns normal next step' do
-          expect(wizard.next_step).to eq(:nationality)
         end
       end
     end
@@ -427,9 +399,45 @@ RSpec.describe PersonalInformationWizard do
         expect(wizard.previous_step_path).to be_nil
       end
     end
+
+    context 'when return to review' do
+      let(:origin) { 'nationality' }
+      let(:current_step_params) { { return_to_review: origin } }
+
+      before do
+        state_store.save_steps(
+          name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
+          nationality: { nationalities: 'british' },
+        )
+      end
+
+      context 'when at origin step' do
+        let(:current_step) { :nationality }
+
+        it 'returns to review' do
+          expect(wizard.previous_step).to eq(:review)
+        end
+      end
+
+      context 'when not at origin step' do
+        let(:current_step) { :review }
+
+        it 'returns previous visited step' do
+          expect(wizard.previous_step).to eq(:nationality)
+        end
+      end
+
+      context 'when at first step' do
+        let(:current_step) { :name_and_date_of_birth }
+
+        it 'returns nil' do
+          expect(wizard.previous_step).to be_nil
+        end
+      end
+    end
   end
 
-  describe '#validated_path_to' do
+  describe '#step_accessible?' do
     context 'when all steps are valid' do
       let(:current_step) { :review }
 
@@ -443,17 +451,20 @@ RSpec.describe PersonalInformationWizard do
       it { is_expected.to be_at_step(:review) }
       it { is_expected.to have_valid_path_to(:review) }
 
-      it 'returns all step identifiers' do
-        expect(wizard.validated_path_to).to eq(%i[name_and_date_of_birth nationality review])
+      it 'review is accessible' do
+        expect(wizard.step_accessible?(:review)).to be true
+      end
+
+      it 'returns full path' do
+        expect(wizard.path_traversal(:review)).to eq(%i[name_and_date_of_birth nationality review])
       end
     end
 
     context 'when path is incomplete' do
       let(:current_step) { :nationality }
-      let(:state_store) { StateStores::PersonalInformation.new(session: session, key: :application_form) }
 
-      it 'returns empty' do
-        expect(wizard.validated_path_to).to eq([])
+      it 'review is not accessible without previous steps' do
+        expect(wizard.step_accessible?(:review)).to be false
       end
     end
 
@@ -467,8 +478,12 @@ RSpec.describe PersonalInformationWizard do
         )
       end
 
-      it 'returns empty' do
-        expect(wizard.validated_path_to).to eq([])
+      it 'name step is invalid' do
+        expect(wizard.step_valid?(:name_and_date_of_birth)).to be false
+      end
+
+      it 'review is not accessible due to invalid previous step' do
+        expect(wizard.step_accessible?(:review)).to be false
       end
     end
 
@@ -484,8 +499,8 @@ RSpec.describe PersonalInformationWizard do
 
       it { is_expected.to have_valid_path_to(:review) }
 
-      it 'validates path to target' do
-        expect(wizard.validated_path_to(:review)).to eq(%i[name_and_date_of_birth nationality review])
+      it 'review is accessible when all previous steps valid' do
+        expect(wizard.step_accessible?(:review)).to be true
       end
     end
   end

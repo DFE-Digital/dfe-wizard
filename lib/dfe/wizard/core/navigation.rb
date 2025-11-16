@@ -103,7 +103,7 @@ module DfE
 
         # Check if a PATH EXISTS in the graph to reach a target step
         #
-        # Only checks GRAPH REACHABILITY based on current data.
+        # Only checks GRAPH REACHABILITY based on current flow.
         #
         # Does NOT check:
         # - If steps are valid

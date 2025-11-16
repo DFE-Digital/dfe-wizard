@@ -24,10 +24,6 @@ module DfE
   #   class MyWizard
   #     include DfE::Wizard
   #
-  #     def initialize(current_step:, state_store:, step_params: {})
-  #       super
-  #     end
-  #
   #     def steps_processor
   #       DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
   #         graph.add_node :name, NameStep
@@ -53,7 +49,7 @@ module DfE
   #   wizard = MyWizard.new(
   #     current_step: :email,
   #     state_store: DfE::Wizard::StateStore::SessionStore.new(session),
-  #     step_params: params
+  #     current_step_params: params
   #   )
   #
   #   wizard.next_step       # => :review
@@ -124,27 +120,6 @@ module DfE
     end
 
     # @!endgroup
-    # @!group Validators
-
-    # Validation logic for steps and paths
-    #
-    # Pure, stateless validators that evaluate step and path validity on each call.
-    # No caching or state is maintained.
-    #
-    # @api public
-    module Validators
-      # Validates paths through the wizard
-      # @api public
-      autoload :PathValidator, 'dfe/wizard/validators/path_validator'
-
-      # Validates individual wizard steps
-      # @api public
-      autoload :StepValidator, 'dfe/wizard/validators/step_validator'
-
-      # Immutable value object representing validation result
-      # @api public
-      autoload :ValidationResult, 'dfe/wizard/validators/validation_result'
-    end
 
     # @!group State Persistence
     # Repository adapters for wizard state persistence
@@ -233,21 +208,23 @@ module DfE
     # Initializes a new wizard instance
     #
     # @param current_step [Symbol, nil] Name of the current step
-    # @param state_store [DfE::Wizard::StateStore::Base] State persistence adapter
-    # @param step_params [Hash] Parameters for the current step (typically from request)
+    # @param current_step_params [Hash] Parameters for the current step (typically from request)
+    # @param state_store [DfE::Wizard::StateStore] State persistence adapter
     #
     # @example
     #   wizard = MyWizard.new(
     #     current_step: :email,
-    #     state_store: DfE::Wizard::StateStore::Session.new(session:, key: 'my_wizard'),
-    #     step_params: params
+    #     current_step_params: params,
+    #     state_store: MyStateStore.new(
+    #       repository: DfE::Wizard::Repository::InMemory.new,
+    #     ),
     #   )
     #
     # @return [self]
-    def initialize(current_step:, state_store:, step_params: {})
+    def initialize(current_step:, current_step_params: {}, state_store:)
       @current_step_name = current_step&.to_sym
+      @current_step_params = current_step_params
       @state_store = state_store
-      @step_params = step_params
     end
 
     # The current step being displayed
@@ -257,10 +234,6 @@ module DfE
     # The state store instance
     # @return [DfE::Wizard::StateStore::Base]
     attr_reader :state_store
-
-    # Parameters for the current step (from request)
-    # @return [Hash]
-    attr_reader :step_params
 
     # @!endgroup
     # @!group Extension Points
@@ -297,75 +270,6 @@ module DfE
     def route_strategy
       raise NotImplementedError, 'Subclass must implement #route_strategy'
     end
-
-    # Create and cache the step validator
-    # The step validator evaluates individual steps:
-    # - Is this step visited (step processor visited and has data)?
-    # - Is this step valid (passes validation)?
-    # - What are the validation errors?
-    #
-    # Used internally by validation methods like {#step_valid?} and {#step_visited?}.
-    #
-    # Pure validator with no state - evaluates fresh on each call.
-    # Instantiated once per wizard and cached.
-    #
-    # Can be overridden to use a custom validator implementation.
-    #
-    # @return [DfE::Wizard::Validators::StepValidator]
-    #
-    # @example Use default validator
-    #   wizard.step_valid?(:email)  # Uses this validator internally
-    #
-    # @example Override with custom validator
-    #   class MyWizard
-    #     include DfE::Wizard
-    #
-    #     def step_validator
-    #       @step_validator ||= MyCustomStepValidator.new(self)
-    #     end
-    #   end
-    #
-    # @api public
-    def step_validator
-      @step_validator ||= Validators::StepValidator.new(self)
-    end
-
-    # Create and cache the path validator
-    #
-    # The path validator evaluates sequences of steps:
-    # - Are all steps up to a target visited?
-    # - Are all steps up to a target valid?
-    # - What's the first invalid step?
-    # - What's the first unvisited step?
-    #
-    # Uses the {#step_validator} to validate individual steps.
-    # Used internally by validation methods like {#path_complete_to?},
-    # {#path_valid_to?}, and {#validated_path}.
-    #
-    # Pure validator with no state - evaluates fresh on each call.
-    # Instantiated once per wizard and cached.
-    #
-    # Can be overridden to use a custom validator implementation.
-    #
-    # @return [DfE::Wizard::Validators::PathValidator]
-    #
-    # @example Use default validator
-    #   wizard.path_complete_to?(:review)  # Uses this validator internally
-    #
-    # @example Override with custom validator
-    #   class MyWizard
-    #     include DfE::Wizard
-    #
-    #     def path_validator
-    #       @path_validator ||= MyCustomPathValidator.new(self, step_validator)
-    #     end
-    #   end
-    #
-    # @api public
-    def path_validator
-      @path_validator ||= Validators::PathValidator.new(self, step_validator)
-    end
-
     # @!endgroup
   end
 end

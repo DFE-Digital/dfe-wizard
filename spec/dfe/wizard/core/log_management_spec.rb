@@ -1,9 +1,7 @@
 RSpec.describe DfE::Wizard::Core::LogManagement do
-  let(:current_step_params) { ActionController::Parameters.new({}) }
   let(:state_store) do
     StateStores::PersonalInformation.new(
       repository: DfE::Wizard::Repository::InMemory.new,
-      current_step_params:,
     )
   end
 

@@ -14,7 +14,7 @@ class PersonalInformationWizard
 
       graph.add_conditional_edge(
         from: :nationality,
-        when: :needs_permission_to_work_or_study?,
+        when: ->(step) { step.needs_permission_to_work_or_study? },
         then: :right_to_work_or_study,
         else: :review,
         label: 'Non-UK/Non-Irish',
@@ -59,10 +59,6 @@ class PersonalInformationWizard
   end
 
   def return_to_review
-    step_params[:return_to_review]
-  end
-
-  def needs_permission_to_work_or_study?(step)
-    step.needs_permission_to_work_or_study?
+    @current_step_params[:return_to_review]
   end
 end

@@ -6,7 +6,7 @@ module AssignMentor
     def new = nil
 
     def create
-      if @wizard.valid_step?
+      if @wizard.current_step_valid?
         @wizard.save
         redirect_to @wizard.next_step_path
       else

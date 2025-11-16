@@ -208,14 +208,17 @@ RSpec.describe DfE::Wizard::Logging::Logger do
 
   describe 'Integration with wizard' do
     let(:session) { {} }
-    let(:state_store) { DfE::Wizard::StateStore::Session.new(session: session, key: 'test_wizard') }
+    let(:state_store) do
+      StateStores::PersonalInformation.new(
+        repository: DfE::Wizard::Repository::InMemory.new,
+      )
+    end
     let(:wizard_logger) { described_class.new(rails_logger).exclude(:navigation) }
 
     let(:wizard) do
       PersonalInformationWizard.new(
         current_step: :name_and_date_of_birth,
-        state_store: state_store,
-        step_params: ActionController::Parameters.new({}),
+        state_store:,
       ).tap do |w|
         allow(w).to receive(:logger).and_return(wizard_logger)
       end
