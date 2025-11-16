@@ -90,9 +90,25 @@ module DfE
       # @api public
       autoload :Navigation, 'dfe/wizard/core/navigation'
 
-      # State store lifecycle management
+      # Low-level read and write for wizard state; raw access to repository storage.
+      #
       # @api public
-      autoload :StateManagement, 'dfe/wizard/core/state_management'
+      autoload :StateAccess, 'dfe/wizard/core/state_access'
+
+      # Path-aware filtering on wizard state
+      #
+      # @api public
+      autoload :StateFiltering, 'dfe/wizard/core/state_filtering'
+
+      # Wizard completion, metadata, export, and state summary helpers.
+      #
+      # @api public
+      autoload :StateLifecycle, 'dfe/wizard/core/state_lifecycle'
+
+      # Define a State store to manage all data and business logic
+      #
+      # @api public
+      autoload :StateStore, 'dfe/wizard/core/state_store'
 
       # Define a step with attributes and validation
       # @api public
@@ -130,36 +146,17 @@ module DfE
       autoload :ValidationResult, 'dfe/wizard/validators/validation_result'
     end
 
-    # @!endgroup
     # @!group State Persistence
-
-    # State store adapters for persisting wizard data
+    # Repository adapters for wizard state persistence
     #
-    # All stores implement a common interface.
+    # All repositories implement a common, minimal interface.
     # Can be extended with new adapters for different backends.
     #
     # @api public
-    module StateStore
-      # Abstract base class defining the StateStore contract
-      # @api public
-      autoload :Base, 'dfe/wizard/state_store/base'
-
-      # In memory-based state store
-      # @api public
-      autoload :InMemory, 'dfe/wizard/state_store/in_memory'
-
-      # Redis-based state store
-      # @api public
-      autoload :RedisStore, 'dfe/wizard/state_store/redis_store'
-
-      # Session-based state store
-      # @api public
-      autoload :Session, 'dfe/wizard/state_store/session'
-
-      # In-memory state store (testing only)
-      # @api public
-      autoload :MemoryStore, 'dfe/wizard/state_store/memory_store'
+    module Repository
+      autoload :InMemory, 'dfe/wizard/repository/in_memory'
     end
+    # @!endgroup
 
     # @!endgroup
     # @!group Step Processors
@@ -226,7 +223,9 @@ module DfE
     include Core::Documentation
     include Core::LogManagement
     include Core::Navigation
-    include Core::StateManagement
+    include Core::StateAccess
+    include Core::StateFiltering
+    include Core::StateLifecycle
     include Core::StepManagement
     include Core::Validation
     include Logging

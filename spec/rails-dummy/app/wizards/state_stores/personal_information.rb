@@ -1,4 +1,5 @@
 module StateStores
-  class PersonalInformation < DfE::Wizard::StateStore::Session
+  class PersonalInformation
+    include DfE::Wizard::StateStore
   end
 end

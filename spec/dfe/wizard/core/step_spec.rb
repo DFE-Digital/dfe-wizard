@@ -2,7 +2,7 @@ RSpec.describe DfE::Wizard::Step do
   let(:wizard) do
     PersonalInformationWizard.new(
       current_step: :name_and_date_of_birth,
-      state_store: StateStores::PersonalInformation.new(session: {}, key: 'personal_information'),
+      state_store: StateStores::PersonalInformation.new(repository: DfE::Wizard::Repository::InMemory.new),
     )
   end
 
