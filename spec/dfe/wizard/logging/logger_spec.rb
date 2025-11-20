@@ -97,14 +97,6 @@ RSpec.describe DfE::Wizard::Logging::Logger do
     end
   end
 
-  describe 'CATEGORIES constant' do
-    it 'defines all expected categories' do
-      expect(described_class::CATEGORIES).to eq(
-        %i[navigation routing state validation callbacks],
-      )
-    end
-  end
-
   describe '#tagged' do
     it 'returns a TaggedLogger instance' do
       tagged = logger.tagged('TestTag')

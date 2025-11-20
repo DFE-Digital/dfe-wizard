@@ -29,7 +29,7 @@ module DfE
       # @api public
       class Logger
         # Available logging categories
-        CATEGORIES = %i[navigation routing state validation callbacks].freeze
+        CATEGORIES = %i[navigation routing state validation callbacks step_processor].freeze
 
         def initialize(rails_logger)
           @logger = rails_logger

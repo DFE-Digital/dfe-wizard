@@ -47,7 +47,7 @@ class PersonalInformationWizard
   end
 
   def logger
-    DfE::Wizard::Logger.new(Rails.logger)
+    DfE::Wizard::Logger.new(Rails.logger).exclude(:navigation, :state, :validation, :routing)
   end
 
   def inspect

@@ -13,7 +13,7 @@ module DfE
       class Graph
         Node = Struct.new(:id, :klass, keyword_init: true)
         Edge = Struct.new(:from, :to, keyword_init: true)
-        ConditionalEdge = Struct.new(:from, :when, :then, :else, :label, keyword_init: true)
+        ConditionalEdge = Struct.new(:from, :when, :then, :else, :label, :original_when, keyword_init: true)
         CustomBranchingEdge = Struct.new(:from, :conditional, :potential_transitions, keyword_init: true)
         MultipleConditionalEdge = Struct.new(:from, :branches, :default, :label, keyword_init: true)
 
@@ -108,6 +108,7 @@ module DfE
             then: options[:then],
             else: options[:else],
             label: options[:label],
+            original_when: options[:when],
           )
         end
 
@@ -207,6 +208,7 @@ module DfE
             end
 
             {
+              original_when: branch[:when],
               when: build_predicate(branch[:when]),
               then: branch[:then],
               label: branch[:label],
@@ -266,32 +268,10 @@ module DfE
         end
 
         def next_step_without_callbacks(current_step = @wizard.current_step_name)
-          custom_edge = @custom_branching_edges.find { |e| e.from == current_step }
-          if custom_edge
-            return call_predicate(custom_edge.conditional, current_step)
-          end
-
-          multiple_edge = @multiple_conditional_edges.find { |e| e.from == current_step }
-          if multiple_edge
-            # Evaluate branches in order, return first match
-            multiple_edge.branches.each do |branch|
-              if call_predicate(branch[:when], current_step)
-                return branch[:then]
-              end
-            end
-            # No branch matched, use default
-            return multiple_edge.default
-          end
-
-          cond_edge = @conditional_edges.find { |e| e.from == current_step }
-          if cond_edge
-            result = call_predicate(cond_edge.when, current_step)
-            return result ? cond_edge.then : cond_edge.else
-          end
-
-          edge = @edges.find { |e| e.from == current_step }
-
-          edge&.to
+          evaluate_custom_edge(current_step) ||
+            evaluate_multiple_conditional_edge(current_step) ||
+            evaluate_conditional_edge(current_step) ||
+            evaluate_simple_edge(current_step)
         end
 
         def previous_step(current_step = nil)
@@ -376,23 +356,106 @@ module DfE
           end
         end
 
+        def evaluate_custom_edge(current_step)
+          custom_edge = @custom_branching_edges.find { |e| e.from == current_step }
+          return unless custom_edge
+
+          result = call_predicate(custom_edge.conditional, current_step)
+          log_custom_edge(current_step, result)
+          result
+        end
+
+        def evaluate_multiple_conditional_edge(current_step)
+          multiple_edge = @multiple_conditional_edges.find { |e| e.from == current_step }
+          return unless multiple_edge
+
+          matched_branch = find_matching_branch(multiple_edge, current_step)
+
+          if matched_branch
+            matched_branch[:then]
+          else
+            log_no_branch_matched(current_step, multiple_edge.default)
+            multiple_edge.default
+          end
+        end
+
+        def find_matching_branch(multiple_edge, current_step)
+          multiple_edge.branches.find do |branch|
+            result = call_predicate(branch[:when], current_step)
+            if result
+              log_branch_matched(current_step, branch, result)
+              true
+            end
+          end
+        end
+
+        def evaluate_conditional_edge(current_step)
+          conditional_edge = @conditional_edges.find { |e| e.from == current_step }
+          return unless conditional_edge
+
+          result = call_predicate(conditional_edge.when, current_step)
+          evaluated_step = result ? conditional_edge.then : conditional_edge.else
+          log_conditional_edge(current_step, conditional_edge, result, evaluated_step)
+          evaluated_step
+        end
+
+        def evaluate_simple_edge(current_step)
+          edge = @edges.find { |e| e.from == current_step }
+          edge&.to
+        end
+
+        def log_custom_edge(current_step, result)
+          return unless @wizard.log.respond_to?(:info)
+
+          @wizard.log.info(
+            "[Graph] Custom edge evaluated from step :#{current_step} → #{result.inspect}",
+            category: log_category,
+          )
+        end
+
+        def log_branch_matched(current_step, branch, result)
+          return unless @wizard.log.respond_to?(:info)
+
+          @wizard.log.info(
+            "[Graph] Branch evaluated from step :#{current_step}: " \
+            "#{branch[:original_when]}=#{result.inspect} → :#{branch[:then]}",
+            category: log_category,
+          )
+        end
+
+        def log_no_branch_matched(current_step, default_step)
+          return unless @wizard.log.respond_to?(:info)
+
+          @wizard.log.info(
+            "[Graph] No branch matched from step :#{current_step}, " \
+            "using default option → :#{default_step}",
+            category: log_category,
+          )
+        end
+
+        def log_conditional_edge(current_step, edge, result, evaluated_step)
+          return unless @wizard.log.respond_to?(:info)
+
+          @wizard.log.info(
+            "[Graph] Conditional edge evaluated from step :#{current_step}: " \
+            "#{edge.original_when}=#{result.inspect} → :#{evaluated_step}",
+            category: log_category,
+          )
+        end
+
+        def log_category
+          :step_processor
+        end
+
         def call_predicate(predicate, current_step)
           arity = predicate.arity
           step_object = @wizard.step(current_step)
 
-          result = if arity == 2
-                     predicate.call(step_object, @wizard)
-                   else
-                     predicate.call(step_object)
-                   end
-
-          if @wizard.respond_to?(:logger) && @wizard.logger.respond_to?(:debug)
-            @wizard.logger.debug(
-              "[Graph] Conditional edge evaluated from step '#{current_step}': #{result.inspect}",
-            )
+          if arity == 2
+            predicate.call(step_object, @wizard)
+          else
+            predicate.call(step_object)
           end
-
-          result
         end
       end
     end

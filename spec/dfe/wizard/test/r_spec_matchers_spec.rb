@@ -82,8 +82,8 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
 
     it 'fails if any step is missing' do
       expect {
-        expect(wizard).to have_in_flow(:name_and_date_of_birth, :review)
-      }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Missing: \[:review\]/)
+        expect(wizard).to have_in_flow(:name_and_date_of_birth, :immigration_status)
+      }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Missing: \[:immigration_status\]/)
     end
   end
 
