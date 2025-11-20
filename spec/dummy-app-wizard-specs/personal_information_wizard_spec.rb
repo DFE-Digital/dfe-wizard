@@ -9,15 +9,19 @@ RSpec.describe PersonalInformationWizard do
 
   let(:current_step_params) { {} }
   let(:state_store) do
-    StateStores::PersonalInformation.new(repository: DfE::Wizard::Repository::InMemory.new)
+    StateStores::PersonalInformation.new
   end
   let(:url_helpers) { Rails.application.routes.url_helpers }
 
-  describe '#path_traversal' do
+  describe 'flow path traversal' do
     context 'when British national' do
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: 'british' },
         )
       end
@@ -26,24 +30,62 @@ RSpec.describe PersonalInformationWizard do
         let(:current_step) { :nationality }
 
         it { is_expected.to be_at_step(:nationality) }
-        it { is_expected.to have_visited(:name_and_date_of_birth, :nationality) }
-        it { is_expected.to be_able_to_reach(:review) }
+        it { is_expected.to have_saved(:name_and_date_of_birth, :nationality) }
+        it { is_expected.to have_in_flow(:name_and_date_of_birth, :nationality) }
+        it { expect(:name_and_date_of_birth).to be_saved.in(wizard) }
+        it { expect(:nationality).to be_saved.in(wizard) }
+
+        it 'branches directly to review (skip immigration flow)' do
+          expect(wizard).to branch_to(:review).from(:nationality)
+        end
       end
 
       context 'at review step' do
         let(:current_step) { :review }
 
         it { is_expected.to be_at_step(:review) }
-        it { is_expected.to have_visited(:name_and_date_of_birth, :nationality, :review) }
+        it { is_expected.to have_saved(:name_and_date_of_birth, :nationality) }
+        it { is_expected.to have_in_flow(:name_and_date_of_birth, :nationality, :review) }
+
+        it 'flow path excludes immigration steps' do
+          expect(wizard.flow_path).to eq(%i[name_and_date_of_birth nationality review])
+        end
+      end
+    end
+
+    context 'when Irish national' do
+      before do
+        state_store.save_steps(
+          name_and_date_of_birth: {
+            first_name: 'Patrick',
+            last_name: 'Murphy',
+            date_of_birth: '1988-03-17',
+          },
+          nationality: { nationalities: 'irish' },
+        )
+      end
+
+      let(:current_step) { :nationality }
+
+      it 'branches directly to review (same as British)' do
+        expect(wizard).to branch_to(:review).from(:nationality)
       end
     end
 
     context 'when non-UK national with right to work' do
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'Jean', last_name: 'Dupont', date_of_birth: '1995-06-15' },
+          name_and_date_of_birth: {
+            first_name: 'Jean',
+            last_name: 'Dupont',
+            date_of_birth: '1995-06-15',
+          },
           nationality: { nationalities: 'french' },
-          right_to_work_or_study: { right_to_work_or_study: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' },
+          right_to_work_or_study: {
+            right_to_work_or_study: 'yes',
+            visa_type: 'work',
+            visa_expiry: '2026-12-31',
+          },
           immigration_status: { status: 'settled' },
         )
       end
@@ -52,8 +94,18 @@ RSpec.describe PersonalInformationWizard do
         let(:current_step) { :right_to_work_or_study }
 
         it { is_expected.to be_at_step(:right_to_work_or_study) }
-        it { is_expected.to have_visited(:name_and_date_of_birth, :nationality, :right_to_work_or_study) }
-        it { expect(:immigration_status).to be_reachable.in(wizard) }
+        it {
+          is_expected.to have_saved(
+            :name_and_date_of_birth,
+            :nationality,
+            :right_to_work_or_study,
+          )
+        }
+        it { expect(:right_to_work_or_study).to be_saved.in(wizard) }
+
+        it 'branches to immigration_status when right to work' do
+          expect(wizard).to branch_to(:immigration_status).from(:right_to_work_or_study)
+        end
       end
 
       context 'at review step' do
@@ -61,7 +113,15 @@ RSpec.describe PersonalInformationWizard do
 
         it { is_expected.to be_at_step(:review) }
         it {
-          is_expected.to have_visited(
+          is_expected.to have_saved(
+            :name_and_date_of_birth,
+            :nationality,
+            :right_to_work_or_study,
+            :immigration_status,
+          )
+        }
+        it {
+          is_expected.to have_in_flow(
             :name_and_date_of_birth,
             :nationality,
             :right_to_work_or_study,
@@ -69,13 +129,29 @@ RSpec.describe PersonalInformationWizard do
             :review,
           )
         }
+
+        it 'flow path includes full immigration journey' do
+          expect(wizard.flow_path).to eq(
+            %i[
+              name_and_date_of_birth
+              nationality
+              right_to_work_or_study
+              immigration_status
+              review
+            ],
+          )
+        end
       end
     end
 
     context 'when non-UK national without right to work' do
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'Maria', last_name: 'Garcia', date_of_birth: '1992-03-22' },
+          name_and_date_of_birth: {
+            first_name: 'Maria',
+            last_name: 'Garcia',
+            date_of_birth: '1992-03-22',
+          },
           nationality: { nationalities: 'spanish' },
           right_to_work_or_study: { right_to_work_or_study: 'no' },
         )
@@ -85,22 +161,48 @@ RSpec.describe PersonalInformationWizard do
         let(:current_step) { :right_to_work_or_study }
 
         it { is_expected.to be_at_step(:right_to_work_or_study) }
-        it { is_expected.to have_visited(:name_and_date_of_birth, :nationality, :right_to_work_or_study) }
-        it { is_expected.to be_able_to_reach(:review) }
+
+        it 'branches directly to review (skip immigration_status)' do
+          expect(wizard).to branch_to(:review).from(:right_to_work_or_study)
+        end
       end
 
       context 'at review step' do
         let(:current_step) { :review }
 
         it { is_expected.to be_at_step(:review) }
-        it { is_expected.to have_visited(:name_and_date_of_birth, :nationality, :right_to_work_or_study, :review) }
+        it {
+          is_expected.to have_saved(
+            :name_and_date_of_birth,
+            :nationality,
+            :right_to_work_or_study,
+          )
+        }
+        it {
+          is_expected.to have_in_flow(
+            :name_and_date_of_birth,
+            :nationality,
+            :right_to_work_or_study,
+            :review,
+          )
+        }
+
+        it 'flow path excludes immigration_status' do
+          expect(wizard.flow_path).to eq(
+            %i[name_and_date_of_birth nationality right_to_work_or_study review],
+          )
+        end
       end
     end
 
     context 'with explicit target step' do
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: 'british' },
         )
       end
@@ -108,10 +210,9 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :name_and_date_of_birth }
 
       it { is_expected.to be_at_step(:name_and_date_of_birth) }
-      it { is_expected.to be_able_to_reach(:review) }
 
-      it 'returns path to specified target' do
-        expect(wizard.path_traversal(:review)).to eq(%i[name_and_date_of_birth nationality review])
+      it 'returns full path to target' do
+        expect(wizard.flow_path(:review)).to eq(%i[name_and_date_of_birth nationality review])
       end
     end
   end
@@ -122,12 +223,16 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+          },
         )
       end
 
       it { is_expected.to be_at_step(:name_and_date_of_birth) }
-      it { is_expected.to be_able_to_reach(:nationality) }
+      it { expect(:name_and_date_of_birth).to be_saved.in(wizard) }
 
       it 'moves to nationality' do
         expect(wizard.next_step).to eq(:nationality)
@@ -143,7 +248,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: nationality_value },
         )
       end
@@ -152,7 +261,6 @@ RSpec.describe PersonalInformationWizard do
         let(:nationality_value) { 'british' }
 
         it { is_expected.to be_at_step(:nationality) }
-        it { is_expected.to be_able_to_reach(:review) }
 
         it 'skips to review' do
           expect(wizard.next_step).to eq(:review)
@@ -161,30 +269,39 @@ RSpec.describe PersonalInformationWizard do
         it 'returns correct path' do
           expect(wizard).to have_next_step_path(url_helpers.personal_information_review_path)
         end
+
+        it 'branches to review from nationality' do
+          expect(wizard).to branch_to(:review).from(:nationality)
+        end
       end
 
       context 'Irish national' do
         let(:nationality_value) { 'irish' }
 
-        it { is_expected.to be_able_to_reach(:review) }
-
         it 'skips to review' do
           expect(wizard.next_step).to eq(:review)
+        end
+
+        it 'branches to review from nationality' do
+          expect(wizard).to branch_to(:review).from(:nationality)
         end
       end
 
       context 'non-UK national' do
         let(:nationality_value) { 'french' }
 
-        it { is_expected.to be_able_to_reach(:right_to_work_or_study) }
-        it { expect(:right_to_work_or_study).to be_reachable.in(wizard) }
-
         it 'proceeds to right_to_work_or_study' do
           expect(wizard.next_step).to eq(:right_to_work_or_study)
         end
 
         it 'returns correct path' do
-          expect(wizard).to have_next_step_path(url_helpers.personal_information_right_to_work_or_study_path)
+          expect(wizard).to have_next_step_path(
+            url_helpers.personal_information_right_to_work_or_study_path,
+          )
+        end
+
+        it 'branches to immigration flow from nationality' do
+          expect(wizard).to branch_to(:right_to_work_or_study).from(:nationality)
         end
       end
     end
@@ -194,9 +311,17 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'Jean', last_name: 'Dupont', date_of_birth: '1995-06-15' },
+          name_and_date_of_birth: {
+            first_name: 'Jean',
+            last_name: 'Dupont',
+            date_of_birth: '1995-06-15',
+          },
           nationality: { nationalities: 'french' },
-          right_to_work_or_study: { right_to_work_or_study: has_right_to_work, visa_type: 'work', visa_expiry: '2026-12-31' },
+          right_to_work_or_study: {
+            right_to_work_or_study: has_right_to_work,
+            visa_type: 'work',
+            visa_expiry: '2026-12-31',
+          },
         )
       end
 
@@ -204,21 +329,24 @@ RSpec.describe PersonalInformationWizard do
         let(:has_right_to_work) { 'yes' }
 
         it { is_expected.to be_at_step(:right_to_work_or_study) }
-        it { expect(:immigration_status).to be_reachable.in(wizard) }
 
         it 'proceeds to immigration_status' do
           expect(wizard.next_step).to eq(:immigration_status)
         end
 
         it 'returns correct path' do
-          expect(wizard).to have_next_step_path(url_helpers.personal_information_immigration_status_path)
+          expect(wizard).to have_next_step_path(
+            url_helpers.personal_information_immigration_status_path,
+          )
+        end
+
+        it 'branches to immigration_status' do
+          expect(wizard).to branch_to(:immigration_status).from(:right_to_work_or_study)
         end
       end
 
       context 'without right to work' do
         let(:has_right_to_work) { 'no' }
-
-        it { is_expected.to be_able_to_reach(:review) }
 
         it 'proceeds to review' do
           expect(wizard.next_step).to eq(:review)
@@ -226,6 +354,10 @@ RSpec.describe PersonalInformationWizard do
 
         it 'returns correct path' do
           expect(wizard).to have_next_step_path(url_helpers.personal_information_review_path)
+        end
+
+        it 'branches to review' do
+          expect(wizard).to branch_to(:review).from(:right_to_work_or_study)
         end
       end
     end
@@ -235,16 +367,23 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'Test',
+            last_name: 'User',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: 'french' },
-          right_to_work_or_study: { right_to_work_or_study: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' },
+          right_to_work_or_study: {
+            right_to_work_or_study: 'yes',
+            visa_type: 'work',
+            visa_expiry: '2026-12-31',
+          },
           immigration_status: { status: 'settled' },
         )
       end
 
       it { is_expected.to be_at_step(:immigration_status) }
-      it { is_expected.to have_visited(:right_to_work_or_study) }
-      it { is_expected.to be_able_to_reach(:review) }
+      it { expect(:right_to_work_or_study).to be_saved.in(wizard) }
 
       it 'proceeds to review' do
         expect(wizard.next_step).to eq(:review)
@@ -260,7 +399,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: 'british' },
         )
       end
@@ -281,21 +424,31 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'Test',
+            last_name: 'User',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: 'french' },
-          right_to_work_or_study: { right_to_work_or_study: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' },
+          right_to_work_or_study: {
+            right_to_work_or_study: 'yes',
+            visa_type: 'work',
+            visa_expiry: '2026-12-31',
+          },
         )
       end
 
       it { is_expected.to be_at_step(:immigration_status) }
-      it { is_expected.to have_visited(:right_to_work_or_study) }
+      it { expect(:right_to_work_or_study).to be_saved.in(wizard) }
 
       it 'returns to right_to_work_or_study step' do
         expect(wizard.previous_step).to eq(:right_to_work_or_study)
       end
 
       it 'returns correct path' do
-        expect(wizard).to have_previous_step_path(url_helpers.personal_information_right_to_work_or_study_path)
+        expect(wizard).to have_previous_step_path(
+          url_helpers.personal_information_right_to_work_or_study_path,
+        )
       end
     end
 
@@ -304,7 +457,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'Test',
+            last_name: 'User',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: 'french' },
         )
       end
@@ -325,7 +482,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'Test',
+            last_name: 'User',
+            date_of_birth: '1990-01-01',
+          },
         )
       end
 
@@ -336,7 +497,9 @@ RSpec.describe PersonalInformationWizard do
       end
 
       it 'returns correct path' do
-        expect(wizard).to have_previous_step_path(url_helpers.personal_information_name_and_date_of_birth_path)
+        expect(wizard).to have_previous_step_path(
+          url_helpers.personal_information_name_and_date_of_birth_path,
+        )
       end
     end
 
@@ -345,13 +508,17 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'Test',
+            last_name: 'User',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: 'british' },
         )
       end
 
       it { is_expected.to be_at_step(:review) }
-      it { is_expected.to have_visited(:nationality) }
+      it { expect(:nationality).to be_saved.in(wizard) }
 
       it 'returns to nationality step' do
         expect(wizard.previous_step).to eq(:nationality)
@@ -367,22 +534,33 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'Test', last_name: 'User', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'Test',
+            last_name: 'User',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: 'french' },
-          right_to_work_or_study: { right_to_work_or_study: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' },
+          right_to_work_or_study: {
+            right_to_work_or_study: 'yes',
+            visa_type: 'work',
+            visa_expiry: '2026-12-31',
+          },
           immigration_status: { status: 'settled' },
         )
       end
 
       it { is_expected.to be_at_step(:review) }
-      it { is_expected.to have_visited(:immigration_status, :right_to_work_or_study) }
+      it { expect(:immigration_status).to be_saved.in(wizard) }
+      it { expect(:right_to_work_or_study).to be_saved.in(wizard) }
 
       it 'returns to immigration_status step' do
         expect(wizard.previous_step).to eq(:immigration_status)
       end
 
       it 'returns correct path' do
-        expect(wizard).to have_previous_step_path(url_helpers.personal_information_immigration_status_path)
+        expect(wizard).to have_previous_step_path(
+          url_helpers.personal_information_immigration_status_path,
+        )
       end
     end
 
@@ -406,7 +584,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: 'british' },
         )
       end
@@ -437,26 +619,33 @@ RSpec.describe PersonalInformationWizard do
     end
   end
 
-  describe '#step_accessible?' do
+  describe 'validation and accessibility' do
     context 'when all steps are valid' do
       let(:current_step) { :review }
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: 'british' },
         )
       end
 
       it { is_expected.to be_at_step(:review) }
-      it { is_expected.to have_valid_path_to(:review) }
+      it { is_expected.to be_valid_to(:review) }
+      it { expect(:review).to be_valid_step.in(wizard) }
+      it { expect(:name_and_date_of_birth).to be_valid_step.in(wizard) }
+      it { expect(:nationality).to be_valid_step.in(wizard) }
 
       it 'review is accessible' do
-        expect(wizard.step_accessible?(:review)).to be true
+        expect(wizard.valid_path_to?(:review)).to be true
       end
 
-      it 'returns full path' do
-        expect(wizard.path_traversal(:review)).to eq(%i[name_and_date_of_birth nationality review])
+      it 'returns full flow path' do
+        expect(wizard.flow_path).to eq(%i[name_and_date_of_birth nationality review])
       end
     end
 
@@ -464,8 +653,10 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :nationality }
 
       it 'review is not accessible without previous steps' do
-        expect(wizard.step_accessible?(:review)).to be false
+        expect(wizard.valid_path_to?(:review)).to be false
       end
+
+      it { expect(wizard).not_to be_valid_to(:review) }
     end
 
     context 'when step has invalid data' do
@@ -473,17 +664,24 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: '', last_name: 'Doe', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: '',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: 'british' },
         )
       end
 
+      it { expect(:name_and_date_of_birth).not_to be_valid_step.in(wizard) }
+      it { expect(wizard).not_to be_valid_to(:review) }
+
       it 'name step is invalid' do
-        expect(wizard.step_valid?(:name_and_date_of_birth)).to be false
+        expect(wizard.valid?(:name_and_date_of_birth)).to be false
       end
 
       it 'review is not accessible due to invalid previous step' do
-        expect(wizard.step_accessible?(:review)).to be false
+        expect(wizard.valid_path_to?(:review)).to be false
       end
     end
 
@@ -492,16 +690,35 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.save_steps(
-          name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
+          name_and_date_of_birth: {
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+          },
           nationality: { nationalities: 'british' },
         )
       end
 
-      it { is_expected.to have_valid_path_to(:review) }
+      it { is_expected.to be_valid_to(:review) }
 
       it 'review is accessible when all previous steps valid' do
-        expect(wizard.step_accessible?(:review)).to be true
+        expect(wizard.valid_path_to?(:review)).to be true
       end
+    end
+
+    context 'with multiple invalid steps' do
+      let(:current_step) { :review }
+
+      before do
+        state_store.save_steps(
+          name_and_date_of_birth: { first_name: '', last_name: '', date_of_birth: '' },
+          nationality: { nationalities: '' },
+        )
+      end
+
+      it { expect(wizard).not_to be_valid_to(:review) }
+      it { expect(:name_and_date_of_birth).not_to be_valid_step.in(wizard) }
+      it { expect(:nationality).not_to be_valid_step.in(wizard) }
     end
   end
 
@@ -513,6 +730,8 @@ RSpec.describe PersonalInformationWizard do
         nationality: { nationalities: 'french' },
       )
     end
+
+    it { expect(:nationality).to be_saved.in(wizard) }
 
     it 'returns hydrated step object' do
       step = wizard.step(:nationality)
@@ -535,7 +754,7 @@ RSpec.describe PersonalInformationWizard do
     end
   end
 
-  describe '#current_step_object' do
+  describe '#current_step' do
     let(:current_step) { :nationality }
 
     before do
@@ -545,9 +764,10 @@ RSpec.describe PersonalInformationWizard do
     end
 
     it { is_expected.to be_at_step(:nationality) }
+    it { expect(:nationality).to be_saved.in(wizard) }
 
     it 'returns hydrated current step' do
-      step = wizard.current_step_object
+      step = wizard.current_step
       expect(step).to be_instance_of(Steps::Nationality)
       expect(step.nationalities).to eq(['british'])
     end

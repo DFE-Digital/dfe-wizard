@@ -1,7 +1,7 @@
 module PersonalInformation
   class ReviewController < WizardController
     def index
-      @summary_steps = @wizard.summary_steps
+      @steps = @wizard.valid_steps
     end
   end
 end

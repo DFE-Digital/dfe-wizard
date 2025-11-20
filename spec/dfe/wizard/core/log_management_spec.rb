@@ -1,8 +1,6 @@
 RSpec.describe DfE::Wizard::Core::LogManagement do
   let(:state_store) do
-    StateStores::PersonalInformation.new(
-      repository: DfE::Wizard::Repository::InMemory.new,
-    )
+    StateStores::PersonalInformation.new
   end
 
   before do
@@ -79,14 +77,14 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
       end
     end
 
-    describe '#log_path_traversal' do
+    describe '#log_flow_path_resolved' do
       it 'logs path calculation at DEBUG level' do
         rails_logger.level = Logger::DEBUG
 
-        wizard.log_path_traversal(target: :review, path: %i[name_and_date_of_birth nationality review])
+        wizard.log_flow_path_resolved(target: :review, path: %i[name_and_date_of_birth nationality review])
 
         output = log_output.string
-        expect(output).to include('Path traversal')
+        expect(output).to include('Flow Path')
         expect(output).to include('target=:review')
         expect(output).to include('path=[:name_and_date_of_birth, :nationality, :review]')
       end
@@ -94,7 +92,7 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
       it 'does not log at INFO level' do
         rails_logger.level = Logger::INFO
 
-        wizard.log_path_traversal(target: :review, path: [])
+        wizard.log_flow_path_resolved(target: :review, path: [])
 
         expect(log_output.string).to be_empty
       end
@@ -103,7 +101,7 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         rails_logger.level = Logger::DEBUG
         wizard_logger.exclude(:navigation)
 
-        wizard.log_path_traversal(target: :review, path: %i[a b])
+        wizard.log_flow_path_resolved(target: :review, path: %i[a b])
 
         expect(log_output.string).to be_empty
       end

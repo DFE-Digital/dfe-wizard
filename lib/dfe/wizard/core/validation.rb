@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module DfE
   module Wizard
     module Core
@@ -18,7 +16,7 @@ module DfE
         # @return [Boolean] true if current step is valid
         #
         # @example After form submission
-        #   wizard.current_step.assign_attributes(params[:step])
+        #
         #   if wizard.current_step_valid?
         #     wizard.save
         #     redirect_to wizard.next_step_path
@@ -33,55 +31,69 @@ module DfE
               type: :step,
               result: result,
               step: current_step_name,
-              errors: current_step.errors.full_messages
+              errors: current_step.errors.full_messages,
             )
           end
         end
 
-        # Validate a given step
+        # Check if step data is valid
         #
-        # Checks if step passes validation rules.
+        # @param step_id [Symbol] Step identifier
+        # @return [Boolean] true if step passes validation
         #
-        # @return [Boolean] true if step is valid
+        # @example
+        #   wizard.valid?(:name)  # => true
         #
         # @api public
-        def step_valid?(step_id)
+        def valid?(step_id)
           step(step_id).valid?
         end
 
-        # Check if a step is accessible to the user
+        # Get steps that are valid (safe path) up to a step (default
+        # to current step).
         #
-        # A step is accessible if:
-        # - It's the root step, OR
-        # - It's in the current path AND all previous steps are valid
+        # Returns array of step IDs where data exists and passes validation.
+        # Stops **before** an invalid step.
         #
-        # Use this in controllers to prevent users jumping ahead.
-        # Or to check user can return to review if can reach review
+        # @return [Array<Symbol>] Steps with valid data
         #
-        # @param step_id [Symbol] Step to check
-        # @return [Boolean] true if step can be accessed
-        #
-        # @example In controller before_action
-        #   def ensure_step_accessible
-        #     render_404 unless @wizard.step_accessible?(params[:step])
-        #   end
-        #
-        # @example Root step always accessible
-        #   wizard.step_accessible?(:name)  # => true
-        #
-        # @example Step requires previous steps valid
-        #   wizard.step_accessible?(:review)  # => false if name invalid
+        # @example
+        #   wizard.valid_path  # => [:name, :email]
         #
         # @api public
-        def step_accessible?(step_id)
-          return true if step_id == steps_processor.root_node
+        def valid_path(target_step = current_step_name)
+          flow_path(target_step).take_while { |step_id| valid?(step_id) }
+        end
 
-          path = path_traversal(step_id)
-          return false unless path.include?(step_id)
+        # Check if can proceed to target step (all previous valid)
+        #
+        # Returns true if all steps before target have valid data.
+        #
+        # @param target_step [Symbol] Target step ID
+        # @return [Boolean] true if can proceed
+        #
+        # @example Can user reach review?
+        #   wizard.valid_path_to?(:review)  # => true
+        #
+        # @api public
+        def valid_path_to?(target_step)
+          return true if target_step == steps_processor.root_node
 
-          # All previous steps must be valid
-          previous_steps = path[0...-1]
-          previous_steps.all? { |prev_id| step(prev_id).valid? }
+          path = flow_path(target_step)
+          idx = path.index(target_step)
+          return false unless idx
+
+          previous = path[0...idx]
+          previous.all? { |step_id| valid?(step_id) }
+        end
+
+        # Get hydrated step objects for valid steps
+        #
+        # @return [Array<DfE::Wizard::Step>]
+        #
+        # @api public
+        def steps_valid
+          valid_path.map { |step_id| step(step_id) }
         end
 
         # Check if current step is accessible
@@ -97,8 +109,8 @@ module DfE
         #   end
         #
         # @api public
-        def current_step_accessible?
-          step_accessible?(current_step_name)
+        def valid_path_to_current_step?
+          valid_path_to?(current_step_name)
         end
       end
     end

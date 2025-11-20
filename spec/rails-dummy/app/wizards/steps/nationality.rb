@@ -23,9 +23,5 @@ module Steps
         :other_nationality,
       ]
     end
-
-    def needs_permission_to_work_or_study?
-      !nationalities.intersect?(%w[british irish])
-    end
   end
 end

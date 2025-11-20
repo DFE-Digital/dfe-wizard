@@ -78,6 +78,10 @@ module DfE
       # @api public
       autoload :Documentation, 'dfe/wizard/core/documentation'
 
+      # Inspect class to understand the whole wizard management in development
+      # @api public
+      autoload :Inspect, 'dfe/wizard/core/inspect'
+
       # Logging capabilities
       # @api public
       autoload :LogManagement, 'dfe/wizard/core/log_management'
@@ -86,20 +90,10 @@ module DfE
       # @api public
       autoload :Navigation, 'dfe/wizard/core/navigation'
 
-      # Low-level read and write for wizard state; raw access to repository storage.
+      # All state management under wizard
       #
       # @api public
-      autoload :StateAccess, 'dfe/wizard/core/state_access'
-
-      # Path-aware filtering on wizard state
-      #
-      # @api public
-      autoload :StateFiltering, 'dfe/wizard/core/state_filtering'
-
-      # Wizard completion, metadata, export, and state summary helpers.
-      #
-      # @api public
-      autoload :StateLifecycle, 'dfe/wizard/core/state_lifecycle'
+      autoload :StateManagement, 'dfe/wizard/core/state_management'
 
       # Define a State store to manage all data and business logic
       #
@@ -130,6 +124,7 @@ module DfE
     # @api public
     module Repository
       autoload :InMemory, 'dfe/wizard/repository/in_memory'
+      autoload :Session, 'dfe/wizard/repository/session'
     end
     # @!endgroup
 
@@ -194,15 +189,13 @@ module DfE
     # @!group Main API
 
     include Core
-    include Core::CheckYourAnswers
-    include Core::Documentation
-    include Core::LogManagement
     include Core::Navigation
-    include Core::StateAccess
-    include Core::StateFiltering
-    include Core::StateLifecycle
-    include Core::StepManagement
     include Core::Validation
+    include Core::StepManagement
+    include Core::StateManagement
+    include Core::CheckYourAnswers
+    include Core::LogManagement
+    include Core::Documentation
     include Logging
 
     # Initializes a new wizard instance
@@ -221,7 +214,7 @@ module DfE
     #   )
     #
     # @return [self]
-    def initialize(current_step:, current_step_params: {}, state_store:)
+    def initialize(current_step:, state_store:, current_step_params: {})
       @current_step_name = current_step&.to_sym
       @current_step_params = current_step_params
       @state_store = state_store

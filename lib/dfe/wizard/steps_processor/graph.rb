@@ -352,26 +352,47 @@ module DfE
         private
 
         def build_predicate(raw)
+          if raw.is_a?(Symbol) && !@wizard.respond_to?(raw)
+            raise ArgumentError,
+                  "Predicate method :#{raw} not found on wizard #{@wizard.class.name}. " \
+                  'Did you forget to create the method? Alternatively, you can delegate it to state_store.'
+          end
+
           if raw.is_a?(Symbol) && @wizard.respond_to?(raw)
-            proc { |step, _wizard| @wizard.send(raw, step) }
+            predicate_method = @wizard.method(raw)
+
+            case predicate_method.arity
+            when ->(arity) { arity.zero? || arity.negative? }
+              proc { predicate_method.call }
+            else
+              proc { |step| predicate_method.call(step) }
+            end
+
           elsif raw.respond_to?(:call)
             raw
           else
-            proc { |_step, _wizard| false }
+            raise ArgumentError,
+                  "Predicate must be a Symbol (method name) or callable (responds to #call). Got: #{raw.class}"
           end
         end
 
         def call_predicate(predicate, current_step)
           arity = predicate.arity
+          step_object = @wizard.step(current_step)
 
-          step_obj = @wizard.step(current_step)
+          result = if arity == 2
+                     predicate.call(step_object, @wizard)
+                   else
+                     predicate.call(step_object)
+                   end
 
-          case arity
-          when 2
-            predicate.call(step_obj, @wizard)
-          else
-            predicate.call(step_obj)
+          if @wizard.respond_to?(:logger) && @wizard.logger.respond_to?(:debug)
+            @wizard.logger.debug(
+              "[Graph] Conditional edge evaluated from step '#{current_step}': #{result.inspect}",
+            )
           end
+
+          result
         end
       end
     end

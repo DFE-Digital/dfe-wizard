@@ -4,15 +4,16 @@ require 'spec_helper'
 
 RSpec.describe DfE::Wizard::StepsProcessor::Graph do
   def build_test_wizard(current_step_name, state_data = {}, predicate_results = {})
-    state_store = instance_double('StateStore', step_data: proc { |step_id| state_data.dig(:steps, step_id) || {} })
+    state_store = instance_double('StateStore', step_data: proc { |step_id| state_data.dig(:steps, step_id) })
 
     wizard_class = Class.new do
-      attr_accessor :current_step_name, :state_store, :predicate_results
+      attr_accessor :current_step_name, :state_store, :predicate_results, :log
 
-      def initialize(step_name, store, predicates)
+      def initialize(step_name, store, predicates, logger)
         @current_step_name = step_name
         @state_store = store
         @predicate_results = predicates
+        @log = logger
       end
 
       def step(step_name)
@@ -30,9 +31,14 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       def respond_to_missing?(method_name, include_private = false)
         @predicate_results.key?(method_name) || super
       end
+
+      def logger
+        @log
+      end
     end
 
-    wizard_class.new(current_step_name, state_store, predicate_results)
+    logger = double('Logger', debug: nil)
+    wizard_class.new(current_step_name, state_store, predicate_results, logger)
   end
 
   let(:step_a_class) { Class.new }
@@ -46,15 +52,14 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     context 'validation' do
       it 'raises ArgumentError if no block given' do
-        expect {
-          described_class.draw(wizard)
-        }.to raise_error(ArgumentError, /A block must be given/)
+        expect { described_class.draw(wizard) }
+          .to raise_error(ArgumentError, /A block must be given/)
       end
 
       it 'raises ArgumentError if root node not set after block executes' do
         expect {
           described_class.draw(wizard) do |g|
-            g.add_node(:step_a, step_a_class)
+            g.add_node :step_a, step_a_class
           end
         }.to raise_error(ArgumentError, /Graph must have a root node set/)
       end
@@ -62,8 +67,8 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'does not raise when root node is properly set' do
         expect {
           described_class.draw(wizard) do |g|
-            g.root(:step_a)
-            g.add_node(:step_a, step_a_class)
+            g.root :step_a
+            g.add_node :step_a, step_a_class
           end
         }.not_to raise_error
       end
@@ -72,17 +77,18 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
     context 'graph construction' do
       it 'returns a Graph instance' do
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.root :step_a
         end
+
         expect(graph).to be_a(described_class)
       end
 
       it 'yields the graph instance to the block' do
         expect { |b|
           described_class.draw(wizard) do |g|
-            g.add_node(:step_a, step_a_class)
-            g.root(:step_a)
+            g.add_node :step_a, step_a_class
+            g.root :step_a
             b.to_proc.call(g)
           end
         }.to yield_with_args(described_class)
@@ -90,9 +96,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
       it 'sets the wizard instance' do
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.root :step_a
         end
+
         expect(graph.instance_variable_get(:@wizard)).to eq(wizard)
       end
     end
@@ -103,8 +110,8 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'adds a node to the graph' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.root(:step_a)
+        g.add_node :step_a, step_a_class
+        g.root :step_a
       end
 
       expect(graph.nodes[:step_a]).to be_a(DfE::Wizard::StepsProcessor::Graph::Node)
@@ -114,10 +121,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'stores multiple nodes' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_node(:step_c, step_c_class)
-        g.root(:step_a)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_node :step_c, step_c_class
+        g.root :step_a
       end
 
       expect(graph.nodes.keys).to contain_exactly(:step_a, :step_b, :step_c)
@@ -125,9 +132,9 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'finds a step class by node id' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.root(:step_a)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.root :step_a
       end
 
       expect(graph.find_step(:step_a)).to eq(step_a_class)
@@ -136,8 +143,8 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'returns nil for non-existent step' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.root(:step_a)
+        g.add_node :step_a, step_a_class
+        g.root :step_a
       end
 
       expect(graph.find_step(:missing)).to be_nil
@@ -149,8 +156,8 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'sets the root node' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.root(:step_a)
+        g.add_node :step_a, step_a_class
+        g.root :step_a
       end
 
       expect(graph.root_node).to eq(:step_a)
@@ -158,10 +165,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'allows changing root node' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.root(:step_a)
-        g.root(:step_b)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.root :step_a
+        g.root :step_b
       end
 
       expect(graph.root_node).to eq(:step_b)
@@ -173,10 +180,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'creates a simple edge between two nodes' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_edge(from: :step_a, to: :step_b)
-        g.root(:step_a)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_edge from: :step_a, to: :step_b
+        g.root :step_a
       end
 
       expect(graph.edges.size).to eq(1)
@@ -186,17 +193,17 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'creates multiple edges for a linear path' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_node(:step_c, step_c_class)
-        g.add_edge(from: :step_a, to: :step_b)
-        g.add_edge(from: :step_b, to: :step_c)
-        g.root(:step_a)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_node :step_c, step_c_class
+        g.add_edge from: :step_a, to: :step_b
+        g.add_edge from: :step_b, to: :step_c
+        g.root :step_a
       end
 
       expect(graph.edges.size).to eq(2)
-      expect(graph.edges.map(&:from)).to eq(%i[step_a step_b])
-      expect(graph.edges.map(&:to)).to eq(%i[step_b step_c])
+      expect(graph.edges.map(&:from)).to eq([:step_a, :step_b])
+      expect(graph.edges.map(&:to)).to eq([:step_b, :step_c])
     end
   end
 
@@ -205,9 +212,9 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'creates a conditional edge' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_node(:step_c, step_c_class)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_node :step_c, step_c_class
         g.add_conditional_edge(
           from: :step_a,
           when: :is_eligible?,
@@ -215,7 +222,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           else: :step_c,
           label: 'Eligibility check',
         )
-        g.root(:step_a)
+        g.root :step_a
       end
 
       expect(graph.conditional_edges.size).to eq(1)
@@ -228,16 +235,16 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'accepts a proc as predicate' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_node(:step_c, step_c_class)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_node :step_c, step_c_class
         g.add_conditional_edge(
           from: :step_a,
-          when: proc { |_step| true },
+          when: proc { |step| true },
           then: :step_b,
           else: :step_c,
         )
-        g.root(:step_a)
+        g.root :step_a
       end
 
       expect(graph.conditional_edges.size).to eq(1)
@@ -245,14 +252,16 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
     end
 
     it 'stores multiple conditional edges' do
+      wizard = build_test_wizard(:step_a, {}, { is_eligible?: true, another_check?: false })
+
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_node(:step_c, step_c_class)
-        g.add_node(:step_d, step_d_class)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_node :step_c, step_c_class
+        g.add_node :step_d, step_d_class
         g.add_conditional_edge(from: :step_a, when: :is_eligible?, then: :step_b, else: :step_c)
         g.add_conditional_edge(from: :step_b, when: :another_check?, then: :step_c, else: :step_d)
-        g.root(:step_a)
+        g.root :step_a
       end
 
       expect(graph.conditional_edges.size).to eq(2)
@@ -264,18 +273,18 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'creates a custom branching edge' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_node(:step_c, step_c_class)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_node :step_c, step_c_class
         g.add_custom_branching_edge(
           from: :step_a,
-          conditional: proc { |_step| :step_b },
+          conditional: proc { |step| :step_b },
           potential_transitions: [
             { label: 'Path 1', nodes: [:step_b] },
             { label: 'Path 2', nodes: [:step_c] },
           ],
         )
-        g.root(:step_a)
+        g.root :step_a
       end
 
       expect(graph.custom_branching_edges.size).to eq(1)
@@ -291,12 +300,12 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'follows linear path' do
         wizard = build_test_wizard(:step_a, {}, {})
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-          g.add_edge(from: :step_a, to: :step_b)
-          g.add_edge(from: :step_b, to: :step_c)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_edge from: :step_a, to: :step_b
+          g.add_edge from: :step_b, to: :step_c
+          g.root :step_a
         end
 
         expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_b)
@@ -306,10 +315,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'returns nil when no edge exists' do
         wizard = build_test_wizard(:step_b, {}, {})
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_edge(from: :step_a, to: :step_b)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_edge from: :step_a, to: :step_b
+          g.root :step_a
         end
 
         expect(graph.next_step_without_callbacks(:step_b)).to be_nil
@@ -318,10 +327,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'uses current_step_name when no argument given' do
         wizard = build_test_wizard(:step_a, {}, {})
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_edge(from: :step_a, to: :step_b)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_edge from: :step_a, to: :step_b
+          g.root :step_a
         end
 
         expect(graph.next_step_without_callbacks).to eq(:step_b)
@@ -332,16 +341,16 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'follows then branch when condition is true' do
         wizard = build_test_wizard(:step_a, {}, { is_uk?: true })
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
           g.add_conditional_edge(
             from: :step_a,
             when: :is_uk?,
             then: :step_b,
             else: :step_c,
           )
-          g.root(:step_a)
+          g.root :step_a
         end
 
         expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_b)
@@ -350,16 +359,16 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'follows else branch when condition is false' do
         wizard = build_test_wizard(:step_a, {}, { is_uk?: false })
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
           g.add_conditional_edge(
             from: :step_a,
             when: :is_uk?,
             then: :step_b,
             else: :step_c,
           )
-          g.root(:step_a)
+          g.root :step_a
         end
 
         expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_c)
@@ -368,16 +377,16 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'evaluates proc predicates' do
         wizard = build_test_wizard(:step_a, {}, {})
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
           g.add_conditional_edge(
             from: :step_a,
-            when: proc { |_step| true },
+            when: proc { |step| true },
             then: :step_b,
             else: :step_c,
           )
-          g.root(:step_a)
+          g.root :step_a
         end
 
         expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_b)
@@ -388,15 +397,15 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'evaluates custom branching logic' do
         wizard = build_test_wizard(:step_a, {}, {})
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
           g.add_custom_branching_edge(
             from: :step_a,
-            conditional: proc { |_step| :step_c },
-            potential_transitions: [{ label: 'Custom', nodes: %i[step_b step_c] }],
+            conditional: proc { |step| :step_c },
+            potential_transitions: [{ label: 'Custom', nodes: [:step_b, :step_c] }],
           )
-          g.root(:step_a)
+          g.root :step_a
         end
 
         expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_c)
@@ -407,18 +416,18 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'prioritizes custom branching over conditional over simple edges' do
         wizard = build_test_wizard(:step_a, {}, { check?: true })
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-          g.add_node(:step_d, step_d_class)
-          g.add_edge(from: :step_a, to: :step_b)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_node :step_d, step_d_class
+          g.add_edge from: :step_a, to: :step_b
           g.add_conditional_edge(from: :step_a, when: :check?, then: :step_c, else: :step_d)
           g.add_custom_branching_edge(
             from: :step_a,
-            conditional: proc { |_step| :step_d },
+            conditional: proc { |step| :step_d },
             potential_transitions: [{ label: 'Custom', nodes: [:step_d] }],
           )
-          g.root(:step_a)
+          g.root :step_a
         end
 
         expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_d)
@@ -431,12 +440,12 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'returns previous step in path' do
         wizard = build_test_wizard(:step_b, {}, {})
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-          g.add_edge(from: :step_a, to: :step_b)
-          g.add_edge(from: :step_b, to: :step_c)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_edge from: :step_a, to: :step_b
+          g.add_edge from: :step_b, to: :step_c
+          g.root :step_a
         end
 
         expect(graph.previous_step_without_callbacks(:step_b)).to eq(:step_a)
@@ -446,10 +455,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'returns nil for root node' do
         wizard = build_test_wizard(:step_a, {}, {})
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_edge(from: :step_a, to: :step_b)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_edge from: :step_a, to: :step_b
+          g.root :step_a
         end
 
         expect(graph.previous_step_without_callbacks(:step_a)).to be_nil
@@ -458,10 +467,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'uses current_step_name when no argument given' do
         wizard = build_test_wizard(:step_b, {}, {})
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_edge(from: :step_a, to: :step_b)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_edge from: :step_a, to: :step_b
+          g.root :step_a
         end
 
         expect(graph.previous_step_without_callbacks).to eq(:step_a)
@@ -472,12 +481,12 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'returns previous step respecting conditions' do
         wizard = build_test_wizard(:step_c, {}, { is_eligible?: true })
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
           g.add_conditional_edge(from: :step_a, when: :is_eligible?, then: :step_b, else: :step_c)
-          g.add_edge(from: :step_b, to: :step_c)
-          g.root(:step_a)
+          g.add_edge from: :step_b, to: :step_c
+          g.root :step_a
         end
 
         expect(graph.previous_step_without_callbacks(:step_c)).to eq(:step_b)
@@ -486,11 +495,11 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'handles skipped steps (direct path)' do
         wizard = build_test_wizard(:step_c, {}, { is_eligible?: false })
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
           g.add_conditional_edge(from: :step_a, when: :is_eligible?, then: :step_b, else: :step_c)
-          g.root(:step_a)
+          g.root :step_a
         end
 
         expect(graph.previous_step_without_callbacks(:step_c)).to eq(:step_a)
@@ -504,37 +513,37 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
       it 'returns full path to target' do
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-          g.add_edge(from: :step_a, to: :step_b)
-          g.add_edge(from: :step_b, to: :step_c)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_edge from: :step_a, to: :step_b
+          g.add_edge from: :step_b, to: :step_c
+          g.root :step_a
         end
 
-        expect(graph.path_traversal(:step_c)).to eq(%i[step_a step_b step_c])
+        expect(graph.path_traversal(:step_c)).to eq([:step_a, :step_b, :step_c])
       end
 
       it 'returns partial path' do
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-          g.add_edge(from: :step_a, to: :step_b)
-          g.add_edge(from: :step_b, to: :step_c)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_edge from: :step_a, to: :step_b
+          g.add_edge from: :step_b, to: :step_c
+          g.root :step_a
         end
 
-        expect(graph.path_traversal(:step_b)).to eq(%i[step_a step_b])
+        expect(graph.path_traversal(:step_b)).to eq([:step_a, :step_b])
       end
 
       it 'returns empty array for unreachable target' do
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-          g.add_edge(from: :step_a, to: :step_b)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_edge from: :step_a, to: :step_b
+          g.root :step_a
         end
 
         expect(graph.path_traversal(:step_c)).to eq([])
@@ -543,13 +552,13 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'uses current_step_name when no target given' do
         wizard = build_test_wizard(:step_b, {}, {})
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_edge(from: :step_a, to: :step_b)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_edge from: :step_a, to: :step_b
+          g.root :step_a
         end
 
-        expect(graph.path_traversal).to eq(%i[step_a step_b])
+        expect(graph.path_traversal).to eq([:step_a, :step_b])
       end
     end
 
@@ -557,33 +566,33 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'follows conditional branches (then path)' do
         wizard = build_test_wizard(:step_a, {}, { is_uk?: true })
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-          g.add_node(:step_review, step_review_class)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_node :step_review, step_review_class
           g.add_conditional_edge(from: :step_a, when: :is_uk?, then: :step_review, else: :step_b)
-          g.add_edge(from: :step_b, to: :step_c)
-          g.add_edge(from: :step_c, to: :step_review)
-          g.root(:step_a)
+          g.add_edge from: :step_b, to: :step_c
+          g.add_edge from: :step_c, to: :step_review
+          g.root :step_a
         end
 
-        expect(graph.path_traversal(:step_review)).to eq(%i[step_a step_review])
+        expect(graph.path_traversal(:step_review)).to eq([:step_a, :step_review])
       end
 
       it 'follows else branch' do
         wizard = build_test_wizard(:step_a, {}, { is_uk?: false })
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-          g.add_node(:step_review, step_review_class)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_node :step_review, step_review_class
           g.add_conditional_edge(from: :step_a, when: :is_uk?, then: :step_review, else: :step_b)
-          g.add_edge(from: :step_b, to: :step_c)
-          g.add_edge(from: :step_c, to: :step_review)
-          g.root(:step_a)
+          g.add_edge from: :step_b, to: :step_c
+          g.add_edge from: :step_c, to: :step_review
+          g.root :step_a
         end
 
-        expect(graph.path_traversal(:step_review)).to eq(%i[step_a step_b step_c step_review])
+        expect(graph.path_traversal(:step_review)).to eq([:step_a, :step_b, :step_c, :step_review])
       end
     end
 
@@ -591,11 +600,11 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'stops at depth limit to prevent infinite loops' do
         wizard = build_test_wizard(:step_a, {}, {})
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_edge(from: :step_a, to: :step_b)
-          g.add_edge(from: :step_b, to: :step_a)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_edge from: :step_a, to: :step_b
+          g.add_edge from: :step_b, to: :step_a
+          g.root :step_a
         end
 
         result = graph.path_traversal(:step_c)
@@ -605,11 +614,11 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'stops on revisiting same node' do
         wizard = build_test_wizard(:step_a, {}, {})
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_edge(from: :step_a, to: :step_b)
-          g.add_edge(from: :step_b, to: :step_a)
-          g.root(:step_a)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_edge from: :step_a, to: :step_b
+          g.add_edge from: :step_b, to: :step_a
+          g.root :step_a
         end
 
         result = graph.path_traversal(:step_a)
@@ -624,14 +633,11 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
     it 'executes callback before next_step' do
       callback_called = false
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_edge(from: :step_a, to: :step_b)
-        g.before_next_step {
-          callback_called = true
-          nil
-        }
-        g.root(:step_a)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_edge from: :step_a, to: :step_b
+        g.before_next_step { callback_called = true; nil }
+        g.root :step_a
       end
 
       graph.next_step(:step_a)
@@ -640,12 +646,12 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'uses callback return value if not nil' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_node(:step_c, step_c_class)
-        g.add_edge(from: :step_a, to: :step_b)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_node :step_c, step_c_class
+        g.add_edge from: :step_a, to: :step_b
         g.before_next_step { :step_c }
-        g.root(:step_a)
+        g.root :step_a
       end
 
       expect(graph.next_step(:step_a)).to eq(:step_c)
@@ -653,11 +659,11 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'falls back to normal navigation if callback returns nil' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_edge(from: :step_a, to: :step_b)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_edge from: :step_a, to: :step_b
         g.before_next_step { nil }
-        g.root(:step_a)
+        g.root :step_a
       end
 
       expect(graph.next_step(:step_a)).to eq(:step_b)
@@ -666,18 +672,12 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
     it 'executes multiple callbacks in order' do
       call_order = []
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_edge(from: :step_a, to: :step_b)
-        g.before_next_step {
-          call_order << 1
-          nil
-        }
-        g.before_next_step {
-          call_order << 2
-          nil
-        }
-        g.root(:step_a)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_edge from: :step_a, to: :step_b
+        g.before_next_step { call_order << 1; nil }
+        g.before_next_step { call_order << 2; nil }
+        g.root :step_a
       end
 
       graph.next_step(:step_a)
@@ -687,17 +687,14 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
     it 'accepts method names as callbacks' do
       callback_called = false
       wizard_with_method = build_test_wizard(:step_a, {}, {})
-      wizard_with_method.define_singleton_method(:my_callback) {
-        callback_called = true
-        nil
-      }
+      wizard_with_method.define_singleton_method(:my_callback) { callback_called = true; nil }
 
       graph = described_class.draw(wizard_with_method) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_edge(from: :step_a, to: :step_b)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_edge from: :step_a, to: :step_b
         g.before_next_step(:my_callback)
-        g.root(:step_a)
+        g.root :step_a
       end
 
       graph.next_step(:step_a)
@@ -711,14 +708,11 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
     it 'executes callback before previous_step' do
       callback_called = false
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_edge(from: :step_a, to: :step_b)
-        g.before_previous_step {
-          callback_called = true
-          nil
-        }
-        g.root(:step_a)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_edge from: :step_a, to: :step_b
+        g.before_previous_step { callback_called = true; nil }
+        g.root :step_a
       end
 
       graph.previous_step(:step_b)
@@ -727,12 +721,12 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'uses callback return value if not nil' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_node(:step_c, step_c_class)
-        g.add_edge(from: :step_a, to: :step_b)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_node :step_c, step_c_class
+        g.add_edge from: :step_a, to: :step_b
         g.before_previous_step { :step_c }
-        g.root(:step_a)
+        g.root :step_a
       end
 
       expect(graph.previous_step(:step_b)).to eq(:step_c)
@@ -740,11 +734,11 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     it 'falls back to normal navigation if callback returns nil' do
       graph = described_class.draw(wizard) do |g|
-        g.add_node(:step_a, step_a_class)
-        g.add_node(:step_b, step_b_class)
-        g.add_edge(from: :step_a, to: :step_b)
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.add_edge from: :step_a, to: :step_b
         g.before_previous_step { nil }
-        g.root(:step_a)
+        g.root :step_a
       end
 
       expect(graph.previous_step(:step_b)).to eq(:step_a)
@@ -756,44 +750,44 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'handles UK national path (short path)' do
         wizard = build_test_wizard(:nationality, {}, { uk_or_irish?: true })
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:name, step_a_class)
-          g.add_node(:nationality, step_b_class)
-          g.add_node(:right_to_work, step_c_class)
-          g.add_node(:review, step_review_class)
-          g.add_edge(from: :name, to: :nationality)
+          g.add_node :name, step_a_class
+          g.add_node :nationality, step_b_class
+          g.add_node :right_to_work, step_c_class
+          g.add_node :review, step_review_class
+          g.add_edge from: :name, to: :nationality
           g.add_conditional_edge(
             from: :nationality,
             when: :uk_or_irish?,
             then: :review,
             else: :right_to_work,
           )
-          g.add_edge(from: :right_to_work, to: :review)
-          g.root(:name)
+          g.add_edge from: :right_to_work, to: :review
+          g.root :name
         end
 
-        expect(graph.path_traversal(:review)).to eq(%i[name nationality review])
+        expect(graph.path_traversal(:review)).to eq([:name, :nationality, :review])
         expect(graph.previous_step_without_callbacks(:review)).to eq(:nationality)
       end
 
       it 'handles non-UK national path (long path)' do
         wizard = build_test_wizard(:nationality, {}, { uk_or_irish?: false })
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:name, step_a_class)
-          g.add_node(:nationality, step_b_class)
-          g.add_node(:right_to_work, step_c_class)
-          g.add_node(:review, step_review_class)
-          g.add_edge(from: :name, to: :nationality)
+          g.add_node :name, step_a_class
+          g.add_node :nationality, step_b_class
+          g.add_node :right_to_work, step_c_class
+          g.add_node :review, step_review_class
+          g.add_edge from: :name, to: :nationality
           g.add_conditional_edge(
             from: :nationality,
             when: :uk_or_irish?,
             then: :review,
             else: :right_to_work,
           )
-          g.add_edge(from: :right_to_work, to: :review)
-          g.root(:name)
+          g.add_edge from: :right_to_work, to: :review
+          g.root :name
         end
 
-        expect(graph.path_traversal(:review)).to eq(%i[name nationality right_to_work review])
+        expect(graph.path_traversal(:review)).to eq([:name, :nationality, :right_to_work, :review])
         expect(graph.previous_step_without_callbacks(:review)).to eq(:right_to_work)
       end
     end
@@ -802,18 +796,18 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'handles nested conditionals' do
         wizard = build_test_wizard(:step_a, {}, { check_a?: true, check_b?: false })
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-          g.add_node(:step_d, step_d_class)
-          g.add_node(:review, step_review_class)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_node :step_d, step_d_class
+          g.add_node :review, step_review_class
           g.add_conditional_edge(from: :step_a, when: :check_a?, then: :step_b, else: :step_c)
           g.add_conditional_edge(from: :step_b, when: :check_b?, then: :step_d, else: :review)
-          g.add_edge(from: :step_c, to: :review)
-          g.root(:step_a)
+          g.add_edge from: :step_c, to: :review
+          g.root :step_a
         end
 
-        expect(graph.path_traversal(:review)).to eq(%i[step_a step_b review])
+        expect(graph.path_traversal(:review)).to eq([:step_a, :step_b, :review])
       end
     end
 
@@ -821,17 +815,17 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'handles convergent paths' do
         wizard = build_test_wizard(:step_a, {}, { path_choice?: true })
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-          g.add_node(:step_d, step_d_class)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_node :step_d, step_d_class
           g.add_conditional_edge(from: :step_a, when: :path_choice?, then: :step_b, else: :step_c)
-          g.add_edge(from: :step_b, to: :step_d)
-          g.add_edge(from: :step_c, to: :step_d)
-          g.root(:step_a)
+          g.add_edge from: :step_b, to: :step_d
+          g.add_edge from: :step_c, to: :step_d
+          g.root :step_a
         end
 
-        expect(graph.path_traversal(:step_d)).to eq(%i[step_a step_b step_d])
+        expect(graph.path_traversal(:step_d)).to eq([:step_a, :step_b, :step_d])
         expect(graph.next_step_without_callbacks(:step_b)).to eq(:step_d)
         expect(graph.next_step_without_callbacks(:step_c)).to eq(:step_d)
       end
@@ -845,12 +839,12 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'raises ArgumentError if from node does not exist' do
         expect {
           described_class.draw(wizard) do |g|
-            g.add_node(:step_a, step_a_class)
+            g.add_node :step_a, step_a_class
             g.add_multiple_conditional_edges(
               from: :nonexistent,
               branches: [{ when: :check?, then: :step_a }],
             )
-            g.root(:step_a)
+            g.root :step_a
           end
         }.to raise_error(ArgumentError, /Cannot add branches from non-existent node/)
       end
@@ -858,9 +852,9 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'raises ArgumentError if branches array is empty' do
         expect {
           described_class.draw(wizard) do |g|
-            g.add_node(:step_a, step_a_class)
+            g.add_node :step_a, step_a_class
             g.add_multiple_conditional_edges(from: :step_a, branches: [])
-            g.root(:step_a)
+            g.root :step_a
           end
         }.to raise_error(ArgumentError, /branches array cannot be empty/)
       end
@@ -868,9 +862,9 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'raises ArgumentError if branches is nil' do
         expect {
           described_class.draw(wizard) do |g|
-            g.add_node(:step_a, step_a_class)
+            g.add_node :step_a, step_a_class
             g.add_multiple_conditional_edges(from: :step_a, branches: nil)
-            g.root(:step_a)
+            g.root :step_a
           end
         }.to raise_error(ArgumentError, /branches array cannot be empty/)
       end
@@ -878,12 +872,12 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'raises ArgumentError if branch is not a Hash' do
         expect {
           described_class.draw(wizard) do |g|
-            g.add_node(:step_a, step_a_class)
+            g.add_node :step_a, step_a_class
             g.add_multiple_conditional_edges(
               from: :step_a,
-              branches: [:not_a_hash],
+              branches: ['not_a_hash'],
             )
-            g.root(:step_a)
+            g.root :step_a
           end
         }.to raise_error(ArgumentError, /Branch at index 0 must be a Hash/)
       end
@@ -891,13 +885,13 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'raises ArgumentError if branch missing :when key' do
         expect {
           described_class.draw(wizard) do |g|
-            g.add_node(:step_a, step_a_class)
-            g.add_node(:step_b, step_b_class)
+            g.add_node :step_a, step_a_class
+            g.add_node :step_b, step_b_class
             g.add_multiple_conditional_edges(
               from: :step_a,
               branches: [{ then: :step_b }],
             )
-            g.root(:step_a)
+            g.root :step_a
           end
         }.to raise_error(ArgumentError, /Branch at index 0 from :step_a is missing required key :when/)
       end
@@ -905,12 +899,12 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'raises ArgumentError if branch missing :then key' do
         expect {
           described_class.draw(wizard) do |g|
-            g.add_node(:step_a, step_a_class)
+            g.add_node :step_a, step_a_class
             g.add_multiple_conditional_edges(
               from: :step_a,
               branches: [{ when: :check? }],
             )
-            g.root(:step_a)
+            g.root :step_a
           end
         }.to raise_error(ArgumentError, /Branch at index 0 from :step_a is missing required key :then/)
       end
@@ -918,12 +912,12 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       it 'raises if target node does not exist' do
         expect {
           described_class.draw(wizard) do |g|
-            g.add_node(:step_a, step_a_class)
+            g.add_node :step_a, step_a_class
             g.add_multiple_conditional_edges(
               from: :step_a,
               branches: [{ when: :check?, then: :nonexistent }],
             )
-            g.root(:step_a)
+            g.root :step_a
           end
         }.to raise_error(ArgumentError, /points to non-existent node/)
       end
@@ -931,11 +925,13 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     context 'structure' do
       it 'creates a multiple-side conditional edge' do
+        wizard = build_test_wizard(:step_a, {}, { check_b?: true, check_c?: false })
+
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-          g.add_node(:step_d, step_d_class)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_node :step_d, step_d_class
           g.add_multiple_conditional_edges(
             from: :step_a,
             branches: [
@@ -945,7 +941,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
             default: :step_d,
             label: 'Multi-way routing',
           )
-          g.root(:step_a)
+          g.root :step_a
         end
 
         expect(graph.multiple_conditional_edges.size).to eq(1)
@@ -957,16 +953,18 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       end
 
       it 'stores branch metadata' do
+        wizard = build_test_wizard(:step_a, {}, { check?: true })
+
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
           g.add_multiple_conditional_edges(
             from: :step_a,
             branches: [
               { when: :check?, then: :step_b, label: 'Check passed' },
             ],
           )
-          g.root(:step_a)
+          g.root :step_a
         end
 
         branch = graph.multiple_conditional_edges.first.branches.first
@@ -978,19 +976,14 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     context 'navigation' do
       it 'follows first matching branch' do
-        wizard = build_test_wizard(:visa_selection, {}, {
-                                     student_visa?: false,
-                                     work_visa?: true,
-                                     family_visa?: false,
-                                   })
+        wizard = build_test_wizard(:visa_selection, {}, { student_visa?: false, work_visa?: true, family_visa?: false })
 
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:visa_selection, step_a_class)
-          g.add_node(:student, step_b_class)
-          g.add_node(:work, step_c_class)
-          g.add_node(:family, step_d_class)
-          g.add_node(:other, step_review_class)
-
+          g.add_node :visa_selection, step_a_class
+          g.add_node :student, step_b_class
+          g.add_node :work, step_c_class
+          g.add_node :family, step_d_class
+          g.add_node :other, step_review_class
           g.add_multiple_conditional_edges(
             from: :visa_selection,
             branches: [
@@ -1000,25 +993,20 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
             ],
             default: :other,
           )
-          g.root(:visa_selection)
+          g.root :visa_selection
         end
 
         expect(graph.next_step_without_callbacks(:visa_selection)).to eq(:work)
       end
 
       it 'uses default when no branches match' do
-        wizard = build_test_wizard(:visa_selection, {}, {
-                                     student_visa?: false,
-                                     work_visa?: false,
-                                     family_visa?: false,
-                                   })
+        wizard = build_test_wizard(:visa_selection, {}, { student_visa?: false, work_visa?: false, family_visa?: false })
 
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:visa_selection, step_a_class)
-          g.add_node(:student, step_b_class)
-          g.add_node(:work, step_c_class)
-          g.add_node(:other, step_d_class)
-
+          g.add_node :visa_selection, step_a_class
+          g.add_node :student, step_b_class
+          g.add_node :work, step_c_class
+          g.add_node :other, step_d_class
           g.add_multiple_conditional_edges(
             from: :visa_selection,
             branches: [
@@ -1027,7 +1015,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
             ],
             default: :other,
           )
-          g.root(:visa_selection)
+          g.root :visa_selection
         end
 
         expect(graph.next_step_without_callbacks(:visa_selection)).to eq(:other)
@@ -1037,30 +1025,25 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
         wizard = build_test_wizard(:step_a, {}, { check?: false })
 
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
           g.add_multiple_conditional_edges(
             from: :step_a,
             branches: [{ when: :check?, then: :step_b }],
           )
-          g.root(:step_a)
+          g.root :step_a
         end
 
         expect(graph.next_step_without_callbacks(:step_a)).to be_nil
       end
 
       it 'evaluates branches in order (first match wins)' do
-        wizard = build_test_wizard(:step_a, {}, {
-                                     always_true?: true,
-                                     also_true?: true,
-                                   })
+        wizard = build_test_wizard(:step_a, {}, { always_true?: true, also_true?: true })
 
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
           g.add_multiple_conditional_edges(
             from: :step_a,
             branches: [
@@ -1068,7 +1051,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
               { when: :also_true?, then: :step_c }, # Never reached
             ],
           )
-          g.root(:step_a)
+          g.root :step_a
         end
 
         expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_b)
@@ -1078,18 +1061,17 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
         wizard = build_test_wizard(:step_a, {}, {})
 
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
           g.add_multiple_conditional_edges(
             from: :step_a,
             branches: [
-              { when: ->(_step) { false }, then: :step_b },
-              { when: ->(_step) { true }, then: :step_c },
+              { when: ->(step) { false }, then: :step_b },
+              { when: ->(step) { true }, then: :step_c },
             ],
           )
-          g.root(:step_a)
+          g.root :step_a
         end
 
         expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_c)
@@ -1101,18 +1083,17 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
         wizard = build_test_wizard(:step_a, {}, { check?: true })
 
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-          g.add_node(:step_d, step_d_class)
-
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_node :step_d, step_d_class
           # Add both types from same node
           g.add_conditional_edge(from: :step_a, when: :check?, then: :step_b, else: :step_c)
           g.add_multiple_conditional_edges(
             from: :step_a,
             branches: [{ when: :check?, then: :step_d }],
           )
-          g.root(:step_a)
+          g.root :step_a
         end
 
         # Many-side takes precedence
@@ -1123,16 +1104,15 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
         wizard = build_test_wizard(:step_a, {}, { check?: true })
 
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:step_a, step_a_class)
-          g.add_node(:step_b, step_b_class)
-          g.add_node(:step_c, step_c_class)
-
-          g.add_edge(from: :step_a, to: :step_b)
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+          g.add_edge from: :step_a, to: :step_b
           g.add_multiple_conditional_edges(
             from: :step_a,
             branches: [{ when: :check?, then: :step_c }],
           )
-          g.root(:step_a)
+          g.root :step_a
         end
 
         expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_c)
@@ -1141,20 +1121,14 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
 
     context 'real-world scenarios' do
       it 'handles visa type selection (4-way)' do
-        wizard = build_test_wizard(:visa_type, {}, {
-                                     student?: false,
-                                     work?: false,
-                                     family?: true,
-                                     tourist?: false,
-                                   })
+        wizard = build_test_wizard(:visa_type, {}, { student?: false, work?: false, family?: true, tourist?: false })
 
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:visa_type, step_a_class)
-          g.add_node(:student_path, step_b_class)
-          g.add_node(:work_path, step_c_class)
-          g.add_node(:family_path, step_d_class)
-          g.add_node(:tourist_path, step_review_class)
-
+          g.add_node :visa_type, step_a_class
+          g.add_node :student_path, step_b_class
+          g.add_node :work_path, step_c_class
+          g.add_node :family_path, step_d_class
+          g.add_node :tourist_path, step_review_class
           g.add_multiple_conditional_edges(
             from: :visa_type,
             branches: [
@@ -1164,7 +1138,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
               { when: :tourist?, then: :tourist_path },
             ],
           )
-          g.root(:visa_type)
+          g.root :visa_type
         end
 
         expect(graph.next_step_without_callbacks(:visa_type)).to eq(:family_path)
@@ -1174,11 +1148,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
         wizard = build_test_wizard(:age_check, {}, {})
 
         graph = described_class.draw(wizard) do |g|
-          g.add_node(:age_check, step_a_class)
-          g.add_node(:child, step_b_class)
-          g.add_node(:adult, step_c_class)
-          g.add_node(:senior, step_d_class)
-
+          g.add_node :age_check, step_a_class
+          g.add_node :child, step_b_class
+          g.add_node :adult, step_c_class
+          g.add_node :senior, step_d_class
           g.add_multiple_conditional_edges(
             from: :age_check,
             branches: [
@@ -1187,11 +1160,156 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
               { when: ->(step) { step.respond_to?(:age) && step.age >= 18 }, then: :adult },
             ],
           )
-          g.root(:age_check)
+          g.root :age_check
         end
 
         expect(graph.multiple_conditional_edges.first.branches.size).to eq(3)
       end
+    end
+  end
+
+  describe 'undefined predicate method' do
+    let(:wizard) { build_test_wizard(:start, {}, {}) }
+
+    it 'raises ArgumentError when method does not exist' do
+      wizard = build_test_wizard(:start, {}, {})
+      expect {
+        DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |graph|
+          graph.add_node :start, double
+          graph.add_node :next, double
+          graph.root :start
+          graph.add_conditional_edge(
+            from: :start,
+            when: :undefined_method?,
+            then: :next,
+            else: :start,
+          )
+        end
+      }.to raise_error(ArgumentError, /Predicate method :undefined_method\? not found/)
+    end
+
+    it 'raises ArgumentError with helpful message about delegation' do
+      expect {
+        DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |graph|
+          graph.add_node :start, double
+          graph.add_node :next, double
+          graph.root :start
+          graph.add_conditional_edge(
+            from: :start,
+            when: :missing_predicate?,
+            then: :next,
+            else: :start,
+          )
+        end
+      }.to raise_error(ArgumentError, /Did you forget to create the method\? Alternatively, you can delegate it to state_store/)
+    end
+
+    it 'raises ArgumentError for invalid predicate types (String)' do
+      expect {
+        DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |graph|
+          graph.add_node :start, double
+          graph.add_node :next, double
+          graph.root :start
+          graph.add_conditional_edge(
+            from: :start,
+            when: 'invalid_string',
+            then: :next,
+            else: :start,
+          )
+        end
+      }.to raise_error(ArgumentError, /Predicate must be a Symbol \(method name\) or callable/)
+    end
+  end
+
+  describe 'predicate logging' do
+    let(:logger) { double('Logger', debug: nil) }
+    let(:wizard_class) do
+      Class.new do
+        include DfE::Wizard
+        attr_accessor :log
+        def initialize(logger); @log = logger; end
+        def logger; @log; end
+        def step(id); OpenStruct.new(step_id: id); end
+        def true_predicate?; true; end
+        def false_predicate?; false; end
+      end
+    end
+
+    it 'logs predicate evaluation and branch taken (true)' do
+      wizard = wizard_class.new(logger)
+      graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
+        g.add_node :start, double
+        g.add_node :yes, double
+        g.add_node :no, double
+        g.root :start
+        g.add_conditional_edge(from: :start, when: :true_predicate?, then: :yes, else: :no)
+      end
+      graph.next_step(:start)
+
+      expect(logger).to have_received(:debug).with(
+        match(/\[Graph\] Conditional edge evaluated from step 'start': true → 'yes'/),
+      )
+    end
+
+    it 'logs predicate evaluation and branch taken (false)' do
+      wizard = wizard_class.new(logger)
+      graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
+        g.add_node :start, double
+        g.add_node :nationality, double
+        g.add_node :right_to_work, double
+        g.add_node :review, double
+        g.root :start
+        g.add_conditional_edge(from: :nationality, when: :british?, then: :review, else: :right_to_work)
+      end
+      graph.next_step(:start)
+
+      expect(logger).to have_received(:debug).with(
+        match(/\[Graph\] Conditional edge from 'nationality': british\?=false → 'right_to_work'/),
+      )
+    end
+
+    it 'logs multiple branch match' do
+      wizard = wizard_class.new(logger)
+      graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
+        g.add_node :start, double
+        g.add_node :path_a, double
+        g.add_node :path_b, double
+        g.add_node :default_path, double
+        g.root :start
+        g.add_multiple_conditional_edges(
+          from: :start,
+          branches: [
+            { when: :false_predicate?, then: :path_a },
+            { when: :true_predicate?, then: :path_b },
+          ],
+          default: :default_path,
+        )
+      end
+      graph.next_step(:start)
+
+      expect(logger).to have_received(:debug).with(
+        match(/\[Graph\] Multiple branch condition matched from 'start' → 'path_b'/),
+      )
+    end
+
+    it 'logs multiple branch default when no match' do
+      wizard = wizard_class.new(logger)
+      graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
+        g.add_node :start, double
+        g.add_node :other, double
+        g.add_node :default_path, double
+        g.root :start
+        g.add_multiple_conditional_edges(
+          from: :start,
+          branches: [{ when: :false_predicate?, then: :other }],
+          default: :default_path,
+        )
+      end
+      graph.next_step(:start)
+
+      expect(logger).to have_received(:debug).with(
+        match(/\[Graph\] No branch matched from 'start', using default → 'default_path''/),
+      )
     end
   end
 end

@@ -17,16 +17,21 @@ module AssignMentor
     private
 
     def verify_step_access
-      render status: :not_found, formats: [:html], template: 'errors/not_found' unless @wizard.current_step_accessible?
+      render status: :not_found, formats: [:html], template: 'errors/not_found' unless @wizard.valid_path_to_current_step?
     end
 
     def assign_wizard
+      state_store = StateStores::AssignMentor.new(
+        repository: DfE::Wizard::Repository::Session.new(session:, key: :assign_mentor_wizard),
+      )
+
       @wizard = AssignMentorWizard.new(
         current_step: current_step,
-        state_store: DfE::Wizard::StateStore::Session.new(session:, key: 'assign_mentor'),
-        step_params: params,
+        current_step_params: params,
+        state_store:,
       )
     end
+
 
     def current_step
       controller_name.to_sym

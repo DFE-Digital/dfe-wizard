@@ -16,14 +16,13 @@ module PersonalInformation
 
     def assign_wizard
       state_store = StateStores::PersonalInformation.new(
-        session:,
-        key: 'personal_information',
+        repository: DfE::Wizard::Repository::Session.new(session:, key: :personal_information),
       )
 
       @wizard = PersonalInformationWizard.new(
         current_step:,
+        current_step_params: params,
         state_store:,
-        step_params: params,
       )
     end
 

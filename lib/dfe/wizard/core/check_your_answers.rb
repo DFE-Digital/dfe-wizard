@@ -58,8 +58,7 @@ module DfE
         #   # Path now requires more steps
         #   # => nil  (falls through to normal navigation)
         def handle_return_to_check_your_answers(target_step)
-          # Check if all steps in path are accessible (visited AND valid)
-          target_step if step_accessible?(target_step)
+          target_step if valid_path_to?(target_step)
         end
 
         # Navigate back through visited steps in edit mode
@@ -77,7 +76,7 @@ module DfE
         # @return [Symbol, nil] Previous step, or nil to use default graph navigation
         #
         # @example At origin step - go back to review
-        #   # URL: /email?return_to_review=review
+        #   # URL: /email?return_to_review=email
         #   # current_step = :email
         #   # origin_step = :email (where user clicked "Change")
         #
@@ -106,10 +105,9 @@ module DfE
         #   # => :email  (last visited step before review)
         def handle_back_in_check_your_answers(target_step, origin_step)
           # If at the step user originally clicked "Change" on, return to review
-          return target_step if current_step_name.to_s == origin_step.to_s
+          target_step if current_step_name.to_s == origin_step.to_s
 
-          # Otherwise walk backward through visited steps
-          previous_visited_step_in_path(target_step)
+          # previous_visited_step_in_path(target_step)
         end
 
         # Find previous visited step in path
@@ -139,14 +137,11 @@ module DfE
         #
         # @api private
         def previous_visited_step_in_path(target_step)
-          path = path_traversal(target_step)
+          path = flow_path(target_step)
           idx = path.index(current_step_name)
           return nil unless idx&.positive?
 
-          # Walk backward to find first visited step (has data in state store)
-          path[0...idx].reverse.find do |step_id|
-            state_store.read_step(step_id).present?
-          end
+          path[0...idx].reverse.find { |step_id| saved?(step_id) }
         end
       end
     end

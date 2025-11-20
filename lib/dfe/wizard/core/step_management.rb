@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module DfE
   module Wizard
     module Core
@@ -19,20 +17,13 @@ module DfE
           @cached_steps[step_id] ||= hydrate_step(step_id)
         end
 
-        # Get current step object
-        #
-        # @return [Object] Hydrated current step instance
-        def current_step_object
-          step(current_step_name)
-        end
-
         # Hydrate a step from state store
         #
         # @param step_id [Symbol]
         # @return [Object] Instantiated step
         def hydrate_step(step_id)
-          step_class = steps_processor.find_step(step_id)
-          persisted_data = state_store.read_step(step_id)
+          step_class = find_step(step_id)
+          persisted_data = raw_step_data(step_id)
 
           # ONLY merge current params if we're hydrating the CURRENT step
           merged_data = if step_id == current_step_name
@@ -73,7 +64,7 @@ module DfE
             klass = find_step(current_step_name)
             params = fetch_step_attributes
 
-            klass.new(params.merge(wizard: self, step_id: current_step_name))
+            klass.new(**params.symbolize_keys.merge(wizard: self, step_id: current_step_name))
           end
         end
 
@@ -147,9 +138,31 @@ module DfE
         #
         # @api public
         def fetch_step_attributes
-          step_data = read_step_data(current_step_name)
+          step_data(current_step_name).deep_merge(current_step_params)
+        end
 
-          step_data.deep_merge(current_step_params)
+        # Get step objects for all steps in current flow
+        #
+        # @return [Array<DfE::Wizard::Step>] All flow steps
+        # @see Navigation#steps_in_flow (same thing, alias)
+        def flow_steps
+          flow_path.map { |step_id| step(step_id) }
+        end
+
+        # Get step objects for steps with saved data
+        #
+        # @return [Array<DfE::Wizard::Step>] Saved steps
+        # @see StateFiltering#steps_saved (same thing, alias)
+        def saved_steps
+          saved_path.map { |step_id| step(step_id) }
+        end
+
+        # Get step objects for steps with valid data
+        #
+        # @return [Array<DfE::Wizard::Step>] Valid steps
+        # @see Validation#steps_valid (same thing, alias)
+        def valid_steps
+          valid_path.map { |step_id| step(step_id) }
         end
       end
     end

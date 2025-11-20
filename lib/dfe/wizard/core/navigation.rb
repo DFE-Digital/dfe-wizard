@@ -1,21 +1,21 @@
-# frozen_string_literal: true
-
 module DfE
   module Wizard
     module Core
       # Navigation through wizard steps
       #
-      # Calculates next/previous steps and complete paths based on the
-      # steps processor (graph) and current wizard state.
+      # Manages step traversal, paths, and direction based on:
+      # - Step processor (graph structure & branching)
+      # - Current wizard state (user data)
+      #
+      # Provides two types of APIs:
+      # 1. Step navigation: next_step, previous_step, *_step_path
+      # 2. Flow paths: flow_path, in_flow? (graph-based)
       #
       # @api public
       module Navigation
         # Calculate the next step
         #
-        # Uses the steps processor to determine what step comes next
-        # based on current state and wizard data.
-        #
-        # @return [Symbol, nil] The next step ID, or nil if at end
+        # @return [Symbol, nil] Next step ID, or nil if at end
         #
         # @example
         #   wizard.next_step  # => :email
@@ -27,10 +27,7 @@ module DfE
 
         # Calculate the previous step
         #
-        # Uses the steps processor to determine the previous step.
-        # Returns nil if at the root step.
-        #
-        # @return [Symbol, nil] The previous step ID, or nil if at root
+        # @return [Symbol, nil] Previous step ID, or nil if at root
         #
         # @example
         #   wizard.previous_step  # => :name
@@ -40,125 +37,89 @@ module DfE
           end
         end
 
-        # Returns the URL/path for the current step
+        # URL/path for the current step
         #
-        # @param options [Hash] Any additional routing options
+        # @param options [Hash] Additional routing options
         # @return [String]
+        #
+        # @example
+        #   wizard.current_step_path  # => "/wizard/name"
         def current_step_path(options = {})
           resolve_step_path(current_step_name, options)
         end
 
-        # Returns the URL/path for the next step
+        # URL/path for the next step
         #
-        # @param options [Hash]
+        # @param options [Hash] Additional routing options
         # @return [String, nil]
+        #
+        # @example
+        #   wizard.next_step_path  # => "/wizard/email"
         def next_step_path(options = {})
           resolve_step_path(next_step, options)
         end
 
-        # Returns the URL/path for the previous step. Can specify a fallback if not present.
+        # URL/path for the previous step
         #
-        # @param fallback [String, nil] Fallback URL if no previous step
-        # @param options [Hash]
+        # @param fallback [String, nil] URL if no previous step exists
+        # @param options [Hash] Additional routing options
         # @return [String, nil]
-        def previous_step_path(**options)
+        #
+        # @example
+        #   wizard.previous_step_path  # => "/wizard/name"
+        #   wizard.previous_step_path(fallback: "/")  # => "/" if no previous
+        def previous_step_path(fallback: nil, **options)
           step = previous_step
-          fallback = options.delete(:fallback)
-
           return fallback unless step && step != current_step_name
 
           resolve_step_path(step, options)
         end
 
-        # Resolves a URL/path for a given step using the route strategy.
+        # Resolves URL/path for a step using the route strategy
         #
-        # @param step [Symbol]
-        # @param options [Hash]
+        # @param step_id [Symbol] The step to resolve
+        # @param options [Hash] Additional routing options
         # @return [String]
+        #
+        # @api private
         def resolve_step_path(step_id, options = {})
           route_strategy.resolve(step_id:, options:).tap do |path|
             log_route_resolved(step: step_id, path:)
           end
         end
 
-        # Calculate the complete path to a target step
+        # Flow path: steps in current wizard flow
         #
-        # Returns the sequence of steps from root to target based on
-        # current wizard state. Returns empty array if target unreachable.
+        # Returns the sequence of steps user will traverse based on:
+        # - Step processor graph structure
+        # - Current user data (for conditional branching only)
         #
-        # **This path traversal does not validate the steps neither uses
-        # callbacks!**
+        # This is the "theoretical" path for this user, regardless of
+        # whether they've completed steps or if data is valid.
         #
-        # @param target_step [Symbol, nil] The target step (default: current path)
-        # @return [Array<Symbol>] Sequence of steps in the path
+        # @return [Array<Symbol>] Sequence of steps in flow
         #
-        # @example
-        #   wizard.path_traversal(:review)  # => [:name, :email, :review]
-        #   wizard.path_traversal  # => [:name, :email, :review] (to end)
-        def path_traversal(target_step = current_step_name)
-          steps_processor.path_traversal(target_step).tap do |path|
-            log_path_traversal(target: target_step, path:)
+        # @example UK national
+        #   wizard.flow_path  # => [:name, :nationality, :review]
+        #
+        # @example Non-UK national
+        #   wizard.flow_path  # => [:name, :nationality, :right_to_work, :immigration_status, :review]
+        def flow_path(target = current_step_name)
+          steps_processor.path_traversal(target).tap do |path|
+            log_flow_path_resolved(target:, path:)
           end
         end
 
-        # Check if a PATH EXISTS in the graph to reach a target step
+        # Check if step is in current flow
         #
-        # Only checks GRAPH REACHABILITY based on current flow.
-        #
-        # Does NOT check:
-        # - If steps are valid
-        # - If steps have the right data
-        #
-        # This answers: "Given current data, is this step theoretically reachable?"
-        #
-        # Does NOT:
-        # - Validate any steps
-        # - Check if all previous steps are complete
-        #
-        # @param target_step [Symbol] The target step
-        # @return [Boolean] true if step exists in reachable path
-        #
-        # @example Step is in graph path
-        #   # Graph: name -> email -> review
-        #   # Current data: not UK (so email is reachable)
-        #   wizard.completed_to?(:email)  # => true
-        #
-        # @example Step is skipped by conditional logic
-        #   # Graph: name -> (if UK: email) -> (if not UK: phone) -> review
-        #   # Data: not UK
-        #   # Email is in graph, but NOT in current path
-        #
-        #   wizard.completed_to?(:email)  # => false
-        #   wizard.completed_to?(:phone)  # => true
-        def completed_to?(target_step)
-          path_traversal(target_step).include?(target_step)
-        end
-
-        # Return all steps as instantiated step objects for a path to the target
-        # Creates an ordered list of instantiated step objects for the
-        # relevant path—useful for rendering "Check your answers" summaries,
-        # review screens, and full wizard navigation.
-        #
-        # It does NOT perform validation; it deals with the actual data and
-        # how to turn that data into step objects, in wizard order.
-        #
-        # Used for rendering review/"check your answers" pages and
-        # building navigation displays.
-        #
-        # @param target_step [Symbol, nil] Step to traverse to (default: end of wizard)
-        # @return [Array<DfE::Wizard::Step>]
+        # @param step_id [Symbol] Step to check
+        # @return [Boolean] true if step will appear in flow
         #
         # @example
-        #   steps = wizard.summary_steps(:review)
-        #   steps.each { |step| puts step.step_id }  # :name, :email, :review
-        def summary_steps(target_step = nil)
-          path = path_traversal(target_step)
-
-          path.map do |step_id|
-            klass = find_step(step_id)
-
-            klass.new(step_data(step_id).merge(wizard: self, step_id: step_id))
-          end
+        #   wizard.in_flow?(:email)           # => true
+        #   wizard.in_flow?(:skipped_step)    # => false
+        def in_flow?(step_id)
+          flow_path(step_id).include?(step_id)
         end
       end
     end

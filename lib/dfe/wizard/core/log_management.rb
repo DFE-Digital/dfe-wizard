@@ -66,8 +66,8 @@ module DfE
         # @param target [Symbol] Target step
         # @param path [Array] Calculated path
         # @api public
-        def log_path_traversal(target:, path:)
-          log.debug('Path traversal', category: :navigation, target:, path:)
+        def log_flow_path_resolved(target:, path:)
+          log.debug('Flow Path', category: :navigation, target:, path:)
         end
 
         # Log state read operation

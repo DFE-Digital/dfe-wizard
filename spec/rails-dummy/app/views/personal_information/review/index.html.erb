@@ -7,7 +7,7 @@
     <h1 class="govuk-heading-l">Check your answers</h1>
 
     <%= govuk_summary_list do |summary_list| %>
-      <% @wizard.summary_steps.each do |step| %>
+      <% @steps.each do |step| %>
         <% step.attributes.each do |label, value| %>
           <%= summary_list.with_row do |row| %>
             <%=  row.with_key(text: step.class.human_attribute_name(label)) %>

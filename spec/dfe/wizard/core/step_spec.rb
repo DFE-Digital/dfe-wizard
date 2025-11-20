@@ -2,7 +2,7 @@ RSpec.describe DfE::Wizard::Step do
   let(:wizard) do
     PersonalInformationWizard.new(
       current_step: :name_and_date_of_birth,
-      state_store: StateStores::PersonalInformation.new(repository: DfE::Wizard::Repository::InMemory.new),
+      state_store: StateStores::PersonalInformation.new,
     )
   end
 
@@ -83,13 +83,13 @@ RSpec.describe DfE::Wizard::Step do
   describe 'validation' do
     it 'validates presence of first_name' do
       step = email_step.new(last_name: 'Doe', date_of_birth: Date.today)
-      expect(step).not_to be_valid
+      expect(step).to be_invalid
       expect(step.errors[:first_name]).to be_present
     end
 
     it 'validates presence of last_name' do
       step = email_step.new(first_name: 'Joe', date_of_birth: Date.today)
-      expect(step).not_to be_valid
+      expect(step).to be_invalid
       expect(step.errors[:last_name]).to be_present
     end
 
