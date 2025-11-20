@@ -202,8 +202,8 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       end
 
       expect(graph.edges.size).to eq(2)
-      expect(graph.edges.map(&:from)).to eq([:step_a, :step_b])
-      expect(graph.edges.map(&:to)).to eq([:step_b, :step_c])
+      expect(graph.edges.map(&:from)).to eq(%i[step_a step_b])
+      expect(graph.edges.map(&:to)).to eq(%i[step_b step_c])
     end
   end
 
@@ -240,7 +240,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
         g.add_node :step_c, step_c_class
         g.add_conditional_edge(
           from: :step_a,
-          when: proc { |step| true },
+          when: proc { |_step| true },
           then: :step_b,
           else: :step_c,
         )
@@ -278,7 +278,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
         g.add_node :step_c, step_c_class
         g.add_custom_branching_edge(
           from: :step_a,
-          conditional: proc { |step| :step_b },
+          conditional: proc { |_step| :step_b },
           potential_transitions: [
             { label: 'Path 1', nodes: [:step_b] },
             { label: 'Path 2', nodes: [:step_c] },
@@ -382,7 +382,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.add_node :step_c, step_c_class
           g.add_conditional_edge(
             from: :step_a,
-            when: proc { |step| true },
+            when: proc { |_step| true },
             then: :step_b,
             else: :step_c,
           )
@@ -402,8 +402,8 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.add_node :step_c, step_c_class
           g.add_custom_branching_edge(
             from: :step_a,
-            conditional: proc { |step| :step_c },
-            potential_transitions: [{ label: 'Custom', nodes: [:step_b, :step_c] }],
+            conditional: proc { |_step| :step_c },
+            potential_transitions: [{ label: 'Custom', nodes: %i[step_b step_c] }],
           )
           g.root :step_a
         end
@@ -424,7 +424,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.add_conditional_edge(from: :step_a, when: :check?, then: :step_c, else: :step_d)
           g.add_custom_branching_edge(
             from: :step_a,
-            conditional: proc { |step| :step_d },
+            conditional: proc { |_step| :step_d },
             potential_transitions: [{ label: 'Custom', nodes: [:step_d] }],
           )
           g.root :step_a
@@ -521,7 +521,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.root :step_a
         end
 
-        expect(graph.path_traversal(:step_c)).to eq([:step_a, :step_b, :step_c])
+        expect(graph.path_traversal(:step_c)).to eq(%i[step_a step_b step_c])
       end
 
       it 'returns partial path' do
@@ -534,7 +534,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.root :step_a
         end
 
-        expect(graph.path_traversal(:step_b)).to eq([:step_a, :step_b])
+        expect(graph.path_traversal(:step_b)).to eq(%i[step_a step_b])
       end
 
       it 'returns empty array for unreachable target' do
@@ -558,7 +558,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.root :step_a
         end
 
-        expect(graph.path_traversal).to eq([:step_a, :step_b])
+        expect(graph.path_traversal).to eq(%i[step_a step_b])
       end
     end
 
@@ -576,7 +576,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.root :step_a
         end
 
-        expect(graph.path_traversal(:step_review)).to eq([:step_a, :step_review])
+        expect(graph.path_traversal(:step_review)).to eq(%i[step_a step_review])
       end
 
       it 'follows else branch' do
@@ -592,7 +592,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.root :step_a
         end
 
-        expect(graph.path_traversal(:step_review)).to eq([:step_a, :step_b, :step_c, :step_review])
+        expect(graph.path_traversal(:step_review)).to eq(%i[step_a step_b step_c step_review])
       end
     end
 
@@ -636,7 +636,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
         g.add_node :step_a, step_a_class
         g.add_node :step_b, step_b_class
         g.add_edge from: :step_a, to: :step_b
-        g.before_next_step { callback_called = true; nil }
+        g.before_next_step {
+          callback_called = true
+          nil
+        }
         g.root :step_a
       end
 
@@ -675,8 +678,14 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
         g.add_node :step_a, step_a_class
         g.add_node :step_b, step_b_class
         g.add_edge from: :step_a, to: :step_b
-        g.before_next_step { call_order << 1; nil }
-        g.before_next_step { call_order << 2; nil }
+        g.before_next_step {
+          call_order << 1
+          nil
+        }
+        g.before_next_step {
+          call_order << 2
+          nil
+        }
         g.root :step_a
       end
 
@@ -687,7 +696,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
     it 'accepts method names as callbacks' do
       callback_called = false
       wizard_with_method = build_test_wizard(:step_a, {}, {})
-      wizard_with_method.define_singleton_method(:my_callback) { callback_called = true; nil }
+      wizard_with_method.define_singleton_method(:my_callback) {
+        callback_called = true
+        nil
+      }
 
       graph = described_class.draw(wizard_with_method) do |g|
         g.add_node :step_a, step_a_class
@@ -711,7 +723,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
         g.add_node :step_a, step_a_class
         g.add_node :step_b, step_b_class
         g.add_edge from: :step_a, to: :step_b
-        g.before_previous_step { callback_called = true; nil }
+        g.before_previous_step {
+          callback_called = true
+          nil
+        }
         g.root :step_a
       end
 
@@ -765,7 +780,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.root :name
         end
 
-        expect(graph.path_traversal(:review)).to eq([:name, :nationality, :review])
+        expect(graph.path_traversal(:review)).to eq(%i[name nationality review])
         expect(graph.previous_step_without_callbacks(:review)).to eq(:nationality)
       end
 
@@ -787,7 +802,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.root :name
         end
 
-        expect(graph.path_traversal(:review)).to eq([:name, :nationality, :right_to_work, :review])
+        expect(graph.path_traversal(:review)).to eq(%i[name nationality right_to_work review])
         expect(graph.previous_step_without_callbacks(:review)).to eq(:right_to_work)
       end
     end
@@ -807,7 +822,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.root :step_a
         end
 
-        expect(graph.path_traversal(:review)).to eq([:step_a, :step_b, :review])
+        expect(graph.path_traversal(:review)).to eq(%i[step_a step_b review])
       end
     end
 
@@ -825,7 +840,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.root :step_a
         end
 
-        expect(graph.path_traversal(:step_d)).to eq([:step_a, :step_b, :step_d])
+        expect(graph.path_traversal(:step_d)).to eq(%i[step_a step_b step_d])
         expect(graph.next_step_without_callbacks(:step_b)).to eq(:step_d)
         expect(graph.next_step_without_callbacks(:step_c)).to eq(:step_d)
       end
@@ -1000,7 +1015,8 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       end
 
       it 'uses default when no branches match' do
-        wizard = build_test_wizard(:visa_selection, {}, { student_visa?: false, work_visa?: false, family_visa?: false })
+        wizard = build_test_wizard(:visa_selection, {},
+                                   { student_visa?: false, work_visa?: false, family_visa?: false })
 
         graph = described_class.draw(wizard) do |g|
           g.add_node :visa_selection, step_a_class
@@ -1067,8 +1083,8 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
           g.add_multiple_conditional_edges(
             from: :step_a,
             branches: [
-              { when: ->(step) { false }, then: :step_b },
-              { when: ->(step) { true }, then: :step_c },
+              { when: ->(_step) { false }, then: :step_b },
+              { when: ->(_step) { true }, then: :step_c },
             ],
           )
           g.root :step_a
@@ -1201,7 +1217,8 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
             else: :start,
           )
         end
-      }.to raise_error(ArgumentError, /Did you forget to create the method\? Alternatively, you can delegate it to state_store/)
+      }.to raise_error(ArgumentError,
+                       /Did you forget to create the method\? Alternatively, you can delegate it to state_store/)
     end
 
     it 'raises ArgumentError for invalid predicate types (String)' do
@@ -1222,21 +1239,14 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
   end
 
   describe 'predicate logging' do
-    let(:logger) { double('Logger', debug: nil) }
-    let(:wizard_class) do
-      Class.new do
-        include DfE::Wizard
-        attr_accessor :log
-        def initialize(logger); @log = logger; end
-        def logger; @log; end
-        def step(id); OpenStruct.new(step_id: id); end
-        def true_predicate?; true; end
-        def false_predicate?; false; end
-      end
+    let(:logger) { double('Logger', info: nil) }
+    let(:wizard) do
+      build_test_wizard(:start, {}, { true_predicate?: true, false_predicate?: false, british?: false })
     end
 
+    before { allow(wizard).to receive(:log).and_return(logger) }
+
     it 'logs predicate evaluation and branch taken (true)' do
-      wizard = wizard_class.new(logger)
       graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
         g.add_node :start, double
         g.add_node :yes, double
@@ -1246,13 +1256,13 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       end
       graph.next_step(:start)
 
-      expect(logger).to have_received(:debug).with(
-        match(/\[Graph\] Conditional edge evaluated from step 'start': true → 'yes'/),
+      expect(logger).to have_received(:info).with(
+        '[Graph] Conditional edge evaluated from step :start: true_predicate?=true → :yes',
+        category: :step_processor,
       )
     end
 
     it 'logs predicate evaluation and branch taken (false)' do
-      wizard = wizard_class.new(logger)
       graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
         g.add_node :start, double
         g.add_node :nationality, double
@@ -1261,15 +1271,15 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
         g.root :start
         g.add_conditional_edge(from: :nationality, when: :british?, then: :review, else: :right_to_work)
       end
-      graph.next_step(:start)
+      graph.next_step(:nationality)
 
-      expect(logger).to have_received(:debug).with(
-        match(/\[Graph\] Conditional edge from 'nationality': british\?=false → 'right_to_work'/),
+      expect(logger).to have_received(:info).with(
+        '[Graph] Conditional edge evaluated from step :nationality: british?=false → :right_to_work',
+        category: :step_processor,
       )
     end
 
     it 'logs multiple branch match' do
-      wizard = wizard_class.new(logger)
       graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
         g.add_node :start, double
         g.add_node :path_a, double
@@ -1287,13 +1297,13 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       end
       graph.next_step(:start)
 
-      expect(logger).to have_received(:debug).with(
-        match(/\[Graph\] Multiple branch condition matched from 'start' → 'path_b'/),
+      expect(logger).to have_received(:info).with(
+        '[Graph] Branch evaluated from step :start: true_predicate?=true → :path_b',
+        category: :step_processor,
       )
     end
 
     it 'logs multiple branch default when no match' do
-      wizard = wizard_class.new(logger)
       graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
         g.add_node :start, double
         g.add_node :other, double
@@ -1307,8 +1317,34 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
       end
       graph.next_step(:start)
 
-      expect(logger).to have_received(:debug).with(
-        match(/\[Graph\] No branch matched from 'start', using default → 'default_path''/),
+      expect(logger).to have_received(:info).with(
+        '[Graph] No branch matched from step :start, using default option → :default_path',
+        category: :step_processor,
+      )
+    end
+
+    it 'logs predicate evaluation and branch taken (true)' do
+      graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
+        g.add_node :start, double
+        g.add_node :nationality, double
+        g.add_node :right_to_work, double
+        g.add_node :immigration_status, double
+        g.add_node :review, double
+        g.root :start
+        g.add_custom_branching_edge(
+          from: :nationality,
+          conditional: proc { |_step| :right_to_work },
+          potential_transitions: [
+            { label: 'right_to_work', nodes: [:right_to_work] },
+            { label: 'Path 2', nodes: [:step_c] },
+          ],
+        )
+      end
+      graph.next_step(:nationality)
+
+      expect(logger).to have_received(:info).with(
+        '[Graph] Custom edge evaluated from step :nationality → :right_to_work',
+        category: :step_processor,
       )
     end
   end
