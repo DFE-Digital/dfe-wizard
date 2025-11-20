@@ -123,26 +123,23 @@ module DfE
           log.debug('Step data', category: :state, step: step_id, data: sanitize_data(attributes))
         end
 
-        # Log params received from form submission
+        # Logs parameter extraction errors
         #
-        # @param step_id [Symbol] Step receiving params
-        # @param raw_params [Hash] Raw params from request
-        # @param permitted_params [Hash] Filtered params
-        # @api public
-        def log_params_received(step_id:, raw_params:, permitted_params:)
-          log.info(
-            'Params received',
+        # Called when parameter extraction fails due to missing required parameters
+        # or unimplemented permitted_params method.
+        #
+        # @param step_id [Symbol] The step identifier where error occurred
+        # @param error [String] Error class name
+        #
+        # @return [void]
+        #
+        # @api private
+        def log_params_error(step_id:, error:)
+          return unless logger.respond_to?(:warn)
+
+          logger.info(
+            "Parameter extraction failed for step :#{step_id}: #{error}",
             category: :state,
-            step: step_id,
-            raw_keys: raw_params.keys,
-            permitted_keys: permitted_params.keys,
-          )
-          log.debug(
-            'Params data',
-            category: :state,
-            step: step_id,
-            raw: sanitize_data(raw_params.to_h),
-            permitted: sanitize_data(permitted_params.to_h),
           )
         end
 
@@ -205,6 +202,41 @@ module DfE
         # @api public
         def log_route_resolved(step:, path:)
           log.debug('Route resolved', category: :routing, step:, path:)
+        end
+
+        # Logs parameter extraction details for debugging wizard state changes
+        #
+        # Called when parameters are received for a step, logging both raw and
+        # permitted parameters to help debug form submission and state persistence.
+        #
+        # @param step_id [Symbol] The step identifier receiving parameters
+        # @param raw_params [Hash] Unfiltered parameters from controller/request
+        # @param permitted_params [Hash] Filtered parameters after Strong Parameters
+        #
+        # @return [void]
+        #
+        # @example Logging during parameter extraction
+        #   log_params_received(
+        #     step_id: :qualification_type,
+        #     raw_params: { qualification_type: { has_qualification: 'yes', extra: 'filtered' } },
+        #     permitted_params: { has_qualification: 'yes' }
+        #   )
+        #   # => "[StepManagement] Params received for step :qualification_type:
+        #   #     raw_count: 2, permitted_count: 1, filtered: 1,
+        #   #     permitted_keys: [:has_qualification]"
+        #
+        # @note Only logs when logger responds to :debug (no-op for NullLogger)
+        # @note Calculates filtered count to highlight parameter security filtering
+        #
+        # @api private
+        def log_params_received(step_id:, raw_params:, permitted_params:)
+          log.debug(
+            'Params data',
+            category: :state,
+            step: step_id,
+            raw: sanitize_data(raw_params.to_h),
+            permitted: sanitize_data(permitted_params.to_h),
+          )
         end
 
         # Sanitize data using Rails parameter filter

@@ -178,8 +178,17 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
     end
 
     describe '#log_params_received' do
-      let(:raw_params) { { email: 'user@example.com', confirmed: 'true', extra: 'ignored' } }
-      let(:permitted_params) { { email: 'user@example.com', confirmed: 'true' } }
+      let(:raw_params) do
+        {
+          email: { email: 'user@example.com', confirmed: 'true', extra: 'ignored' },
+        }
+      end
+
+      let(:permitted_params) do
+        {
+          email: { email: 'user@example.com', confirmed: 'true' },
+        }
+      end
 
       it 'logs param keys at INFO level' do
         wizard.log_params_received(
@@ -189,10 +198,12 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
         )
 
         output = log_output.string
-        expect(output).to include('Params received')
-        expect(output).to include('step=:email')
-        expect(output).to include('raw_keys=[:email, :confirmed, :extra]')
-        expect(output).to include('permitted_keys=[:email, :confirmed]')
+        expect(output).to eq(
+          '[PersonalInformationWizard] Params data step=:email ' \
+          'raw={email: {email: "user@example.com", confirmed: "true", extra: "ignored"}} ' \
+          'permitted={email: {email: "user@example.com", confirmed: "true"}}' \
+          "\n",
+        )
       end
 
       it 'logs param values at DEBUG level' do

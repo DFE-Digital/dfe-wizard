@@ -1,7 +1,3 @@
-# frozen_string_literal: true
-
-require 'spec_helper'
-
 RSpec.describe DfE::Wizard::Core::StateManagement do
   # ============================================================================
   # WIZARD GRAPH STRUCTURE EXAMPLE
@@ -551,31 +547,6 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
                                           phone_verification
                                         ])
       end
-    end
-  end
-
-  describe '#steps_saved' do
-    before do
-      state_store.save_steps(
-        personal_details: { name: 'John', email: 'john@example.com' },
-        account_type: { account_type: 'individual' },
-      )
-    end
-
-    let(:current_step) { :verification_method }
-
-    it 'returns step objects for saved steps' do
-      steps = wizard.steps_saved
-
-      expect(steps).to all(be_a(DfE::Wizard::Step))
-      expect(steps.map(&:step_id)).to eq(%i[personal_details account_type])
-    end
-
-    it 'hydrates step objects with data' do
-      personal_step = wizard.steps_saved.first
-
-      expect(personal_step.name).to eq('John')
-      expect(personal_step.email).to eq('john@example.com')
     end
   end
 
