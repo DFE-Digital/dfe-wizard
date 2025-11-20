@@ -1,0 +1,606 @@
+RSpec.describe DfE::Wizard::Core::StateStore do
+  # ============================================================================
+  # WIZARD: Apply for Basic DBS Check
+  # ============================================================================
+
+  let(:wizard_class) do
+    Class.new do
+      include DfE::Wizard
+
+      def steps_processor
+        DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+          graph.add_node :start, DBSSteps::Start
+          graph.add_node :what_service, DBSSteps::WhatService
+          graph.add_node :personal_details, DBSSteps::PersonalDetails
+          graph.add_node :address_history, DBSSteps::AddressHistory
+          graph.add_node :previous_names_question, DBSSteps::PreviousNamesQuestion
+          graph.add_node :previous_names_details, DBSSteps::PreviousNamesDetails
+          graph.add_node :identity_documents, DBSSteps::IdentityDocuments
+          graph.add_node :contact_preferences, DBSSteps::ContactPreferences
+          graph.add_node :payment, DBSSteps::Payment
+          graph.add_node :check_answers, DBSSteps::CheckAnswers
+
+          graph.root :start
+
+          graph.add_edge from: :start, to: :what_service
+          graph.add_edge from: :what_service, to: :personal_details
+          graph.add_edge from: :personal_details, to: :address_history
+          graph.add_edge from: :address_history, to: :previous_names_question
+          graph.add_conditional_edge(
+            from: :previous_names_question,
+            when: :has_previous_names?,
+            then: :previous_names_details,
+            else: :identity_documents,
+          )
+          graph.add_edge from: :previous_names_details, to: :identity_documents
+          graph.add_edge from: :identity_documents, to: :contact_preferences
+          graph.add_edge from: :contact_preferences, to: :payment
+          graph.add_edge from: :payment, to: :check_answers
+        end
+      end
+
+      def route_strategy
+        DfE::Wizard::RouteStrategy::ConfigurableRoutes.new(wizard: self)
+      end
+
+      def logger
+        @logger ||= DfE::Wizard::Logger.new(Rails.logger)
+      end
+
+      # Delegate predicates to state_store
+      delegate :has_previous_names?, to: :state_store
+    end
+  end
+
+  let(:state_store_class) do
+    Class.new do
+      include DfE::Wizard::Core::StateStore
+
+      def has_previous_names?
+        previous_names == 'yes'
+      end
+
+      def full_name
+        "#{first_name} #{middle_names} #{last_name}".squeeze(' ').strip
+      end
+
+      def age
+        return nil unless date_of_birth
+
+        Date.parse(date_of_birth).then do |dob|
+          ((Date.today - dob).to_i / 365.25).floor
+        end
+      rescue ArgumentError
+        nil
+      end
+
+      def uk_resident?
+        country_of_residence == 'united_kingdom'
+      end
+
+      def attribute_redefined_in_state_store
+        :this_attribute_is_redefined
+      end
+    end
+  end
+
+  before(:all) do
+    unless defined?(DBSSteps::Start)
+      module DBSSteps
+        class Start
+          include DfE::Wizard::Step
+
+          def self.permitted_params
+            []
+          end
+        end
+
+        class WhatService
+          include DfE::Wizard::Step
+
+          attribute :service_type
+
+          validates :service_type,
+                    presence: true,
+                    inclusion: { in: %w[basic standard enhanced] }
+
+          def self.permitted_params
+            %w[service_type]
+          end
+        end
+
+        class PersonalDetails
+          include DfE::Wizard::Step
+
+          attribute :first_name
+          attribute :middle_names
+          attribute :last_name
+          attribute :date_of_birth
+          attribute :gender
+          attribute :country_of_birth
+
+          validates :first_name, :last_name, :date_of_birth, :gender, presence: true
+          validates :gender, inclusion: { in: %w[male female prefer_not_to_say] }
+
+          def self.permitted_params
+            %w[first_name middle_names last_name date_of_birth gender country_of_birth]
+          end
+        end
+
+        class AddressHistory
+          include DfE::Wizard::Step
+
+          attribute :current_address_line_1
+          attribute :current_address_line_2
+          attribute :current_address_town
+          attribute :current_address_postcode
+          attribute :current_address_country
+          attribute :lived_here_since
+
+          validates :current_address_line_1,
+                    :current_address_town,
+                    :current_address_postcode,
+                    presence: true
+
+          def self.permitted_params
+            %w[
+              current_address_line_1
+              current_address_line_2
+              current_address_town
+              current_address_postcode
+              current_address_country
+              lived_here_since
+            ]
+          end
+        end
+
+        class PreviousNamesQuestion
+          include DfE::Wizard::Step
+
+          attribute :previous_names
+
+          validates :previous_names,
+                    presence: true,
+                    inclusion: { in: %w[yes no] }
+
+          def self.permitted_params
+            %w[previous_names]
+          end
+        end
+
+        class PreviousNamesDetails
+          include DfE::Wizard::Step
+
+          attribute :previous_first_name
+          attribute :previous_middle_names
+          attribute :previous_last_name
+          attribute :name_changed_date
+          attribute :reason_for_change
+          attribute :attribute_redefined_in_state_store
+
+          validates :previous_first_name, :previous_last_name, presence: true
+
+          def self.permitted_params
+            %w[
+              previous_first_name
+              previous_middle_names
+              previous_last_name
+              name_changed_date
+              reason_for_change
+            ]
+          end
+        end
+
+        class IdentityDocuments
+          include DfE::Wizard::Step
+
+          attribute :document_type
+          attribute :passport_number
+          attribute :driving_license_number
+          attribute :national_insurance_number
+
+          validates :document_type,
+                    presence: true,
+                    inclusion: { in: %w[passport driving_license both] }
+
+          def self.permitted_params
+            %w[
+              document_type
+              passport_number
+              driving_license_number
+              national_insurance_number
+            ]
+          end
+        end
+
+        class ContactPreferences
+          include DfE::Wizard::Step
+
+          attribute :email
+          attribute :phone
+          attribute :contact_method
+          attribute :country_of_residence
+
+          validates :email, :phone, :contact_method, presence: true
+          validates :contact_method, inclusion: { in: %w[email phone post] }
+
+          def self.permitted_params
+            %w[email phone contact_method country_of_residence]
+          end
+        end
+
+        class Payment
+          include DfE::Wizard::Step
+
+          attribute :payment_method
+          attribute :card_number
+          attribute :card_expiry
+          attribute :card_cvv
+
+          validates :payment_method, presence: true
+
+          def self.permitted_params
+            %w[payment_method card_number card_expiry card_cvv]
+          end
+        end
+
+        class CheckAnswers
+          include DfE::Wizard::Step
+
+          def self.permitted_params
+            []
+          end
+        end
+      end
+    end
+  end
+
+  let(:repository) { DfE::Wizard::Repository::InMemory.new }
+  let(:state_store) { state_store_class.new(repository:) }
+  let(:wizard) do
+    wizard_class.new(
+      current_step: :start,
+      state_store:,
+    )
+  end
+
+  describe '#define_step_attributes_methods?' do
+    it 'returns true by default' do
+      expect(state_store.define_step_attributes_methods?).to be true
+    end
+
+    it 'can be overridden to disable auto-generation' do
+      custom_store = Class.new do
+        include DfE::Wizard::Core::StateStore
+
+        def define_step_attributes_methods?
+          false
+        end
+      end
+
+      instance = custom_store.new(repository: repository)
+      expect(instance.define_step_attributes_methods?).to be false
+    end
+  end
+
+  describe '#define_step_attributes_methods' do
+    context 'with complete DBS check application' do
+      before do
+        state_store.save_steps(
+          what_service: { service_type: 'basic' },
+          personal_details: {
+            first_name: 'Sarah',
+            middle_names: 'Elizabeth',
+            last_name: 'Johnson',
+            date_of_birth: '1985-03-15',
+            gender: 'female',
+            country_of_birth: 'United Kingdom',
+          },
+          address_history: {
+            current_address_line_1: '10 Downing Street',
+            current_address_line_2: 'Westminster',
+            current_address_town: 'London',
+            current_address_postcode: 'SW1A 2AA',
+            current_address_country: 'United Kingdom',
+            lived_here_since: '2020-01-01',
+          },
+          previous_names_question: { previous_names: 'yes' },
+          previous_names_details: {
+            previous_first_name: 'Sarah',
+            previous_last_name: 'Smith',
+            name_changed_date: '2010-06-20',
+            reason_for_change: 'marriage',
+          },
+          identity_documents: {
+            document_type: 'both',
+            passport_number: '123456789',
+            driving_license_number: 'JOHNS851203AB9CD',
+            national_insurance_number: 'AB123456C',
+          },
+          contact_preferences: {
+            email: 'sarah.johnson@example.com',
+            phone: '07700900123',
+            contact_method: 'email',
+            country_of_residence: 'united_kingdom',
+          },
+          payment: { payment_method: 'card', card_number: '4111111111111111' },
+        )
+
+        state_store.define_step_attributes_methods(wizard)
+      end
+
+      it 'generates reader methods for all step attributes' do
+        expect(state_store).to respond_to(:service_type)
+        expect(state_store).to respond_to(:first_name)
+        expect(state_store).to respond_to(:last_name)
+        expect(state_store).to respond_to(:date_of_birth)
+        expect(state_store).to respond_to(:email)
+        expect(state_store).to respond_to(:passport_number)
+      end
+
+      it 'returns correct values from generated methods' do
+        expect(state_store.service_type).to eq('basic')
+        expect(state_store.first_name).to eq('Sarah')
+        expect(state_store.last_name).to eq('Johnson')
+        expect(state_store.email).to eq('sarah.johnson@example.com')
+      end
+
+      it 'custom predicate methods work with auto-generated attributes' do
+        expect(state_store.has_previous_names?).to be true
+        expect(state_store.full_name).to eq('Sarah Elizabeth Johnson')
+        expect(state_store.age).to be_between(38, 40)
+        expect(state_store.uk_resident?).to be true
+      end
+
+      it 'does not overwrite custom methods' do
+        expect(state_store).to respond_to(:full_name)
+        expect(state_store).to respond_to(:age)
+        expect(state_store.full_name).to include('Sarah')
+      end
+    end
+
+    context 'applicant without previous names' do
+      before do
+        state_store.save_steps(
+          personal_details: {
+            first_name: 'James',
+            last_name: 'Brown',
+            date_of_birth: '1990-07-22',
+            gender: 'male',
+          },
+          previous_names_question: { previous_names: 'no' },
+        )
+
+        state_store.define_step_attributes_methods(wizard)
+      end
+
+      it 'predicate returns false when previous_names is no' do
+        expect(state_store.has_previous_names?).to be false
+      end
+
+      it 'previous_names_details attributes return nil' do
+        expect(state_store.previous_first_name).to be_nil
+        expect(state_store.previous_last_name).to be_nil
+      end
+    end
+
+    context 'partial application (incomplete data)' do
+      before do
+        state_store.save_steps(
+          what_service: { service_type: 'basic' },
+          personal_details: {
+            first_name: 'John',
+            last_name: 'Doe',
+          },
+        )
+
+        state_store.define_step_attributes_methods(wizard)
+      end
+
+      it 'returns nil for attributes not yet provided' do
+        expect(state_store.date_of_birth).to be_nil
+        expect(state_store.email).to be_nil
+        expect(state_store.passport_number).to be_nil
+      end
+
+      it 'returns provided values correctly' do
+        expect(state_store.first_name).to eq('John')
+        expect(state_store.last_name).to eq('Doe')
+        expect(state_store.service_type).to eq('basic')
+      end
+    end
+
+    context 'with logger' do
+      it 'logs count and method names during wizard initialization' do
+        fresh_state_store = state_store_class.new(repository: repository)
+        fresh_state_store.save_steps(
+          personal_details: { first_name: 'Test', last_name: 'User' },
+        )
+
+        logger_mock = instance_double(DfE::Wizard::Logging::Logger)
+        tagged_logger = instance_double(DfE::Wizard::Logging::TaggedLogger)
+        allow(logger_mock).to receive(:tagged).and_return(tagged_logger)
+        allow(tagged_logger).to receive(:info)
+        allow(tagged_logger).to receive(:debug)
+        allow(fresh_state_store).to receive(:logger).and_return(tagged_logger)
+
+        # Initialize wizard - triggers after_initialize
+        wizard_class.new(
+          current_step: :start,
+          state_store: fresh_state_store,
+        )
+
+        # Verify info logging happened with method names
+        expect(tagged_logger).to have_received(:info) do |message, **options|
+          expect(message).to match(/Auto-generated 31 attribute reader methods/)
+          expect(message).to include(':service_type')
+          expect(message).to include(':first_name')
+          expect(message).to include(':email')
+          expect(options[:category]).to eq(:state)
+        end
+      end
+
+      it 'logs skipped methods when collisions exist' do
+        collision_store_class = Class.new do
+          include DfE::Wizard::Core::StateStore
+
+          def first_name
+            'EXISTING_METHOD'
+          end
+        end
+
+        collision_store = collision_store_class.new(repository: repository)
+        collision_store.save_steps(
+          personal_details: { first_name: 'Should not override' },
+        )
+
+        logger_mock = instance_double(DfE::Wizard::Logging::Logger)
+        tagged_logger = instance_double(DfE::Wizard::Logging::TaggedLogger)
+        allow(logger_mock).to receive(:tagged).and_return(tagged_logger)
+        allow(tagged_logger).to receive(:info)
+        allow(tagged_logger).to receive(:debug)
+        allow(collision_store).to receive(:logger).and_return(tagged_logger)
+
+        wizard_class.new(
+          current_step: :start,
+          state_store: collision_store,
+        )
+
+        expect(tagged_logger).to have_received(:debug).with(
+          match(/Skipped attribute :first_name for step :personal_details/),
+          category: :state,
+        )
+
+        expect(collision_store.first_name).to eq('EXISTING_METHOD')
+      end
+    end
+
+    context 'integration with wizard initialization' do
+      it 'auto-generates methods during wizard initialization' do
+        state_store.save_steps(
+          personal_details: {
+            first_name: 'Alice',
+            last_name: 'Smith',
+          },
+        )
+
+        wizard_class.new(
+          current_step: :personal_details,
+          state_store: state_store,
+        )
+
+        expect(state_store.first_name).to eq('Alice')
+        expect(state_store.last_name).to eq('Smith')
+      end
+
+      it 'makes custom predicates work immediately' do
+        state_store.save_steps(
+          previous_names_question: { previous_names: 'yes' },
+        )
+
+        wizard_class.new(
+          current_step: :previous_names_question,
+          state_store: state_store,
+        )
+
+        expect(state_store.has_previous_names?).to be true
+      end
+    end
+
+    context 'real-world usage example' do
+      it 'provides natural attribute access instead of read.dig' do
+        state_store.save_steps(
+          personal_details: {
+            first_name: 'Emma',
+            middle_names: 'Grace',
+            last_name: 'Williams',
+            date_of_birth: '1992-11-08',
+          },
+          contact_preferences: {
+            email: 'emma.williams@example.com',
+            phone: '07700900456',
+            country_of_residence: 'united_kingdom',
+          },
+        )
+
+        state_store.define_step_attributes_methods(wizard)
+
+        expect(state_store.first_name).to eq('Emma')
+        expect(state_store.email).to eq('emma.williams@example.com')
+        expect(state_store.full_name).to eq('Emma Grace Williams')
+        expect(state_store.uk_resident?).to be true
+      end
+    end
+
+    context 'when disabled' do
+      let(:disabled_store_class) do
+        Class.new do
+          include DfE::Wizard::Core::StateStore
+
+          def define_step_attributes_methods?
+            false
+          end
+        end
+      end
+
+      let(:disabled_store) { disabled_store_class.new(repository: repository) }
+
+      it 'does not generate any methods' do
+        disabled_store.save_steps(
+          personal_details: { first_name: 'Test' },
+        )
+
+        disabled_store.define_step_attributes_methods(wizard)
+
+        expect(disabled_store).not_to respond_to(:first_name)
+        expect(disabled_store).not_to respond_to(:email)
+      end
+
+      it 'requires manual read.dig for attribute access' do
+        disabled_store.save_steps(
+          personal_details: { first_name: 'Manual' },
+        )
+
+        disabled_store.define_step_attributes_methods(wizard)
+
+        expect(
+          disabled_store.read.dig(:steps, :personal_details, :first_name),
+        ).to eq('Manual')
+      end
+    end
+  end
+
+  describe 'edge cases' do
+    context 'with steps that have no attributes' do
+      it 'handles Start and CheckAnswers gracefully' do
+        state_store.define_step_attributes_methods(wizard)
+
+        expect { state_store.define_step_attributes_methods(wizard) }.not_to raise_error
+      end
+    end
+
+    context 'with attribute name collisions' do
+      let(:collision_store_class) do
+        Class.new do
+          include DfE::Wizard::Core::StateStore
+
+          def first_name
+            'CUSTOM_METHOD'
+          end
+        end
+      end
+
+      let(:collision_store) { collision_store_class.new(repository: repository) }
+
+      it 'preserves existing custom method' do
+        collision_store.save_steps(
+          personal_details: { first_name: 'Sarah' },
+        )
+
+        collision_store.define_step_attributes_methods(wizard)
+
+        expect(collision_store.first_name).to eq('CUSTOM_METHOD')
+      end
+    end
+  end
+end

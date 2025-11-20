@@ -218,6 +218,36 @@ module DfE
       @current_step_name = current_step&.to_sym
       @current_step_params = current_step_params
       @state_store = state_store
+
+      after_initialize
+    end
+
+    # Callback hook executed after wizard initialization
+    #
+    # Automatically triggers attribute method generation on the state_store
+    # if enabled via `define_step_attributes_methods?`.
+    #
+    # This ensures all step attribute reader methods are available immediately
+    # after wizard instantiation without requiring manual setup.
+    #
+    # @return [void]
+    #
+    # @example Automatic generation during initialization
+    #   wizard = DBSCheckWizard.new(
+    #     current_step: :personal_details,
+    #     state_store: state_store
+    #   )
+    #
+    #   # Methods already available thanks to after_initialize
+    #   state_store.first_name  # => "Sarah"
+    #   state_store.email       # => "sarah@example.com"
+    #
+    # @note Called automatically by initialize - no manual invocation needed
+    # @note Can be overridden in subclasses to customize initialization behavior
+    #
+    # @api public
+    def after_initialize
+      @state_store.define_step_attributes_methods(self) if @state_store.define_step_attributes_methods?
     end
 
     # The current step being displayed
