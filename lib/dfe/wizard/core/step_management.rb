@@ -103,7 +103,8 @@ module DfE
               )
             end
           end
-        rescue ActionController::ParameterMissing, NotImplementedError
+        rescue ActionController::ParameterMissing, NotImplementedError => error
+          log_params_error(step_id: current_step_name, error:)
           {}
         end
 
@@ -149,10 +150,25 @@ module DfE
           flow_path.map { |step_id| step(step_id) }
         end
 
-        # Get step objects for steps with saved data
+        # Get hydrated step objects for steps with saved data
         #
-        # @return [Array<DfE::Wizard::Step>] Saved steps
-        # @see StateFiltering#steps_saved (same thing, alias)
+        # Returns instantiated Step objects for all steps in current flow
+        # where user has entered data. Useful for rendering forms with
+        # pre-filled values or showing saved progress.
+        #
+        # @return [Array<DfE::Wizard::Step>] Step objects with saved data
+        #
+        # @example Pre-fill form with saved data
+        #   wizard.steps_saved.each do |step|
+        #     render_form(step, data: step.data)
+        #   end
+        #
+        # @example Show saved progress
+        #   wizard.steps_saved.count  # => 2 steps completed
+        #
+        # @see #saved_path For step IDs only
+        # @see Navigation#steps_in_flow For all flow steps
+        # @api public
         def saved_steps
           saved_path.map { |step_id| step(step_id) }
         end
