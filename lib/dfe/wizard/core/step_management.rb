@@ -103,8 +103,8 @@ module DfE
               )
             end
           end
-        rescue ActionController::ParameterMissing, NotImplementedError => error
-          log_params_error(step_id: current_step_name, error:)
+        rescue ActionController::ParameterMissing, NotImplementedError => e
+          log_params_error(step_id: current_step_name, error: e)
           {}
         end
 

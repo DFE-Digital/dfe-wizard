@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module DfE
   module Wizard
     module Core
@@ -19,31 +17,22 @@ module DfE
       #     repository: DfE::Wizard::Repository::InMemory.new,
       #   )
       #
-      #   # Later, wizard calls:
-      #   state_store.define_accessors_from_steps(wizard.steps_schema)
+      #   # Later, wizard calls during initialization:
+      #   state_store.define_step_attributes_methods(wizard)
       #
-      #   # Now you can use:
-      #   state_store.name_first_name       # getter
-      #   state_store.name_first_name = 'John'  # setter
-      #   state_store.name_first_name?      # predicate
+      #   # Now you can use auto-generated methods:
+      #   state_store.first_name       # getter
+      #   state_store.email            # getter
+      #   state_store.has_previous_names?  # custom predicate (not overwritten)
       #
       # @api public
       module StateStore
-        # Included hook
-        def self.included(base)
-          base.extend ClassMethods
-        end
-
-        module ClassMethods
-        end
-
         # Initialize state store
         #
         # @param repository [DfE::Wizard::Repository::*] Backend storage adapter
         # @return [void]
         def initialize(repository: DfE::Wizard::Repository::InMemory.new)
           @repository = repository
-          @accessor_cache = {}
         end
 
         # Access the underlying repository
@@ -51,128 +40,76 @@ module DfE
         # @return [DfE::Wizard::Repository::*]
         attr_reader :repository
 
-        # Define dynamic accessors from wizard's step schema
+        # Called during wizard initialization to dynamically define methods
+        # based on step definitions from the wizard's graph.
         #
-        # Introspects each step class and generates methods like:
-        #   state_store.name_first_name       # getter
-        #   state_store.name_first_name = 'John'  # setter
-        #   state_store.name_first_name?      # predicate
-        #   state_store.name_attributes       # batch getter
-        #   state_store.name_attributes = {}  # batch setter
-        #
-        # Attributes are extracted from step classes via ActiveModel's attribute_names.
-        #
-        # @param steps_schema [Hash<Symbol, Class>] Map of step_id => step_class
+        # @param wizard [DfE::Wizard] The wizard instance to introspect
         # @return [void]
         #
-        # @example
-        #   state_store.define_accessors_from_steps(
-        #     name: Steps::Name,
-        #     email: Steps::Email
-        #   )
-        def define_accessors_from_steps(steps_schema)
-          steps_schema.each do |step_id, step_class|
-            step_attributes = extract_step_attributes(step_class)
-            next if step_attributes.empty?
+        # @example Generated methods
+        #   # For step :email with attributes [:email, :confirmed]
+        #   def email
+        #     read.dig(:steps, :email, :email)
+        #   end
+        #
+        #   def confirmed
+        #     read.dig(:steps, :email, :confirmed)
+        #   end
+        #
+        # @note Methods are defined as singleton methods on the state_store instance
+        # @note Skips attributes that would conflict with existing methods
+        # @note Only generates readers, not writers
+        #
+        # @api public
+        def define_step_attributes_methods(wizard)
+          return unless define_step_attributes_methods?
 
-            define_accessors_for_step(step_id, step_attributes)
+          step_definitions = wizard.steps_processor.step_definitions
+          generated_methods = []
+
+          step_definitions.each do |node|
+            step_id = node.id
+            step_class = node.klass
+            next unless step_class.respond_to?(:attribute_names)
+
+            step_class.attribute_names.each do |attr_name|
+              attr_sym = attr_name.to_sym
+
+              if respond_to?(attr_sym)
+                log_attribute_skipped(step_id, attr_sym)
+                next
+              end
+
+              define_singleton_method(attr_sym) do
+                read.dig(:steps, step_id, attr_sym)
+              end
+
+              generated_methods << attr_sym
+            end
           end
+
+          log_attributes_defined(wizard, generated_methods)
         end
 
-        # Extract attribute names from a step class
+        # Whether to auto-generate step attribute methods
         #
-        # Uses ActiveModel's built-in attribute_names if available.
+        # Can be overridden in subclasses to disable auto-generation
+        # if custom method definitions are preferred.
         #
-        # @param step_class [Class] A step class that includes DfE::Wizard::Core::Step
-        # @return [Array<Symbol>] List of attribute names
+        # @return [Boolean] true to enable auto-generation, false to disable
         #
-        # @api private
-        def extract_step_attributes(step_class)
-          return [] unless step_class.respond_to?(:attribute_names)
-
-          step_class.attribute_names.map(&:to_sym)
-        end
-
-        # Define all accessors for a single step
+        # @example Disable for specific state store
+        #   class CustomStateStore
+        #     include DfE::Wizard::StateStore
         #
-        # @param step_id [Symbol] The step identifier
-        # @param attribute_names [Array<Symbol>] Attribute names from step class
-        # @return [void]
+        #     def define_step_attributes_methods?
+        #       false
+        #     end
+        #   end
         #
-        # @api private
-        def define_accessors_for_step(step_id, attribute_names)
-          attribute_names.each do |attr_name|
-            define_attribute_getter(step_id, attr_name)
-            define_attribute_setter(step_id, attr_name)
-            define_attribute_predicate(step_id, attr_name)
-          end
-
-          define_batch_getter(step_id)
-          define_batch_setter(step_id)
-        end
-
-        # Define getter: state_store.name_first_name
-        #
-        # @api private
-        def define_attribute_getter(step_id, attr_name)
-          method_name = :"#{step_id}_#{attr_name}"
-          cache_key = [:getter, step_id, attr_name]
-
-          define_singleton_method(method_name) do
-            return @accessor_cache[cache_key] if @accessor_cache.key?(cache_key)
-
-            value = read_step(step_id)[attr_name]
-            @accessor_cache[cache_key] = value
-            value
-          end
-        end
-
-        # Define setter: state_store.name_first_name = 'John'
-        #
-        # @api private
-        def define_attribute_setter(step_id, attr_name)
-          method_name = :"#{step_id}_#{attr_name}="
-
-          define_singleton_method(method_name) do |value|
-            write_step(step_id, { attr_name => value })
-            @accessor_cache.delete([:getter, step_id, attr_name])
-            value
-          end
-        end
-
-        # Define predicate: state_store.name_first_name?
-        #
-        # @api private
-        def define_attribute_predicate(step_id, attr_name)
-          method_name = :"#{step_id}_#{attr_name}?"
-
-          define_singleton_method(method_name) do
-            read_step(step_id)[attr_name].present?
-          end
-        end
-
-        # Define batch getter: state_store.name_attributes
-        #
-        # @api private
-        def define_batch_getter(step_id)
-          method_name = :"#{step_id}_attributes"
-
-          define_singleton_method(method_name) do
-            read_step(step_id)
-          end
-        end
-
-        # Define batch setter: state_store.name_attributes = {...}
-        #
-        # @api private
-        def define_batch_setter(step_id)
-          method_name = :"#{step_id}_attributes="
-
-          define_singleton_method(method_name) do |attrs|
-            write_step(step_id, attrs)
-            @accessor_cache.clear
-            attrs
-          end
+        # @api public
+        def define_step_attributes_methods?
+          true
         end
 
         # Read complete wizard state from repository
@@ -203,7 +140,6 @@ module DfE
         # @return [void]
         def clear
           @repository.clear
-          @accessor_cache.clear
         end
 
         # Read data for a specific step
@@ -248,6 +184,40 @@ module DfE
           steps = current[:steps] || {}
           steps.delete(step_id)
           write(current.merge(steps: steps))
+        end
+
+        private
+
+        # Logs when an attribute is skipped during generation
+        #
+        # @param step_id [Symbol] The step identifier
+        # @param attr_name [Symbol] The attribute name
+        # @return [void]
+        # @api private
+        def log_attribute_skipped(step_id, attr_name)
+          return unless respond_to?(:logger) && logger.respond_to?(:debug)
+
+          logger.debug(
+            "[StateStore] Skipped attribute :#{attr_name} for step :#{step_id} " \
+            '(method already exists)',
+            category: :state,
+          )
+        end
+
+        # Logs summary of generated attributes with method names
+        #
+        # @param wizard [DfE::Wizard] The wizard instance
+        # @param methods [Array<Symbol>] List of generated method names
+        # @return [void]
+        # @api private
+        def log_attributes_defined(wizard, methods)
+          return unless respond_to?(:logger) && logger.respond_to?(:info)
+
+          logger.info(
+            "[StateStore] Auto-generated #{methods.size} attribute reader methods " \
+            "for #{wizard.class.name}: #{methods.inspect}",
+            category: :state,
+          )
         end
       end
     end

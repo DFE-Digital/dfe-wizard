@@ -64,6 +64,10 @@ module DfE
           @nodes[node_id] = Node.new(id: node_id, klass: klass)
         end
 
+        def step_definitions
+          @nodes.values
+        end
+
         # Finds the step class for a given node
         #
         # Returns the class associated with a node identifier.
