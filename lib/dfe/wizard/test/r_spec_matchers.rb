@@ -6,135 +6,271 @@ module DfE
 
         matcher :have_next_step_path do |expected|
           match { |wiz| wiz.next_step_path == expected }
-          failure_message { |wiz| "expected next_step_path to be #{expected.inspect} but got #{wiz.next_step_path.inspect}" }
+
+          failure_message do |wiz|
+            <<~MSG
+              Expected next_step_path: #{expected.inspect}
+              Got: #{wiz.next_step_path.inspect}
+
+              #{wizard_inspect(wiz)}
+            MSG
+          end
         end
 
         matcher :have_previous_step_path do |expected|
           match { |wiz| wiz.previous_step_path == expected }
-          failure_message { |wiz| "expected previous_step_path to be #{expected.inspect} but got #{wiz.previous_step_path.inspect}" }
+
+          failure_message do |wiz|
+            <<~MSG
+              Expected previous_step_path: #{expected.inspect}
+              Got: #{wiz.previous_step_path.inspect}
+
+              #{wizard_inspect(wiz)}
+            MSG
+          end
         end
 
         matcher :be_at_step do |expected_step|
           match { |wizard| wizard.current_step_name == expected_step }
-          failure_message { |wizard| "Expected step #{expected_step.inspect}, got #{wizard.current_step_name.inspect}" }
-        end
 
-        matcher :have_visited do |*expected_steps|
-          match do |wizard|
-            path = wizard.path_traversal
-            expected_steps.all? { |step| path.include?(step) }
-          end
           failure_message do |wizard|
-            path = wizard.path_traversal
-            missing = expected_steps.reject { |step| path.include?(step) }
-            "Expected #{expected_steps.inspect}, missing #{missing.inspect}\nPath: #{path.inspect}"
+            <<~MSG
+              Expected current step: #{expected_step.inspect}
+              Got: #{wizard.current_step_name.inspect}
+
+              #{wizard_inspect(wizard)}
+            MSG
           end
         end
 
-        matcher :be_able_to_reach do |target_step|
-          match do |wizard|
-            path = wizard.path_traversal(target_step)
-            path.include?(target_step)
-          end
-          failure_message do |wizard|
-            path = wizard.path_traversal(target_step)
-            "Cannot reach #{target_step.inspect}\nPath: #{path.inspect}"
-          end
-        end
-
-        # FIXED: Uses path_traversal(validate: true) instead of removed validators
-        matcher :have_valid_path_to do |target_step|
-          match do |wizard|
-            wizard.step_accessible?(target_step)
+        matcher :be_in_flow do
+          chain :in do |wizard_instance|
+            @wizard = wizard_instance
           end
 
-          failure_message do |wizard|
-            results = wizard.path_traversal(target_step, validate: true)
-            path = wizard.path_traversal(target_step)
+          match do |step_id|
+            return false unless @wizard
 
-            invalid = results.find { |r| r[:visited] && !r[:valid] }
-            unvisited = results.find { |r| !r[:visited] }
+            @wizard.in_flow?(step_id)
+          end
 
-            reason = if invalid
-                       "Step #{invalid[:step]} has errors: #{invalid[:errors].join(', ')}"
-                     elsif unvisited
-                       "Step #{unvisited[:step]} not visited"
-                     else
-                       "Path validation failed"
-                     end
-
-            validation_output = results.map do |r|
-              status = "#{r[:visited] ? '✓' : '✗'} visited, #{r[:valid] ? '✓' : '✗'} valid"
-              errors = r[:errors].any? ? " (#{r[:errors].join(', ')})" : ""
-              "  #{r[:step]}: [#{status}]#{errors}"
-            end.join("\n")
+          failure_message do |step_id|
+            return 'No wizard provided - use .in(wizard)' unless @wizard
 
             <<~MSG
-              Expected valid path to #{target_step.inspect}
+              Step not in flow: #{step_id.inspect}
+              Flow path: #{@wizard.flow_path.inspect}
+
+              #{state_store_data(@wizard)}
+
+              #{wizard_inspect(@wizard)}
+            MSG
+          end
+        end
+
+        matcher :have_in_flow do |*expected_steps|
+          match do |wizard|
+            expected_steps.all? { |step| wizard.in_flow?(step) }
+          end
+
+          failure_message do |wizard|
+            flow = wizard.flow_path
+            missing = expected_steps.reject { |step| wizard.in_flow?(step) }
+
+            <<~MSG
+              Expected steps in flow: #{expected_steps.inspect}
+              Missing: #{missing.inspect}
+              Flow path: #{flow.inspect}
+
+              #{state_store_data(wizard)}
+
+              #{wizard_inspect(wizard)}
+            MSG
+          end
+        end
+
+        matcher :be_saved do
+          chain :in do |wizard_instance|
+            @wizard = wizard_instance
+          end
+
+          match do |step_id|
+            return false unless @wizard
+
+            @wizard.saved?(step_id)
+          end
+
+          failure_message do |step_id|
+            return 'No wizard provided - use .in(wizard)' unless @wizard
+
+            <<~MSG
+              Step not saved: #{step_id.inspect}
+              Saved path: #{@wizard.saved_path.inspect}
+
+              #{state_store_data(@wizard)}
+
+              #{wizard_inspect(@wizard)}
+            MSG
+          end
+        end
+
+        matcher :have_saved do |*expected_steps|
+          match do |wizard|
+            expected_steps.all? { |step| wizard.saved?(step) }
+          end
+
+          failure_message do |wizard|
+            saved = wizard.saved_path
+            missing = expected_steps.reject { |step| wizard.saved?(step) }
+
+            <<~MSG
+              Expected saved steps: #{expected_steps.inspect}
+              Missing: #{missing.inspect}
+              Saved path: #{saved.inspect}
+
+              #{state_store_data(wizard)}
+
+              #{wizard_inspect(wizard)}
+            MSG
+          end
+        end
+
+        matcher :be_valid_to do |target_step|
+          match do |wizard|
+            wizard.valid_path_to?(target_step)
+          end
+
+          failure_message do |wizard|
+            flow = wizard.flow_path(target_step)
+            valid = wizard.valid_path(target_step)
+
+            if flow.present?
+              invalid_steps = flow.reject { |s| wizard.valid?(s) }
+              reason = "#{invalid_steps.count} step(s) invalid before reaching #{target_step.inspect}"
+
+              invalid_steps_details = invalid_steps.map do |step_id|
+                step_obj = wizard.step(step_id)
+                step_obj.valid?
+                errors = step_obj.errors.full_messages
+
+                "  ✗ #{step_id}:\n" + errors.map { |e| "    - #{e}" }.join("\n")
+              end.join("\n\n")
+            else
+              reason = "Step #{target_step.inspect} not in flow path"
+              invalid_steps_details = ''
+            end
+
+            <<~MSG
+              Expected valid path to: #{target_step.inspect}
 
               #{reason}
 
-              Path: #{path.inspect}
+              Flow path: #{flow.inspect}
+              Valid path: #{valid.inspect}
 
-              Validation results:
-              #{validation_output}
+              #{"Invalid steps:\n#{invalid_steps_details}\n" if invalid_steps_details.present?}
+              #{state_store_data(wizard)}
 
-              State store data:
-              #{format_state_data(wizard)}
+              #{wizard_inspect(wizard)}
             MSG
           end
-
-          def format_state_data(wizard)
-            data = wizard.state_store.read
-            steps = data[:steps] || {}
-            steps.map { |k, v| "  #{k}: #{v.inspect}" }.join("\n")
-          end
         end
 
-        matcher :be_reachable do
+        matcher :be_valid_step do
           chain :in do |wizard_instance|
             @wizard = wizard_instance
           end
 
           match do |step_id|
             return false unless @wizard
-            @wizard.path_traversal(step_id).include?(step_id)
+
+            @wizard.valid?(step_id)
           end
 
           failure_message do |step_id|
-            return "No wizard provided - use .in(wizard)" unless @wizard
-            path = @wizard.path_traversal(step_id)
-            "Cannot reach #{step_id.inspect} (path: #{path.inspect})"
+            return 'No wizard provided - use .in(wizard)' unless @wizard
+
+            step_obj = @wizard.step(step_id)
+            step_obj.valid?
+            errors = step_obj.errors.full_messages
+
+            <<~MSG
+              Step invalid: #{step_id.inspect}
+
+              Errors:
+              #{errors.map { |e| "  - #{e}" }.join("\n")}
+
+              #{state_store_data(@wizard)}
+
+              #{wizard_inspect(@wizard)}
+            MSG
           end
         end
 
-        matcher :be_accessible do
-          chain :in do |wizard_instance|
-            @wizard = wizard_instance
+        matcher :branch_to do |expected_step|
+          chain :from do |from_step|
+            @from_step = from_step
           end
 
-          match do |step_id|
-            return false unless @wizard
-            @wizard.step_accessible?(step_id)
+          match do |wizard|
+            return false unless @from_step
+
+            # Simulate being at the from_step and check next step
+            wizard_at_step = wizard.class.new(
+              current_step: @from_step,
+              state_store: wizard.state_store,
+            )
+            wizard_at_step.next_step == expected_step
           end
 
-          failure_message do |step_id|
-            return "No wizard provided - use .in(wizard)" unless @wizard
-            path = @wizard.path_traversal(step_id)
+          failure_message do |wizard|
+            return 'No from step provided - use .from(step)' unless @from_step
 
-            if !path.include?(step_id)
-              "Step #{step_id.inspect} not in path: #{path.inspect}"
-            else
-              results = @wizard.path_traversal(step_id, validate: true)
-              invalid = results.find { |r| r[:visited] && !r[:valid] }
+            wizard_at_step = wizard.class.new(
+              current_step: @from_step,
+              state_store: wizard.state_store,
+            )
+            actual_next = wizard_at_step.next_step
 
-              if invalid
-                "Step #{step_id.inspect} not accessible - #{invalid[:step]} is invalid"
-              else
-                "Step #{step_id.inspect} not accessible"
-              end
-            end
+            <<~MSG
+              Expected branch from #{@from_step.inspect} to: #{expected_step.inspect}
+              Got: #{actual_next.inspect}
+
+              #{state_store_data(wizard)}
+
+              #{wizard_inspect(wizard)}
+            MSG
           end
+        end
+
+        def wizard_inspect(wizard)
+          DfE::Wizard::Core::Inspect.new(wizard:).inspect
+        end
+
+        def state_store_data(wizard)
+          raw_data = wizard.raw_data[:steps] || {}
+          filtered_data = wizard.data[:steps] || {}
+
+          raw_lines = if raw_data.empty?
+                        '  (empty)'
+                      else
+                        raw_data.map { |k, v| "  #{k}: #{v.inspect}" }.join("\n")
+                      end
+
+          filtered_lines = if filtered_data.empty?
+                             '  (empty)'
+                           else
+                             filtered_data.map { |k, v| "  #{k}: #{v.inspect}" }.join("\n")
+                           end
+
+          <<~DATA
+            ┌─ STATE STORE DATA ─────────────────────────┐
+            │ Raw:
+            #{raw_lines}
+            │ Filtered:
+            #{filtered_lines}
+            └────────────────────────────────────────────┘
+          DATA
         end
       end
     end

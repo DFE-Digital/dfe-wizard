@@ -1,6 +1,8 @@
 class AssignMentorWizard
   include DfE::Wizard
 
+  delegate :lead_provider_will_not_provide?, to: :state_store
+
   def steps_processor
     DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
       graph.add_node :who_will_be_the_mentor, Steps::WhoWillBeTheMentor
@@ -13,7 +15,7 @@ class AssignMentorWizard
 
       graph.add_conditional_edge(
         from: :can_receive_mentor_training,
-        when: ->(step) { step.lp_will_provide == 'no' },
+        when: :lead_provider_will_not_provide?,
         then: :which_lead_provider,
         else: :confirmation,
         label: 'LP provides?',
@@ -28,5 +30,13 @@ class AssignMentorWizard
       wizard: self,
       namespace: 'assign_mentor',
     )
+  end
+
+  def logger
+    DfE::Wizard::Logger.new(Rails.logger)
+  end
+
+  def inspect
+    DfE::Wizard::Inspect.new(wizard: self) if Rails.env.local?
   end
 end

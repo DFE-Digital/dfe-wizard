@@ -1,6 +1,10 @@
 class PersonalInformationWizard
   include DfE::Wizard
 
+  delegate :needs_permission_to_work_or_study?,
+           :right_to_work_or_study?,
+           to: :state_store
+
   def steps_processor
     DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
       graph.add_node :name_and_date_of_birth, Steps::NameAndDateOfBirth
@@ -14,7 +18,7 @@ class PersonalInformationWizard
 
       graph.add_conditional_edge(
         from: :nationality,
-        when: ->(step) { step.needs_permission_to_work_or_study? },
+        when: :needs_permission_to_work_or_study?,
         then: :right_to_work_or_study,
         else: :review,
         label: 'Non-UK/Non-Irish',
@@ -22,7 +26,7 @@ class PersonalInformationWizard
 
       graph.add_conditional_edge(
         from: :right_to_work_or_study,
-        when: ->(step, _) { step.right_to_work_or_study? },
+        when: :right_to_work_or_study?,
         then: :immigration_status,
         else: :review,
         label: 'Right to work or study?',
@@ -44,6 +48,10 @@ class PersonalInformationWizard
 
   def logger
     DfE::Wizard::Logger.new(Rails.logger)
+  end
+
+  def inspect
+    DfE::Wizard::Inspect.new(wizard: self) if Rails.env.local?
   end
 
   def next_step_before_callback

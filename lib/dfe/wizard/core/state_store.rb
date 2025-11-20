@@ -41,7 +41,7 @@ module DfE
         #
         # @param repository [DfE::Wizard::Repository::*] Backend storage adapter
         # @return [void]
-        def initialize(repository:)
+        def initialize(repository: DfE::Wizard::Repository::InMemory.new)
           @repository = repository
           @accessor_cache = {}
         end
