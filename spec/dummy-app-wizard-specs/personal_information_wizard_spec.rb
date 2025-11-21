@@ -14,6 +14,33 @@ RSpec.describe PersonalInformationWizard do
   let(:url_helpers) { Rails.application.routes.url_helpers }
 
   describe 'flow path traversal' do
+    context 'when British national and not answered' do
+      before do
+        state_store.save_steps(
+          name_and_date_of_birth: {
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+          },
+        )
+      end
+
+      context 'at nationality step' do
+        let(:current_step) { :nationality }
+
+        it { is_expected.to be_at_step(:nationality) }
+        it { is_expected.to have_saved(:name_and_date_of_birth) }
+        it { is_expected.to have_in_flow(:name_and_date_of_birth, :nationality) }
+        it { expect(:name_and_date_of_birth).to be_saved.in(wizard) }
+
+        it 'returns flow path' do
+          expect(wizard.flow_path).to eq(%i[name_and_date_of_birth nationality])
+          expect(wizard.saved_path).to eq([:name_and_date_of_birth])
+          expect(wizard.valid_path(:review)).to eq([:name_and_date_of_birth])
+        end
+      end
+    end
+
     context 'when British national' do
       before do
         state_store.save_steps(
