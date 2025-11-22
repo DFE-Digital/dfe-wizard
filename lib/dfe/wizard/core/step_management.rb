@@ -91,11 +91,7 @@ module DfE
         #   # If there are no params for current step, returns {}
         #
         def current_step_params
-          params = if @current_step_params.is_a?(ActionController::Parameters)
-                     @current_step_params.require(current_step_name).permit(permitted_params)
-                   else
-                     @current_step_params.fetch(current_step_name, {})
-                   end
+          params = extract_step_params_from_request
 
           raw_params = if @current_step_params.respond_to?(:to_unsafe_h)
                          @current_step_params.to_unsafe_h
@@ -115,6 +111,40 @@ module DfE
         rescue ActionController::ParameterMissing, NotImplementedError => e
           log_params_error(step_id: current_step_name, error: e)
           {}
+        end
+
+        # Extracts and filters parameters for the current step.
+        #
+        # This method handles the difference between Rails Strong Parameters
+        # (ActionController::Parameters) and plain hashes. Override this method
+        # to customize parameter extraction logic.
+        #
+        # @param request_params [ActionController::Parameters, Hash] The raw parameters
+        # @return [Hash] Filtered parameters for the current step
+        #
+        # @example Default behavior (Rails Strong Parameters):
+        #   extract_step_params_from_request(params)
+        #   # Calls: params.require(:email_step).permit(:email, :confirmed)
+        #
+        # @example Default behavior (Plain Hash):
+        #   extract_step_params_from_request({email_step: {email: "test@example.com"}})
+        #   # Returns: {email: "test@example.com"}
+        #
+        # @example Custom extraction (override in subclass):
+        #   class MyWizard < DfE::Wizard::Base
+        #     def extract_step_params_from_request(request_params)
+        #       # Custom logic - e.g., different param structure
+        #       request_params.dig(:wizard_data, current_step_name) || {}
+        #     end
+        #   end
+        #
+        # @api public
+        def extract_step_params_from_request
+          if @current_step_params.is_a?(ActionController::Parameters)
+            @current_step_params.require(current_step_name).permit(permitted_params)
+          else
+            @current_step_params.fetch(current_step_name, {})
+          end
         end
 
         # Returns the permitted parameter keys for the current step class.
