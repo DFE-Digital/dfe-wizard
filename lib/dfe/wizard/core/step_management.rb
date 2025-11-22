@@ -6,6 +6,11 @@ module DfE
       # Handles step lookup, instantiation, and attribute extraction.
       # Called by the wizard to load and prepare steps.
       #
+      # In Solution 3 architecture:
+      # - Repository stores flat hash of all attributes
+      # - Wizard transforms between flat storage and step-specific views
+      # - StepManagement extracts relevant attributes per step
+      #
       # @api public
       module StepManagement
         # Get a hydrated step object
@@ -18,6 +23,10 @@ module DfE
         end
 
         # Hydrate a step from state store
+        #
+        # Extracts only the attributes relevant to this step from the flat hash.
+        # In Solution 3, the repository stores all attributes flat, and we filter
+        # to just the ones this step cares about.
         #
         # @param step_id [Symbol]
         # @return [Object] Instantiated step
@@ -135,6 +144,11 @@ module DfE
         # Merges persisted step data with incoming form parameters,
         # giving precedence to form parameters.
         #
+        # In Solution 3:
+        # - Gets flat hash from repository via state_store
+        # - Filters to attributes for current step only
+        # - Merges with current params (params take precedence)
+        #
         # @return [Hash] Attributes for step initialization
         #
         # @api public
@@ -156,15 +170,20 @@ module DfE
         # where user has entered data. Useful for rendering forms with
         # pre-filled values or showing saved progress.
         #
+        # In Solution 3:
+        # - Reads flat hash from repository
+        # - Filters attributes per step
+        # - Creates step instances with relevant data
+        #
         # @return [Array<DfE::Wizard::Step>] Step objects with saved data
         #
         # @example Pre-fill form with saved data
-        #   wizard.steps_saved.each do |step|
+        #   wizard.saved_steps.each do |step|
         #     render_form(step, data: step.data)
         #   end
         #
         # @example Show saved progress
-        #   wizard.steps_saved.count  # => 2 steps completed
+        #   wizard.saved_steps.count  # => 2 steps completed
         #
         # @see #saved_path For step IDs only
         # @see Navigation#steps_in_flow For all flow steps
@@ -179,6 +198,31 @@ module DfE
         # @see Validation#steps_valid (same thing, alias)
         def valid_steps
           valid_path.map { |step_id| step(step_id) }
+        end
+
+        # Extract attributes for a specific step from flat repository data
+        #
+        # Reads flat hash from state_store/repository and filters
+        # to only the attributes defined in the step class.
+        #
+        # @param step_id [Symbol] The step to extract data for
+        # @return [Hash] Attributes for this step only
+        #
+        # @example
+        #   # Repository contains: { first_name: "John", email: "john@example.com", city: "London" }
+        #   # Step :personal_details has attributes [:first_name]
+        #   raw_step_data(:personal_details)  # => { first_name: "John" }
+        #
+        # @api private
+        def raw_step_data(step_id)
+          step_class = find_step(step_id)
+          return {} unless step_class.respond_to?(:attribute_names)
+
+          flat_data = state_store.read
+          attribute_names = step_class.attribute_names.map(&:to_sym)
+
+          # Filter flat hash to only this step's attributes
+          flat_data.slice(*attribute_names)
         end
       end
     end

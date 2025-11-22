@@ -264,6 +264,54 @@ RSpec.describe DfE::Wizard::Core::StateStore do
     )
   end
 
+  describe '#initialize' do
+    it 'accepts a repository' do
+      expect(state_store.repository).to eq(repository)
+    end
+
+    it 'initializes wizard as nil' do
+      expect(state_store.wizard).to be_nil
+    end
+  end
+
+  describe '#read, #write, #clear delegation' do
+    it 'delegates read to repository' do
+      expect(repository).to receive(:read).and_return({})
+      state_store.read
+    end
+
+    it 'delegates write to repository' do
+      flat_hash = { first_name: 'John', email: 'john@example.com' }
+      expect(repository).to receive(:write).with(flat_hash)
+      state_store.write(flat_hash)
+    end
+
+    it 'delegates clear to repository' do
+      expect(repository).to receive(:clear)
+      state_store.clear
+    end
+
+    it 'read returns flat hash from repository' do
+      repository.write({ first_name: 'Sarah', email: 'sarah@example.com' })
+      result = state_store.read
+
+      expect(result).to eq({ first_name: 'Sarah', email: 'sarah@example.com' })
+    end
+
+    it 'write stores flat hash in repository' do
+      state_store.write({ first_name: 'John', last_name: 'Doe' })
+
+      expect(repository.read).to eq({ first_name: 'John', last_name: 'Doe' })
+    end
+
+    it 'clear removes all data from repository' do
+      state_store.write({ first_name: 'John' })
+      state_store.clear
+
+      expect(repository.read).to eq({})
+    end
+  end
+
   describe '#define_step_attributes_methods?' do
     it 'returns true by default' do
       expect(state_store.define_step_attributes_methods?).to be true
@@ -278,7 +326,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
         end
       end
 
-      instance = custom_store.new(repository: repository)
+      instance = custom_store.new(repository:)
       expect(instance.define_step_attributes_methods?).to be false
     end
   end
@@ -286,47 +334,43 @@ RSpec.describe DfE::Wizard::Core::StateStore do
   describe '#define_step_attributes_methods' do
     context 'with complete DBS check application' do
       before do
-        state_store.save_steps(
-          what_service: { service_type: 'basic' },
-          personal_details: {
-            first_name: 'Sarah',
-            middle_names: 'Elizabeth',
-            last_name: 'Johnson',
-            date_of_birth: '1985-03-15',
-            gender: 'female',
-            country_of_birth: 'United Kingdom',
-          },
-          address_history: {
-            current_address_line_1: '10 Downing Street',
-            current_address_line_2: 'Westminster',
-            current_address_town: 'London',
-            current_address_postcode: 'SW1A 2AA',
-            current_address_country: 'United Kingdom',
-            lived_here_since: '2020-01-01',
-          },
-          previous_names_question: { previous_names: 'yes' },
-          previous_names_details: {
-            previous_first_name: 'Sarah',
-            previous_last_name: 'Smith',
-            name_changed_date: '2010-06-20',
-            reason_for_change: 'marriage',
-          },
-          identity_documents: {
-            document_type: 'both',
-            passport_number: '123456789',
-            driving_license_number: 'JOHNS851203AB9CD',
-            national_insurance_number: 'AB123456C',
-          },
-          contact_preferences: {
-            email: 'sarah.johnson@example.com',
-            phone: '07700900123',
-            contact_method: 'email',
-            country_of_residence: 'united_kingdom',
-          },
-          payment: { payment_method: 'card', card_number: '4111111111111111' },
-        )
+        # Setup flat data in repository directly
+        repository.write({
+                           service_type: 'basic',
+                           first_name: 'Sarah',
+                           middle_names: 'Elizabeth',
+                           last_name: 'Johnson',
+                           date_of_birth: '1985-03-15',
+                           gender: 'female',
+                           country_of_birth: 'United Kingdom',
+                           current_address_line_1: '10 Downing Street',
+                           current_address_line_2: 'Westminster',
+                           current_address_town: 'London',
+                           current_address_postcode: 'SW1A 2AA',
+                           current_address_country: 'United Kingdom',
+                           lived_here_since: '2020-01-01',
+                           previous_names: 'yes',
+                           previous_first_name: 'Sarah',
+                           previous_last_name: 'Smith',
+                           name_changed_date: '2010-06-20',
+                           reason_for_change: 'marriage',
+                           document_type: 'both',
+                           passport_number: '123456789',
+                           driving_license_number: 'JOHNS851203AB9CD',
+                           national_insurance_number: 'AB123456C',
+                           email: 'sarah.johnson@example.com',
+                           phone: '07700900123',
+                           contact_method: 'email',
+                           country_of_residence: 'united_kingdom',
+                           payment_method: 'card',
+                           card_number: '4111111111111111',
+                         })
 
         state_store.define_step_attributes_methods(wizard)
+      end
+
+      it 'stores wizard reference' do
+        expect(state_store.wizard).to eq(wizard)
       end
 
       it 'generates reader methods for all step attributes' do
@@ -345,6 +389,13 @@ RSpec.describe DfE::Wizard::Core::StateStore do
         expect(state_store.email).to eq('sarah.johnson@example.com')
       end
 
+      it 'generated methods read from flat repository data' do
+        # Change repository data directly
+        repository.write(repository.read.merge(first_name: 'Emma'))
+
+        expect(state_store.first_name).to eq('Emma')
+      end
+
       it 'custom predicate methods work with auto-generated attributes' do
         expect(state_store.has_previous_names?).to be true
         expect(state_store.full_name).to eq('Sarah Elizabeth Johnson')
@@ -361,15 +412,13 @@ RSpec.describe DfE::Wizard::Core::StateStore do
 
     context 'applicant without previous names' do
       before do
-        state_store.save_steps(
-          personal_details: {
-            first_name: 'James',
-            last_name: 'Brown',
-            date_of_birth: '1990-07-22',
-            gender: 'male',
-          },
-          previous_names_question: { previous_names: 'no' },
-        )
+        repository.write({
+                           first_name: 'James',
+                           last_name: 'Brown',
+                           date_of_birth: '1990-07-22',
+                           gender: 'male',
+                           previous_names: 'no',
+                         })
 
         state_store.define_step_attributes_methods(wizard)
       end
@@ -386,13 +435,11 @@ RSpec.describe DfE::Wizard::Core::StateStore do
 
     context 'partial application (incomplete data)' do
       before do
-        state_store.save_steps(
-          what_service: { service_type: 'basic' },
-          personal_details: {
-            first_name: 'John',
-            last_name: 'Doe',
-          },
-        )
+        repository.write({
+                           service_type: 'basic',
+                           first_name: 'John',
+                           last_name: 'Doe',
+                         })
 
         state_store.define_step_attributes_methods(wizard)
       end
@@ -412,26 +459,28 @@ RSpec.describe DfE::Wizard::Core::StateStore do
 
     context 'with logger' do
       it 'logs count and method names during wizard initialization' do
-        fresh_state_store = state_store_class.new(repository: repository)
-        fresh_state_store.save_steps(
-          personal_details: { first_name: 'Test', last_name: 'User' },
-        )
+        fresh_repository = DfE::Wizard::Repository::InMemory.new
+        fresh_state_store = state_store_class.new(repository: fresh_repository)
 
-        logger_mock = instance_double(DfE::Wizard::Logging::Logger)
-        tagged_logger = instance_double(DfE::Wizard::Logging::TaggedLogger)
-        allow(logger_mock).to receive(:tagged).and_return(tagged_logger)
-        allow(tagged_logger).to receive(:info)
-        allow(tagged_logger).to receive(:debug)
-        allow(fresh_state_store).to receive(:logger).and_return(tagged_logger)
+        fresh_repository.write({ first_name: 'Test', last_name: 'User' })
 
-        # Initialize wizard - triggers after_initialize
-        wizard_class.new(
+        # Create wizard (triggers after_initialize -> define_step_attributes_methods)
+        fresh_wizard = wizard_class.new(
           current_step: :start,
-          state_store: fresh_state_store,
+          state_store: OpenStruct.new,
         )
+
+        # Mock the wizard's logger
+        logger_double = instance_double(DfE::Wizard::Logging::TaggedLogger)
+        allow(fresh_wizard).to receive(:log).and_return(logger_double)
+        allow(logger_double).to receive(:info)
+        allow(logger_double).to receive(:debug)
+
+        # Call define_step_attributes_methods again to trigger logging with mocked logger
+        fresh_state_store.define_step_attributes_methods(fresh_wizard)
 
         # Verify info logging happened with method names
-        expect(tagged_logger).to have_received(:info) do |message, **options|
+        expect(logger_double).to have_received(:info) do |message, **options|
           expect(message).to match(/Auto-generated 31 attribute reader methods/)
           expect(message).to include(':service_type')
           expect(message).to include(':first_name')
@@ -449,24 +498,28 @@ RSpec.describe DfE::Wizard::Core::StateStore do
           end
         end
 
-        collision_store = collision_store_class.new(repository: repository)
-        collision_store.save_steps(
-          personal_details: { first_name: 'Should not override' },
-        )
+        collision_repository = DfE::Wizard::Repository::InMemory.new
+        collision_store = collision_store_class.new(repository: collision_repository)
 
-        logger_mock = instance_double(DfE::Wizard::Logging::Logger)
-        tagged_logger = instance_double(DfE::Wizard::Logging::TaggedLogger)
-        allow(logger_mock).to receive(:tagged).and_return(tagged_logger)
-        allow(tagged_logger).to receive(:info)
-        allow(tagged_logger).to receive(:debug)
-        allow(collision_store).to receive(:logger).and_return(tagged_logger)
+        collision_repository.write({ first_name: 'Should not override' })
 
-        wizard_class.new(
+        # Create wizard first
+        collision_wizard = wizard_class.new(
           current_step: :start,
           state_store: collision_store,
         )
 
-        expect(tagged_logger).to have_received(:debug).with(
+        # Mock the wizard's logger
+        logger_double = instance_double(DfE::Wizard::Logging::TaggedLogger)
+        allow(collision_wizard).to receive(:log).and_return(logger_double)
+        allow(logger_double).to receive(:info)
+        allow(logger_double).to receive(:debug)
+
+        # Call define_step_attributes_methods again to trigger logging with mocked logger
+        collision_store.define_step_attributes_methods(collision_wizard)
+
+        # Verify debug logging for skipped method
+        expect(logger_double).to have_received(:debug).with(
           match(/Skipped attribute :first_name for step :personal_details/),
           category: :state,
         )
@@ -477,12 +530,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
 
     context 'integration with wizard initialization' do
       it 'auto-generates methods during wizard initialization' do
-        state_store.save_steps(
-          personal_details: {
-            first_name: 'Alice',
-            last_name: 'Smith',
-          },
-        )
+        repository.write({ first_name: 'Alice', last_name: 'Smith' })
 
         wizard_class.new(
           current_step: :personal_details,
@@ -494,9 +542,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
       end
 
       it 'makes custom predicates work immediately' do
-        state_store.save_steps(
-          previous_names_question: { previous_names: 'yes' },
-        )
+        repository.write({ previous_names: 'yes' })
 
         wizard_class.new(
           current_step: :previous_names_question,
@@ -508,20 +554,16 @@ RSpec.describe DfE::Wizard::Core::StateStore do
     end
 
     context 'real-world usage example' do
-      it 'provides natural attribute access instead of read.dig' do
-        state_store.save_steps(
-          personal_details: {
-            first_name: 'Emma',
-            middle_names: 'Grace',
-            last_name: 'Williams',
-            date_of_birth: '1992-11-08',
-          },
-          contact_preferences: {
-            email: 'emma.williams@example.com',
-            phone: '07700900456',
-            country_of_residence: 'united_kingdom',
-          },
-        )
+      it 'provides natural attribute access' do
+        repository.write({
+                           first_name: 'Emma',
+                           middle_names: 'Grace',
+                           last_name: 'Williams',
+                           date_of_birth: '1992-11-08',
+                           email: 'emma.williams@example.com',
+                           phone: '07700900456',
+                           country_of_residence: 'united_kingdom',
+                         })
 
         state_store.define_step_attributes_methods(wizard)
 
@@ -546,9 +588,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
       let(:disabled_store) { disabled_store_class.new(repository: repository) }
 
       it 'does not generate any methods' do
-        disabled_store.save_steps(
-          personal_details: { first_name: 'Test' },
-        )
+        repository.write({ first_name: 'Test' })
 
         disabled_store.define_step_attributes_methods(wizard)
 
@@ -556,16 +596,12 @@ RSpec.describe DfE::Wizard::Core::StateStore do
         expect(disabled_store).not_to respond_to(:email)
       end
 
-      it 'requires manual read.dig for attribute access' do
-        disabled_store.save_steps(
-          personal_details: { first_name: 'Manual' },
-        )
+      it 'can still access data via read' do
+        repository.write({ first_name: 'Manual' })
 
         disabled_store.define_step_attributes_methods(wizard)
 
-        expect(
-          disabled_store.read.dig(:steps, :personal_details, :first_name),
-        ).to eq('Manual')
+        expect(disabled_store.read[:first_name]).to eq('Manual')
       end
     end
   end
@@ -593,9 +629,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
       let(:collision_store) { collision_store_class.new(repository: repository) }
 
       it 'preserves existing custom method' do
-        collision_store.save_steps(
-          personal_details: { first_name: 'Sarah' },
-        )
+        repository.write({ first_name: 'Sarah' })
 
         collision_store.define_step_attributes_methods(wizard)
 

@@ -1,224 +1,214 @@
 module DfE
   module Wizard
     module Core
-      # StateStore module: High-level wizard state management with dynamic accessors
-      #
-      # This module provides:
-      # - Reading/writing step data from repository
-      # - Dynamically generating accessors from ActiveModel step attributes
-      #
-      # ## Usage
-      #
-      #   class PersonalInformationStateStore
-      #     include DfE::Wizard::StateStore
-      #   end
-      #
-      #   state_store = PersonalInformationStateStore.new(
-      #     repository: DfE::Wizard::Repository::InMemory.new,
-      #   )
-      #
-      #   # Later, wizard calls during initialization:
-      #   state_store.define_step_attributes_methods(wizard)
-      #
-      #   # Now you can use auto-generated methods:
-      #   state_store.first_name       # getter
-      #   state_store.email            # getter
-      #   state_store.has_previous_names?  # custom predicate (not overwritten)
-      #
-      # @api public
       module StateStore
-        # Initialize state store
+        # Reference to the wizard instance that uses this state store.
+        # Set during wizard initialization via {#define_step_attributes_methods}.
         #
-        # @param repository [DfE::Wizard::Repository::*] Backend storage adapter
-        # @return [void]
-        def initialize(repository: DfE::Wizard::Repository::InMemory.new)
-          @repository = repository
-        end
+        # @return [DfE::Wizard, nil] the wizard instance, or nil if not yet initialized
+        attr_accessor :wizard
 
-        # Access the underlying repository
+        # The repository instance used for persistent storage.
         #
-        # @return [DfE::Wizard::Repository::*]
+        # @return [DfE::Wizard::Repository::Base] the repository handling data persistence
         attr_reader :repository
 
-        # Called during wizard initialization to dynamically define methods
-        # based on step definitions from the wizard's graph.
+        # Initializes a new state store with the given repository.
         #
-        # @param wizard [DfE::Wizard] The wizard instance to introspect
+        # @param repository [DfE::Wizard::Repository::Base] the repository to use for data storage
+        # @return [void]
+        #
+        # @example Initialize with session repository
+        #   repository = DfE::Wizard::Repository::Session.new(session)
+        #   state_store = StateStores::PersonalInformation.new(repository: repository)
+        def initialize(repository: ::DfE::Wizard::Repository::InMemory.new)
+          @repository = repository
+          @wizard = nil
+        end
+
+        # Generates attribute reader methods for all step attributes and stores wizard reference.
+        #
+        # This method is automatically called by the wizard during initialization (via `after_initialize`).
+        # It dynamically creates reader methods for each attribute defined in the wizard's steps,
+        # allowing natural attribute access like `state_store.first_name` instead of
+        # `state_store.read[:first_name]`.
+        #
+        # Skips method generation if:
+        # - {#define_step_attributes_methods?} returns false
+        # - A method with the same name already exists (preserves custom methods)
+        #
+        # @param wizard [DfE::Wizard] the wizard instance to generate methods for
         # @return [void]
         #
         # @example Generated methods
-        #   # For step :email with attributes [:email, :confirmed]
-        #   def email
-        #     read.dig(:steps, :email, :email)
+        #   # Given a step with attributes :first_name, :last_name
+        #   state_store.first_name  # => "John"
+        #   state_store.last_name   # => "Doe"
+        #
+        # @example Custom methods are preserved
+        #   class MyStateStore
+        #     include DfE::Wizard::Core::StateStore
+        #
+        #     def full_name
+        #       "#{first_name} #{last_name}"  # Custom method not overwritten
+        #     end
         #   end
         #
-        #   def confirmed
-        #     read.dig(:steps, :email, :confirmed)
-        #   end
-        #
-        # @note Methods are defined as singleton methods on the state_store instance
-        # @note Skips attributes that would conflict with existing methods
-        # @note Only generates readers, not writers
-        #
-        # @api public
+        # @see #define_step_attributes_methods?
         def define_step_attributes_methods(wizard)
+          @wizard = wizard
           return unless define_step_attributes_methods?
 
-          step_definitions = wizard.steps_processor.step_definitions
           generated_methods = []
+          skipped_methods = []
 
-          step_definitions.each do |node|
-            step_id = node.id
-            step_class = node.klass
+          wizard.steps_processor.step_definitions.each do |step|
+            step_class = step.klass
             next unless step_class.respond_to?(:attribute_names)
 
-            step_class.attribute_names.each do |attr_name|
-              attr_sym = attr_name.to_sym
+            step_class.attribute_names.each do |attribute_name|
+              attribute_sym = attribute_name.to_sym
 
-              if respond_to?(attr_sym)
-                log_attribute_skipped(step_id, attr_sym)
+              # Skip if method already exists (preserve custom methods)
+              if respond_to?(attribute_sym, true)
+                log_attribute_skipped(step.id, attribute_sym)
+                skipped_methods << { attribute: attribute_sym, step: step.id }
                 next
               end
 
-              define_singleton_method(attr_sym) do
-                read.dig(:steps, step_id, attr_sym)
+              # Define reader method that reads from flat repository data
+              define_singleton_method(attribute_sym) do
+                read[attribute_sym]
               end
 
-              generated_methods << attr_sym
+              generated_methods << attribute_sym
             end
           end
 
           log_attributes_defined(wizard, generated_methods)
+
+          { generated_methods:, skipped_methods: }
         end
 
-        # Whether to auto-generate step attribute methods
+        # Controls whether attribute reader methods should be auto-generated.
         #
-        # Can be overridden in subclasses to disable auto-generation
-        # if custom method definitions are preferred.
+        # Override this method in your state store class to disable automatic
+        # attribute method generation. When disabled, you must manually access
+        # attributes via `read[:attribute_name]`.
         #
-        # @return [Boolean] true to enable auto-generation, false to disable
+        # @return [Boolean] true to enable auto-generation (default), false to disable
         #
-        # @example Disable for specific state store
-        #   class CustomStateStore
-        #     include DfE::Wizard::StateStore
+        # @example Disable auto-generation
+        #   class MyStateStore
+        #     include DfE::Wizard::Core::StateStore
         #
         #     def define_step_attributes_methods?
-        #       false
+        #       false  # Disable automatic method generation
         #     end
         #   end
         #
-        # @api public
+        # @see #define_step_attributes_methods
         def define_step_attributes_methods?
           true
         end
 
-        # Read complete wizard state from repository
+        # Logs a debug message when an attribute method is skipped.
         #
-        # @return [Hash] All persisted wizard data
-        def read
-          @repository.read
-        end
-
-        # Write data by deep merging with existing state
+        # This occurs when an attribute name would collide with an existing method
+        # on the state store, and the existing method is preserved.
         #
-        # @param hash [Hash] Data to merge into existing state
-        # @return [Hash] The merged result
-        def write(hash)
-          @repository.write(hash)
-        end
-
-        # Save data atomically (replaces entire state)
-        #
-        # @param hash [Hash] Complete state to save
-        # @return [Hash] The saved data
-        def save(hash)
-          @repository.save(hash)
-        end
-
-        # Clear all state from repository
-        #
+        # @param step_id [Symbol] the ID of the step containing the attribute
+        # @param attr_name [Symbol] the name of the attribute that was skipped
         # @return [void]
-        def clear
-          @repository.clear
-        end
-
-        # Read data for a specific step
         #
-        # @param step_id [Symbol] The step identifier
-        # @return [Hash] Step data or empty hash if not found
-        def read_step(step_id)
-          read.dig(:steps, step_id) || {}
-        end
-
-        # Write data for a specific step (deep merge)
+        # @example
+        #   log_attribute_skipped(:personal_details, :first_name)
+        #   # Logs: "[StateStore] Skipped attribute :first_name for step :personal_details (method already exists)"
         #
-        # Updates only the specified step, preserving all other data.
-        #
-        # @param step_id [Symbol] The step identifier
-        # @param data [Hash] Attributes to merge into step
-        # @return [Hash] Updated state
-        def write_step(step_id, data)
-          current = read
-          steps = current[:steps] || {}
-          steps[step_id] = (steps[step_id] || {}).deep_merge(data)
-          write(current.merge(steps: steps))
-        end
-
-        # Save multiple steps atomically
-        #
-        # Replaces all steps while preserving other state.
-        #
-        # @param steps_hash [Hash<Symbol, Hash>] Map of step_id => step_data
-        # @return [Hash] Updated state
-        def save_steps(steps_hash)
-          current = read
-          write(current.merge(steps: steps_hash))
-        end
-
-        # Delete step data from state
-        #
-        # @param step_id [Symbol] The step identifier
-        # @return [Hash] Updated state
-        def delete_step(step_id)
-          current = read
-          steps = current[:steps] || {}
-          steps.delete(step_id)
-          write(current.merge(steps: steps))
-        end
-
-        private
-
-        # Logs when an attribute is skipped during generation
-        #
-        # @param step_id [Symbol] The step identifier
-        # @param attr_name [Symbol] The attribute name
-        # @return [void]
-        # @api private
+        # @see #define_step_attributes_methods
         def log_attribute_skipped(step_id, attr_name)
-          return unless respond_to?(:logger) && logger.respond_to?(:debug)
-
-          logger.debug(
+          wizard.log.debug(
             "[StateStore] Skipped attribute :#{attr_name} for step :#{step_id} " \
             '(method already exists)',
             category: :state,
           )
         end
 
-        # Logs summary of generated attributes with method names
+        # Logs an info message summarizing the auto-generated attribute reader methods.
         #
-        # @param wizard [DfE::Wizard] The wizard instance
-        # @param methods [Array<Symbol>] List of generated method names
+        # Called after all attribute methods have been generated for the state store.
+        # Provides insight into which methods were created during initialization.
+        #
+        # @param wizard [DfE::Wizard] the wizard instance
+        # @param generated_methods [Array<Symbol>] list of method names that were generated
         # @return [void]
-        # @api private
-        def log_attributes_defined(wizard, methods)
-          return unless respond_to?(:logger) && logger.respond_to?(:info)
-
-          logger.info(
-            "[StateStore] Auto-generated #{methods.size} attribute reader methods " \
-            "for #{wizard.class.name}: #{methods.inspect}",
+        #
+        # @example
+        #   log_attributes_defined(wizard, [:first_name, :last_name, :email])
+        #   # Logs: "[StateStore] Auto-generated 3 attribute reader methods for PersonalInfoWizard:
+        #   #        [:first_name, :last_name, :email]"
+        #
+        # @see #define_step_attributes_methods
+        def log_attributes_defined(wizard, generated_methods)
+          wizard.log.info(
+            "[StateStore] Auto-generated #{generated_methods.size} attribute reader methods " \
+            "for #{wizard.class.name}: #{generated_methods.inspect}",
             category: :state,
           )
         end
+
+        # @!method read
+        #   Reads the current state from the repository.
+        #
+        #   This method is delegated directly to the repository. In Solution 3 architecture,
+        #   the repository stores data as a flat hash of attributes. The wizard is responsible
+        #   for transforming this flat hash into the nested `{ steps: {...} }` structure when needed.
+        #
+        #   @return [Hash] flat hash of all wizard attributes
+        #
+        #   @example
+        #     state_store.read
+        #     # => { first_name: "John", last_name: "Doe", email: "john@example.com" }
+        #
+        #   @note The state store does NOT transform data. It returns the flat hash as-is from
+        #     the repository. Transformation to `{ steps: {...} }` happens in the wizard layer.
+        #
+        #   @see DfE::Wizard::Repository::Base#read
+
+        # @!method write(flat_hash)
+        #   Writes state to the repository.
+        #
+        #   This method is delegated directly to the repository. In Solution 3 architecture,
+        #   the wizard is responsible for flattening the `{ steps: {...} }` structure into
+        #   a flat hash before calling this method.
+        #
+        #   @param flat_hash [Hash] flat hash of attributes to store
+        #   @return [void]
+        #
+        #   @example
+        #     state_store.write({ first_name: "John", last_name: "Doe" })
+        #
+        #   @note The state store does NOT transform data. It expects a flat hash and stores
+        #     it as-is. Flattening from `{ steps: {...} }` happens in the wizard layer.
+        #
+        #   @see DfE::Wizard::Repository::Base#write
+
+        # @!method clear
+        #   Clears all state from the repository.
+        #
+        #   This method is delegated directly to the repository. It removes all stored data,
+        #   effectively resetting the wizard to a clean state.
+        #
+        #   @return [void]
+        #
+        #   @example
+        #     state_store.clear
+        #     state_store.read  # => {}
+        #
+        #   @see DfE::Wizard::Repository::Base#clear
+
+        # Pure delegation to repository
+        delegate :read, :write, :clear, to: :repository
       end
     end
   end

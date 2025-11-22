@@ -1,7 +1,3 @@
-# frozen_string_literal: true
-
-require 'spec_helper'
-
 RSpec.describe DfE::Wizard::Repository::Session do
   let(:session) { {} }
   let(:key) { :wizard_store }
@@ -34,25 +30,22 @@ RSpec.describe DfE::Wizard::Repository::Session do
         end
       end
 
-      context 'when session has data' do
+      context 'when session has flat data' do
         before do
-          session[:wizard_store] = { 'steps' => { 'name' => { 'first_name' => 'John' } } }
+          session[:wizard_store] = { 'first_name' => 'John', 'last_name' => 'Doe', 'email' => 'john@example.com' }
         end
 
-        it 'returns the stored data' do
-          expect(repository.read[:steps][:name][:first_name]).to eq('John')
+        it 'returns the stored flat hash' do
+          expect(repository.read[:first_name]).to eq('John')
+          expect(repository.read[:email]).to eq('john@example.com')
         end
 
         it 'allows access via string keys' do
-          expect(repository.read['steps']['name']['first_name']).to eq('John')
+          expect(repository.read['first_name']).to eq('John')
         end
 
         it 'allows access via symbol keys' do
-          expect(repository.read[:steps][:name][:first_name]).to eq('John')
-        end
-
-        it 'allows mixed string/symbol access' do
-          expect(repository.read['steps'][:name]['first_name']).to eq('John')
+          expect(repository.read[:first_name]).to eq('John')
         end
       end
     end
@@ -70,24 +63,25 @@ RSpec.describe DfE::Wizard::Repository::Session do
         end
       end
 
-      context 'when state_key has data' do
+      context 'when state_key has flat data' do
         before do
           session[:wizard_store] = {
-            'app_123' => { 'steps' => { 'name' => { 'first_name' => 'John' } } },
-            'app_456' => { 'steps' => { 'name' => { 'first_name' => 'Jane' } } },
+            'app_123' => { 'first_name' => 'John', 'email' => 'john@example.com' },
+            'app_456' => { 'first_name' => 'Jane', 'email' => 'jane@example.com' },
           }
         end
 
         it 'returns only the data for this state_key' do
-          expect(repository.read[:steps][:name][:first_name]).to eq('John')
+          expect(repository.read[:first_name]).to eq('John')
+          expect(repository.read[:email]).to eq('john@example.com')
         end
 
-        it 'allows symbol access to string-stored data' do
-          expect(repository.read[:steps][:name][:first_name]).to eq('John')
+        it 'allows symbol access' do
+          expect(repository.read[:first_name]).to eq('John')
         end
 
-        it 'allows string access to string-stored data' do
-          expect(repository.read['steps']['name']['first_name']).to eq('John')
+        it 'allows string access' do
+          expect(repository.read['first_name']).to eq('John')
         end
 
         it 'does not return other state_key data' do
@@ -100,53 +94,49 @@ RSpec.describe DfE::Wizard::Repository::Session do
   describe '#write' do
     context 'string/symbol key handling' do
       it 'stores symbol keys as strings' do
-        repository.write(steps: { name: { first_name: 'John' } })
+        repository.write(first_name: 'John', last_name: 'Doe')
         expect(session[:wizard_store].keys).to all(be_a(String))
       end
 
       it 'allows reading with symbols after writing with symbols' do
-        repository.write(steps: { name: { first_name: 'John' } })
-        expect(repository.read[:steps][:name][:first_name]).to eq('John')
+        repository.write(first_name: 'John', email: 'john@example.com')
+        expect(repository.read[:first_name]).to eq('John')
+        expect(repository.read[:email]).to eq('john@example.com')
       end
 
       it 'allows reading with strings after writing with symbols' do
-        repository.write(steps: { name: { first_name: 'John' } })
-        expect(repository.read['steps']['name']['first_name']).to eq('John')
+        repository.write(first_name: 'John')
+        expect(repository.read['first_name']).to eq('John')
       end
 
       it 'accepts string keys in write' do
-        repository.write('steps' => { 'name' => { 'first_name' => 'John' } })
-        expect(repository.read[:steps][:name][:first_name]).to eq('John')
-      end
-
-      it 'allows reading with symbols after writing with strings' do
-        repository.write('steps' => { 'name' => { 'first_name' => 'John' } })
-        expect(repository.read[:steps][:name][:first_name]).to eq('John')
-      end
-
-      it 'handles mixed symbol/string keys in nested hashes' do
-        repository.write(
-          'steps' => {
-            name: { 'first_name' => 'John', last_name: 'Doe' },
-          },
-        )
-        expect(repository.read[:steps][:name][:first_name]).to eq('John')
-        expect(repository.read[:steps][:name][:last_name]).to eq('Doe')
+        repository.write('first_name' => 'John', 'last_name' => 'Doe')
+        expect(repository.read[:first_name]).to eq('John')
       end
     end
 
     context 'without state_key (single instance)' do
       it 'initializes session key if not present' do
-        repository.write(steps: { name: { first_name: 'John' } })
-        expect(session[:wizard_store]['steps']['name']['first_name']).to eq('John')
+        repository.write(first_name: 'John', last_name: 'Doe')
+        expect(session[:wizard_store]['first_name']).to eq('John')
       end
 
-      it 'deep merges with existing data' do
-        session[:wizard_store] = { 'steps' => { 'name' => { 'first_name' => 'John' } } }
-        repository.write(steps: { email: { email: 'john@example.com' } })
+      it 'merges with existing data' do
+        session[:wizard_store] = { 'first_name' => 'John', 'last_name' => 'Doe' }
+        repository.write(email: 'john@example.com', city: 'London')
 
-        expect(repository.read[:steps][:name][:first_name]).to eq('John')
-        expect(repository.read[:steps][:email][:email]).to eq('john@example.com')
+        expect(repository.read[:first_name]).to eq('John')
+        expect(repository.read[:last_name]).to eq('Doe')
+        expect(repository.read[:email]).to eq('john@example.com')
+        expect(repository.read[:city]).to eq('London')
+      end
+
+      it 'updates existing attributes' do
+        session[:wizard_store] = { 'first_name' => 'John', 'email' => 'old@example.com' }
+        repository.write(email: 'new@example.com')
+
+        expect(repository.read[:first_name]).to eq('John')
+        expect(repository.read[:email]).to eq('new@example.com')
       end
     end
 
@@ -154,35 +144,35 @@ RSpec.describe DfE::Wizard::Repository::Session do
       let(:state_key) { 'app_123' }
 
       it 'stores data with string keys' do
-        repository.write(steps: { name: { first_name: 'John' } })
+        repository.write(first_name: 'John')
         expect(session[:wizard_store]['app_123'].keys).to all(be_a(String))
       end
 
       it 'initializes state_key if not present' do
-        repository.write(steps: { name: { first_name: 'John' } })
-        expect(repository.read[:steps][:name][:first_name]).to eq('John')
+        repository.write(first_name: 'John', email: 'john@example.com')
+        expect(repository.read[:first_name]).to eq('John')
       end
 
-      it 'deep merges with existing state_key data' do
+      it 'merges with existing state_key data' do
         session[:wizard_store] = {
-          'app_123' => { 'steps' => { 'name' => { 'first_name' => 'John' } } },
+          'app_123' => { 'first_name' => 'John', 'last_name' => 'Doe' },
         }
-        repository.write(steps: { email: { email: 'john@example.com' } })
+        repository.write(email: 'john@example.com')
 
-        expect(repository.read[:steps][:name][:first_name]).to eq('John')
-        expect(repository.read[:steps][:email][:email]).to eq('john@example.com')
+        expect(repository.read[:first_name]).to eq('John')
+        expect(repository.read[:email]).to eq('john@example.com')
       end
 
       it 'does not affect other state_keys' do
         session[:wizard_store] = {
-          'app_123' => { 'steps' => { 'name' => { 'first_name' => 'John' } } },
-          'app_456' => { 'steps' => { 'name' => { 'first_name' => 'Jane' } } },
+          'app_123' => { 'first_name' => 'John' },
+          'app_456' => { 'first_name' => 'Jane' },
         }
-        repository.write(steps: { email: { email: 'john@example.com' } })
+        repository.write(email: 'john@example.com')
 
         repo2 = described_class.new(session:, key:, state_key: 'app_456')
-        expect(repo2.read[:steps][:name][:first_name]).to eq('Jane')
-        expect(repo2.read[:steps]).not_to have_key(:email)
+        expect(repo2.read[:first_name]).to eq('Jane')
+        expect(repo2.read).not_to have_key(:email)
       end
     end
   end
@@ -190,28 +180,30 @@ RSpec.describe DfE::Wizard::Repository::Session do
   describe '#save' do
     context 'string/symbol key handling' do
       it 'stores symbol keys as strings' do
-        repository.save(steps: { name: { first_name: 'John' } })
+        repository.save(first_name: 'John', email: 'john@example.com')
         expect(session[:wizard_store].keys).to all(be_a(String))
       end
 
       it 'allows symbol access after save' do
-        repository.save(steps: { name: { first_name: 'John' } })
-        expect(repository.read[:steps][:name][:first_name]).to eq('John')
+        repository.save(first_name: 'John')
+        expect(repository.read[:first_name]).to eq('John')
       end
 
       it 'allows string access after save' do
-        repository.save(steps: { name: { first_name: 'John' } })
-        expect(repository.read['steps']['name']['first_name']).to eq('John')
+        repository.save(first_name: 'John')
+        expect(repository.read['first_name']).to eq('John')
       end
     end
 
     context 'without state_key (single instance)' do
       it 'replaces entire state atomically' do
-        session[:wizard_store] = { 'steps' => { 'name' => { 'first_name' => 'John' } } }
-        repository.save(steps: { email: { email: 'new@example.com' } })
+        session[:wizard_store] = { 'first_name' => 'John', 'last_name' => 'Doe', 'age' => 30 }
+        repository.save(email: 'new@example.com', city: 'London')
 
-        expect(repository.read[:steps]).not_to have_key(:name)
-        expect(repository.read[:steps][:email][:email]).to eq('new@example.com')
+        expect(repository.read).not_to have_key(:first_name)
+        expect(repository.read).not_to have_key(:age)
+        expect(repository.read[:email]).to eq('new@example.com')
+        expect(repository.read[:city]).to eq('London')
       end
     end
 
@@ -220,32 +212,32 @@ RSpec.describe DfE::Wizard::Repository::Session do
 
       it 'replaces only this state_key data' do
         session[:wizard_store] = {
-          'app_123' => { 'steps' => { 'name' => { 'first_name' => 'John' } } },
-          'app_456' => { 'steps' => { 'name' => { 'first_name' => 'Jane' } } },
+          'app_123' => { 'first_name' => 'John', 'last_name' => 'Doe' },
+          'app_456' => { 'first_name' => 'Jane' },
         }
-        repository.save(steps: { email: { email: 'new@example.com' } })
+        repository.save(email: 'new@example.com')
 
-        expect(repository.read[:steps]).not_to have_key(:name)
-        expect(repository.read[:steps][:email][:email]).to eq('new@example.com')
+        expect(repository.read).not_to have_key(:first_name)
+        expect(repository.read[:email]).to eq('new@example.com')
       end
 
       it 'does not affect other state_keys' do
         session[:wizard_store] = {
-          'app_123' => { 'steps' => { 'name' => { 'first_name' => 'John' } } },
-          'app_456' => { 'steps' => { 'name' => { 'first_name' => 'Jane' } } },
+          'app_123' => { 'first_name' => 'John' },
+          'app_456' => { 'first_name' => 'Jane' },
         }
-        repository.save(steps: { email: { email: 'new@example.com' } })
+        repository.save(email: 'new@example.com')
 
         repo2 = described_class.new(session:, key:, state_key: 'app_456')
-        expect(repo2.read[:steps][:name][:first_name]).to eq('Jane')
+        expect(repo2.read[:first_name]).to eq('Jane')
       end
 
       it 'stores a deep copy' do
-        data = { steps: { name: { first_name: 'John' } } }
+        data = { first_name: 'John', email: 'john@example.com' }
         repository.save(data)
-        data[:steps][:name][:first_name] = 'Jane'
+        data[:first_name] = 'Jane'
 
-        expect(repository.read[:steps][:name][:first_name]).to eq('John')
+        expect(repository.read[:first_name]).to eq('John')
       end
     end
   end
@@ -253,7 +245,7 @@ RSpec.describe DfE::Wizard::Repository::Session do
   describe '#clear' do
     context 'without state_key (single instance)' do
       before do
-        session[:wizard_store] = { 'steps' => { 'name' => { 'first_name' => 'John' } } }
+        session[:wizard_store] = { 'first_name' => 'John', 'email' => 'john@example.com' }
         session[:other_data] = 'preserved'
       end
 
@@ -273,8 +265,8 @@ RSpec.describe DfE::Wizard::Repository::Session do
 
       before do
         session[:wizard_store] = {
-          'app_123' => { 'steps' => { 'name' => { 'first_name' => 'John' } } },
-          'app_456' => { 'steps' => { 'name' => { 'first_name' => 'Jane' } } },
+          'app_123' => { 'first_name' => 'John' },
+          'app_456' => { 'first_name' => 'Jane' },
         }
       end
 
@@ -287,11 +279,6 @@ RSpec.describe DfE::Wizard::Repository::Session do
         repository.clear
         expect(session[:wizard_store]['app_456']).to be_present
       end
-
-      it 'preserves the wizard_store key itself' do
-        repository.clear
-        expect(session[:wizard_store]).to be_present
-      end
     end
   end
 
@@ -300,88 +287,41 @@ RSpec.describe DfE::Wizard::Repository::Session do
     let(:repo2) { described_class.new(session:, key: :wizard_store, state_key: 'app_456') }
 
     it 'keeps data isolated per state_key' do
-      repo1.save(steps: { name: { first_name: 'John' } })
-      repo2.save(steps: { name: { first_name: 'Jane' } })
+      repo1.save(first_name: 'John', email: 'john@example.com')
+      repo2.save(first_name: 'Jane', email: 'jane@example.com')
 
-      expect(repo1.read[:steps][:name][:first_name]).to eq('John')
-      expect(repo2.read[:steps][:name][:first_name]).to eq('Jane')
-    end
-
-    it 'allows symbol access across all instances' do
-      repo1.save(steps: { name: { first_name: 'John' } })
-      repo2.save(steps: { name: { first_name: 'Jane' } })
-
-      expect(repo1.read[:steps][:name][:first_name]).to eq('John')
-      expect(repo2.read[:steps][:name][:first_name]).to eq('Jane')
+      expect(repo1.read[:first_name]).to eq('John')
+      expect(repo2.read[:first_name]).to eq('Jane')
     end
 
     it 'allows independent operations' do
-      repo1.write(steps: { name: { first_name: 'John' } })
-      repo2.write(steps: { email: { email: 'jane@example.com' } })
+      repo1.write(first_name: 'John', last_name: 'Doe')
+      repo2.write(email: 'jane@example.com', city: 'Paris')
 
-      expect(repo1.read[:steps]).to have_key(:name)
-      expect(repo1.read[:steps]).not_to have_key(:email)
-      expect(repo2.read[:steps]).to have_key(:email)
-      expect(repo2.read[:steps]).not_to have_key(:name)
+      expect(repo1.read).to have_key(:first_name)
+      expect(repo1.read).not_to have_key(:email)
+      expect(repo2.read).to have_key(:email)
+      expect(repo2.read).not_to have_key(:first_name)
     end
 
     it 'allows independent clearing' do
-      repo1.save(steps: { name: { first_name: 'John' } })
-      repo2.save(steps: { name: { first_name: 'Jane' } })
+      repo1.save(first_name: 'John')
+      repo2.save(first_name: 'Jane')
 
       repo1.clear
 
       expect(repo1.read).to eq({})
-      expect(repo2.read[:steps][:name][:first_name]).to eq('Jane')
-    end
-  end
-
-  describe 'mixed key and state_key scenarios' do
-    let(:single_wizard) { described_class.new(session:, key: :wizard_a) }
-    let(:multi_wizard_1) { described_class.new(session:, key: :wizard_b, state_key: 'instance_1') }
-    let(:multi_wizard_2) { described_class.new(session:, key: :wizard_b, state_key: 'instance_2') }
-
-    it 'allows different wizards with different patterns' do
-      single_wizard.save(steps: { a: { value: 1 } })
-      multi_wizard_1.save(steps: { b: { value: 2 } })
-      multi_wizard_2.save(steps: { c: { value: 3 } })
-
-      expect(single_wizard.read[:steps][:a][:value]).to eq(1)
-      expect(multi_wizard_1.read[:steps][:b][:value]).to eq(2)
-      expect(multi_wizard_2.read[:steps][:c][:value]).to eq(3)
-    end
-
-    it 'stores all data as strings internally' do
-      single_wizard.save(steps: { a: { value: 1 } })
-      multi_wizard_1.save(steps: { b: { value: 2 } })
-
-      expect(session[:wizard_a].keys).to all(be_a(String))
-      expect(session[:wizard_b]['instance_1'].keys).to all(be_a(String))
+      expect(repo2.read[:first_name]).to eq('Jane')
     end
   end
 
   describe 'DoS protection' do
     it 'does not create symbols from user input' do
-      user_input = { 'user_controlled_key' => { 'nested' => 'value' } }
+      user_input = { 'user_controlled_key' => 'value', 'another_key' => 'data' }
       repository.write(user_input)
 
       expect(session[:wizard_store].keys).to all(be_a(String))
       expect(Symbol.all_symbols.map(&:to_s)).not_to include('user_controlled_key')
-    end
-
-    it 'handles deeply nested user input safely' do
-      user_input = {
-        'level1' => {
-          'level2' => {
-            'level3' => {
-              'user_key' => 'value',
-            },
-          },
-        },
-      }
-      repository.write(user_input)
-
-      expect(session[:wizard_store]['level1']['level2']['level3']['user_key']).to eq('value')
     end
   end
 end
