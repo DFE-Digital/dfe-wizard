@@ -1,4 +1,9 @@
 RSpec.describe DfE::Wizard::Test::RSpecMatchers do
+  let(:repository) { DfE::Wizard::Repository::InMemory.new }
+  let(:state_store) { StateStores::PersonalInformation.new(repository:) }
+  let(:current_step) { :name_and_date_of_birth }
+  let(:steps_data) { {} }
+
   let(:wizard) do
     PersonalInformationWizard.new(
       current_step:,
@@ -6,15 +11,8 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
     )
   end
 
-  let(:state_store) do
-    StateStores::PersonalInformation.new
-  end
-
-  let(:steps_data) { {} }
-  let(:current_step) { :name_and_date_of_birth }
-
   before do
-    state_store.save_steps(steps_data) if steps_data.any?
+    repository.write(steps_data) if steps_data.any?
   end
 
   describe '#be_at_step' do
@@ -33,7 +31,11 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
 
   describe '#be_saved and #have_saved' do
     let(:steps_data) do
-      { name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' } }
+      {
+        first_name: 'John',
+        last_name: 'Doe',
+        date_of_birth: '1990-01-01',
+      }
     end
     let(:current_step) { :nationality }
 
@@ -42,7 +44,7 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
     end
 
     it 'passes for multiple steps using #have_saved' do
-      state_store.write_step(:nationality, { nationalities: 'british' })
+      repository.write(repository.read.merge(nationalities: 'british'))
       expect(wizard).to have_saved(:name_and_date_of_birth, :nationality)
     end
 
@@ -53,7 +55,7 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
     end
 
     it 'fails if multiple required steps are missing' do
-      state_store.write_step(:nationality, { nationalities: 'british' })
+      repository.write(repository.read.merge(nationalities: 'british'))
       expect {
         expect(wizard).to have_saved(:name_and_date_of_birth, :review, :nationality)
       }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Missing: \[:review\]/)
@@ -62,7 +64,11 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
 
   describe '#be_in_flow and #have_in_flow' do
     let(:steps_data) do
-      { name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' } }
+      {
+        first_name: 'John',
+        last_name: 'Doe',
+        date_of_birth: '1990-01-01',
+      }
     end
     let(:current_step) { :nationality }
 
@@ -90,15 +96,20 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
   describe '#be_valid_to' do
     let(:steps_data) do
       {
-        name_and_date_of_birth: { first_name: '', last_name: 'Doe', date_of_birth: '1990-01-01' },
-        nationality: { nationalities: 'british' },
+        first_name: '',
+        last_name: 'Doe',
+        date_of_birth: '1990-01-01',
+        nationalities: 'british',
       }
     end
     let(:current_step) { :nationality }
 
     it 'passes if all steps to the target are valid' do
-      state_store.save_steps(name_and_date_of_birth: { first_name: 'Jane', last_name: 'Smith',
-                                                       date_of_birth: '1950-01-01' })
+      repository.write({
+                         first_name: 'Jane',
+                         last_name: 'Smith',
+                         date_of_birth: '1950-01-01',
+                       })
       expect(wizard).to be_valid_to(:nationality)
     end
 
@@ -114,8 +125,10 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
       context 'when target step itself is invalid' do
         let(:steps_data) do
           {
-            name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
-            nationality: { nationalities: '' },
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+            nationalities: '',
           }
         end
 
@@ -127,9 +140,13 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
       context 'when middle step is invalid' do
         let(:steps_data) do
           {
-            name_and_date_of_birth: { first_name: '', last_name: 'Doe', date_of_birth: '1990-01-01' },
-            nationality: { nationalities: 'french' },
-            right_to_work_or_study: { right_to_work_or_study: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' },
+            first_name: '',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+            nationalities: 'french',
+            right_to_work_or_study: 'yes',
+            visa_type: 'work',
+            visa_expiry: '2026-12-31',
           }
         end
 
@@ -143,8 +160,10 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
       context 'when all steps up to and including target are valid' do
         let(:steps_data) do
           {
-            name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
-            nationality: { nationalities: 'british' },
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+            nationalities: 'british',
           }
         end
 
@@ -156,8 +175,10 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
       context 'when step not in flow path' do
         let(:steps_data) do
           {
-            name_and_date_of_birth: { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
-            nationality: { nationalities: 'british' },
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+            nationalities: 'british',
           }
         end
 
@@ -180,7 +201,11 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
 
   describe '#be_valid (single step)' do
     let(:steps_data) do
-      { name_and_date_of_birth: { first_name: '', last_name: 'Doe', date_of_birth: '1990-01-01' } }
+      {
+        first_name: '',
+        last_name: 'Doe',
+        date_of_birth: '1990-01-01',
+      }
     end
     let(:current_step) { :nationality }
 
@@ -191,16 +216,23 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
     end
 
     it 'passes on valid' do
-      state_store.save_steps(name_and_date_of_birth: { first_name: 'Valid', last_name: 'Doe',
-                                                       date_of_birth: '1990-01-01' })
+      repository.write({
+                         first_name: 'Valid',
+                         last_name: 'Doe',
+                         date_of_birth: '1990-01-01',
+                       })
       expect(:name_and_date_of_birth).to be_valid_step.in(wizard)
     end
   end
 
   describe '#branch_to' do
     let(:steps_data) do
-      { name_and_date_of_birth: { first_name: 'Alice', last_name: 'Smith', date_of_birth: '1980-02-22' },
-        nationality: { nationalities: nationalities } }
+      {
+        first_name: 'Alice',
+        last_name: 'Smith',
+        date_of_birth: '1980-02-22',
+        nationalities: nationalities,
+      }
     end
 
     let(:current_step) { :nationality }
@@ -235,11 +267,14 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
   describe 'integration smoke tests' do
     let(:steps_data) do
       {
-        name_and_date_of_birth: { first_name: 'Jean', last_name: 'Dupont', date_of_birth: '2000-01-01' },
-        nationality: { nationalities: 'french' },
-        right_to_work_or_study: { right_to_work_or_study: 'yes', visa_type: 'work', visa_expiry: '2026-12-31' },
-        immigration_status: { status: 'settled' },
-        review: {},
+        first_name: 'Jean',
+        last_name: 'Dupont',
+        date_of_birth: '2000-01-01',
+        nationalities: 'french',
+        right_to_work_or_study: 'yes',
+        visa_type: 'work',
+        visa_expiry: '2026-12-31',
+        status: 'settled',
       }
     end
 

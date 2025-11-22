@@ -3,200 +3,140 @@ RSpec.describe DfE::Wizard::Repository::InMemory do
 
   describe '#read' do
     context 'when no data has been written' do
-      it 'returns empty hash' do
+      it 'returns an empty hash' do
         expect(repository.read).to eq({})
       end
     end
 
     context 'when data has been written' do
-      before { repository.save({ steps: { name: { first_name: 'John' } } }) }
+      before { repository.write({ first_name: 'John', last_name: 'Doe' }) }
 
-      it 'returns the stored data' do
-        expect(repository.read).to eq({ steps: { name: { first_name: 'John' } } })
+      it 'returns the stored flat hash' do
+        expect(repository.read).to eq({ first_name: 'John', last_name: 'Doe' })
       end
     end
 
-    context 'when data is returned' do
-      before { repository.save({ data: { key: 'value' } }) }
+    context 'when modifying the returned hash' do
+      before { repository.write({ email: 'value@example.com' }) }
 
-      it 'returns a deep copy, not the original' do
+      it 'does not affect the stored data (returns a copy)' do
         read_data = repository.read
-        read_data[:data][:key] = 'modified'
+        read_data[:email] = 'other@example.com'
 
-        expect(repository.read[:data][:key]).to eq('value')
+        # Repository data remains unchanged
+        expect(repository.read[:email]).to eq('value@example.com')
       end
     end
   end
 
   describe '#write' do
     context 'when repository is empty' do
-      it 'adds new data' do
-        repository.write({ steps: { name: { first_name: 'Alice' } } })
-
-        expect(repository.read).to eq({ steps: { name: { first_name: 'Alice' } } })
+      it 'adds new attributes' do
+        repository.write({ first_name: 'Alice', last_name: 'Smith' })
+        expect(repository.read).to eq({ first_name: 'Alice', last_name: 'Smith' })
       end
     end
 
     context 'when data exists' do
-      before do
-        repository.save(
-          {
-            steps: { name: { first_name: 'John', last_name: 'Doe' } },
-            metadata: { user_id: 123 },
-          },
-        )
+      before { repository.write({ first_name: 'John', last_name: 'Doe', age: 30 }) }
+
+      it 'merges new attributes with existing' do
+        repository.write({ email: 'john@example.com', city: 'London' })
+
+        expect(repository.read).to eq({
+                                        first_name: 'John',
+                                        last_name: 'Doe',
+                                        age: 30,
+                                        email: 'john@example.com',
+                                        city: 'London',
+                                      })
       end
 
-      it 'deep merges new data with existing' do
-        repository.write({ steps: { email: { email: 'john@example.com' } } })
+      it 'updates existing attributes' do
+        repository.write({ first_name: 'Jane', email: 'jane@example.com' })
 
-        expected = {
-          steps: {
-            name: { first_name: 'John', last_name: 'Doe' },
-            email: { email: 'john@example.com' },
-          },
-          metadata: { user_id: 123 },
-        }
-        expect(repository.read).to eq(expected)
-      end
-    end
-
-    context 'when writing overwrites nested keys' do
-      before do
-        repository.save({ steps: { name: { first_name: 'John', last_name: 'Doe' } } })
-      end
-
-      it 'deep merges, preserving unmodified keys' do
-        repository.write({ steps: { name: { first_name: 'Jane' } } })
-
-        expect(repository.read[:steps][:name]).to eq(
-          {
-            first_name: 'Jane',
-            last_name: 'Doe',
-          },
-        )
+        expect(repository.read).to eq({
+                                        first_name: 'Jane', # Updated
+                                        last_name: 'Doe',    # Preserved
+                                        age: 30,             # Preserved
+                                        email: 'jane@example.com', # Added
+                                      })
       end
     end
 
-    context 'when writing with empty hash' do
-      before { repository.save({ data: 'value' }) }
+    context 'when writing empty hash' do
+      before { repository.write({ data: 'value' }) }
 
       it 'preserves existing data' do
         repository.write({})
-
         expect(repository.read).to eq({ data: 'value' })
       end
     end
 
     it 'returns the merged result' do
-      repository.save({ steps: { name: { first_name: 'John' } } })
-      result = repository.write({ steps: { email: { email: 'john@example.com' } } })
+      repository.write({ first_name: 'John' })
+      result = repository.write({ email: 'john@example.com' })
 
-      expect(result).to include({ steps: hash_including(:name, :email) })
+      expect(result).to eq({ first_name: 'John', email: 'john@example.com' })
     end
   end
 
   describe '#save' do
     context 'when repository is empty' do
       it 'stores data' do
-        repository.save({ steps: { name: { first_name: 'Bob' } } })
-
-        expect(repository.read).to eq({ steps: { name: { first_name: 'Bob' } } })
+        repository.save({ first_name: 'Bob', last_name: 'Builder' })
+        expect(repository.read).to eq({ first_name: 'Bob', last_name: 'Builder' })
       end
     end
 
     context 'when data exists' do
-      before do
-        repository.save(
-          {
-            steps: { name: { first_name: 'John' } },
-            metadata: { user_id: 123 },
-          },
-        )
-      end
+      before { repository.write({ first_name: 'John', last_name: 'Doe', age: 30 }) }
 
       it 'replaces all data atomically' do
-        repository.save({ steps: { email: { email: 'new@example.com' } } })
+        repository.save({ email: 'new@example.com' })
 
-        expect(repository.read).to eq({ steps: { email: { email: 'new@example.com' } } })
-      end
-
-      it 'does not preserve previous metadata' do
-        repository.save({ steps: { email: { email: 'new@example.com' } } })
-
-        expect(repository.read).not_to include({ metadata: { user_id: 123 } })
+        # Old data is gone
+        expect(repository.read).to eq({ email: 'new@example.com' })
       end
     end
 
     context 'when saving empty hash' do
-      before { repository.save({ data: 'original' }) }
+      before { repository.write({ data: 'original' }) }
 
       it 'clears all data' do
         repository.save({})
-
         expect(repository.read).to eq({})
       end
     end
 
-    context 'when saving nested structures' do
-      it 'preserves deep nesting' do
-        complex_data = {
-          steps: {
-            name: { first_name: 'John', last_name: 'Doe' },
-            address: {
-              street: '123 Main St',
-              city: 'Springfield',
-              country: { code: 'US', name: 'United States' },
-            },
-          },
-          metadata: { created_at: Time.now, version: 1 },
-        }
-
-        repository.save(complex_data)
-
-        expect(repository.read).to eq(complex_data)
-      end
-    end
-
     it 'returns the saved data' do
-      data = { steps: { name: { first_name: 'Test' } } }
+      data = { first_name: 'Test', last_name: 'User' }
       result = repository.save(data)
-
       expect(result).to eq(data)
     end
 
     it 'saves a deep copy, not a reference' do
-      data = { steps: { name: { first_name: 'John' } } }
+      data = { first_name: 'John' }
       repository.save(data)
+      data[:first_name] = 'Jane'
 
-      data[:steps][:name][:first_name] = 'Jane'
-
-      expect(repository.read[:steps][:name][:first_name]).to eq('John')
+      expect(repository.read[:first_name]).to eq('John')
     end
   end
 
   describe '#clear' do
     context 'when repository has data' do
-      before do
-        repository.save(
-          {
-            steps: { name: { first_name: 'John' }, email: { email: 'john@example.com' } },
-            metadata: { user_id: 123 },
-          },
-        )
-      end
+      before { repository.write({ first_name: 'John', email: 'john@example.com' }) }
 
       it 'removes all data' do
         repository.clear
-
         expect(repository.read).to eq({})
       end
 
-      it 'allows subsequent saves' do
+      it 'allows subsequent writes' do
         repository.clear
-        repository.save({ steps: { name: { first_name: 'Alice' } } })
-
-        expect(repository.read).to eq({ steps: { name: { first_name: 'Alice' } } })
+        repository.write({ first_name: 'Alice' })
+        expect(repository.read).to eq({ first_name: 'Alice' })
       end
     end
 
@@ -208,52 +148,38 @@ RSpec.describe DfE::Wizard::Repository::InMemory do
     end
   end
 
-  describe 'integration: save, write, and read' do
-    it 'handles typical wizard flow' do
-      repository.save(
-        {
-          steps: { name: { first_name: 'John', last_name: 'Doe' } },
-          metadata: { user_id: 1, created_at: Time.now },
-        },
-      )
+  describe 'integration: typical wizard flow' do
+    it 'handles incremental attribute updates' do
+      # Step 1: Name
+      repository.write({ first_name: 'John', last_name: 'Doe' })
 
-      repository.write({ steps: { email: { email: 'john@example.com' } } })
+      # Step 2: Contact
+      repository.write({ email: 'john@example.com', phone: '555-1234' })
 
-      expect(repository.read[:steps]).to include(
-        name: { first_name: 'John', last_name: 'Doe' },
-        email: { email: 'john@example.com' },
-      )
+      # Step 3: Address
+      repository.write({ city: 'London', postcode: 'SW1A 1AA' })
 
-      repository.write({ steps: { review: { confirmed: true } } })
-
-      expect(repository.read[:steps]).to include(
-        name: hash_including(first_name: 'John'),
-        email: hash_including(email: 'john@example.com'),
-        review: { confirmed: true },
-      )
-      expect(repository.read[:metadata]).to include(user_id: 1)
+      expect(repository.read).to eq({
+                                      first_name: 'John',
+                                      last_name: 'Doe',
+                                      email: 'john@example.com',
+                                      phone: '555-1234',
+                                      city: 'London',
+                                      postcode: 'SW1A 1AA',
+                                    })
     end
 
-    it 'allows replacing entire state while preserving workflow' do
-      repository.save(
-        { steps: { step1: { data: 'v1' }, step2: { data: 'v2' } } },
-      )
+    it 'handles corrections to previous steps' do
+      repository.write({ first_name: 'John', last_name: 'Doe', email: 'john@example.com' })
 
-      expect(repository.read[:steps]).to eq(
-        {
-          step1: { data: 'v1' },
-          step2: { data: 'v2' },
-        },
-      )
+      # User goes back and changes email
+      repository.write({ email: 'john.doe@example.com' })
 
-      repository.save({ steps: { step1: { data: 'v1_updated' }, step3: { data: 'v3' } } })
-
-      expect(repository.read[:steps]).to eq(
-        {
-          step1: { data: 'v1_updated' },
-          step3: { data: 'v3' },
-        },
-      )
+      expect(repository.read).to eq({
+                                      first_name: 'John',
+                                      last_name: 'Doe',
+                                      email: 'john.doe@example.com', # Updated
+                                    })
     end
   end
 

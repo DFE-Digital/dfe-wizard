@@ -1,24 +1,17 @@
 RSpec.describe DfE::Wizard::Core::LogManagement do
-  let(:state_store) do
-    StateStores::PersonalInformation.new
-  end
+  let(:repository) { DfE::Wizard::Repository::InMemory.new }
+  let(:state_store) { StateStores::PersonalInformation.new(repository: repository) }
 
   before do
     @original = Rails.application.config.filter_parameters
     Rails.application.config.filter_parameters = %i[password ssn date_of_birth]
 
-    state_store.save_steps(
-      {
-        'name_and_date_of_birth' => {
-          'first_name' => 'John',
-          'last_name' => 'Doe',
-          'date_of_birth' => '1990-01-01',
-        },
-        'nationality' => {
-          'nationalities' => ['british'],
-        },
-      },
-    )
+    repository.write({
+                       first_name: 'John',
+                       last_name: 'Doe',
+                       date_of_birth: '1990-01-01',
+                       nationalities: ['british'],
+                     })
   end
 
   after do
@@ -29,13 +22,14 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
     let(:log_output) { StringIO.new }
     let(:rails_logger) { ActiveSupport::TaggedLogging.new(ActiveSupport::Logger.new(log_output)) }
     let(:wizard_logger) { DfE::Wizard::Logging::Logger.new(rails_logger) }
+    let(:tagged_logger) { wizard_logger.tagged(PersonalInformationWizard) }
 
     let(:wizard) do
       PersonalInformationWizard.new(
         current_step: :nationality,
         state_store:,
-      ).tap do |w|
-        allow(w).to receive(:logger).and_return(wizard_logger)
+      ).tap do |test_wizard|
+        allow(test_wizard).to receive(:log).and_return(tagged_logger)
       end
     end
 
@@ -399,10 +393,11 @@ RSpec.describe DfE::Wizard::Core::LogManagement do
       PersonalInformationWizard.new(
         current_step: :nationality,
         state_store: state_store,
-      ).tap do |wizard|
-        # Override logger to return nil (disable logging)
-        allow(wizard).to receive(:logger).and_return(nil)
-      end
+      )
+    end
+
+    before do
+      allow(wizard).to receive(:log).and_return(DfE::Wizard::Logging::NullLogger.new)
     end
 
     it 'does not raise errors when logging' do

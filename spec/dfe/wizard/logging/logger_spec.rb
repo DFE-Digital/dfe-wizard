@@ -206,13 +206,14 @@ RSpec.describe DfE::Wizard::Logging::Logger do
       )
     end
     let(:wizard_logger) { described_class.new(rails_logger).exclude(:navigation) }
+    let(:tagged_logger) { wizard_logger.tagged(PersonalInformationWizard) }
 
     let(:wizard) do
       PersonalInformationWizard.new(
         current_step: :name_and_date_of_birth,
         state_store:,
-      ).tap do |w|
-        allow(w).to receive(:logger).and_return(wizard_logger)
+      ).tap do |test_wizard|
+        allow(test_wizard).to receive(:log).and_return(tagged_logger)
       end
     end
 

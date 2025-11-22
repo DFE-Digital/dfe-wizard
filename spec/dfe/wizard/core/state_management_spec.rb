@@ -32,7 +32,6 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
 
       def steps_processor
         DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
-          # Define all nodes
           graph.add_node :personal_details, Steps::PersonalDetails
           graph.add_node :account_type, Steps::AccountType
           graph.add_node :company_details, Steps::CompanyDetails
@@ -42,13 +41,10 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
           graph.add_node :id_verification, Steps::IdVerification
           graph.add_node :review, Steps::Review
 
-          # Set entry point
           graph.root :personal_details
 
-          # Linear flow: personal_details → account_type
           graph.add_edge from: :personal_details, to: :account_type
 
-          # Branch 1: account_type conditional
           graph.add_conditional_edge(
             from: :account_type,
             when: :business?,
@@ -57,10 +53,8 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
             label: 'Business vs Individual',
           )
 
-          # Branch 1 converges: company_details → verification_method
           graph.add_edge from: :company_details, to: :verification_method
 
-          # Branch 2: verification_method multiple branches
           graph.add_multiple_conditional_edges(
             from: :verification_method,
             branches: [
@@ -72,7 +66,6 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
             label: 'Verification Method',
           )
 
-          # Branch 2 converges: all verification → review
           graph.add_edge from: :email_verification, to: :review
           graph.add_edge from: :phone_verification, to: :review
           graph.add_edge from: :id_verification, to: :review
@@ -87,7 +80,6 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
         DfE::Wizard::Logger.new(nil)
       end
 
-      # Delegate predicates to state_store
       delegate :business?, :individual?,
                :verification_email?, :verification_phone?, :verification_id?,
                to: :state_store
@@ -96,33 +88,30 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
 
   let(:state_store_class) do
     Class.new do
-      include DfE::Wizard::StateStore
+      include DfE::Wizard::Core::StateStore
 
-      # Account type predicates
       def business?(_step = nil)
-        read.dig(:steps, :account_type, :account_type) == 'business'
+        account_type == 'business'
       end
 
       def individual?(_step = nil)
-        read.dig(:steps, :account_type, :account_type) == 'individual'
+        account_type == 'individual'
       end
 
-      # Verification method predicates
       def verification_email?(_step = nil)
-        read.dig(:steps, :verification_method, :verification_type) == 'email'
+        verification_type == 'email'
       end
 
       def verification_phone?(_step = nil)
-        read.dig(:steps, :verification_method, :verification_type) == 'phone'
+        verification_type == 'phone'
       end
 
       def verification_id?(_step = nil)
-        read.dig(:steps, :verification_method, :verification_type) == 'id'
+        verification_type == 'id'
       end
     end
   end
 
-  # Test step classes
   before(:all) do
     unless defined?(Steps::PersonalDetails)
       module Steps
@@ -163,17 +152,17 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
         class EmailVerification
           include DfE::Wizard::Step
 
-          attribute :code
+          attribute :email_code
 
-          validates :code, presence: true
+          validates :email_code, presence: true
         end
 
         class PhoneVerification
           include DfE::Wizard::Step
 
-          attribute :code
+          attribute :phone_code
 
-          validates :code, presence: true
+          validates :phone_code, presence: true
         end
 
         class IdVerification
@@ -191,27 +180,31 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
     end
   end
 
-  let(:state_store) { state_store_class.new }
+  let(:repository) { DfE::Wizard::Repository::InMemory.new }
+  let(:state_store) { state_store_class.new(repository: repository) }
   let(:wizard) { wizard_class.new(current_step:, state_store:) }
   let(:current_step) { :personal_details }
 
   describe '#raw_data' do
     context 'with no saved data' do
-      it 'returns empty structure' do
-        expect(wizard.raw_data).to eq({})
+      it 'returns empty structure with steps key' do
+        expect(wizard.raw_data).to eq({ steps: {} })
       end
     end
 
     context 'with saved data' do
       before do
-        state_store.save_steps(
-          personal_details: { name: 'John Doe', email: 'john@example.com' },
-          account_type: { account_type: 'individual' },
-        )
+        repository.write({
+                           name: 'John Doe',
+                           email: 'john@example.com',
+                           account_type: 'individual',
+                         })
       end
 
-      it 'returns all persisted data' do
-        expect(wizard.raw_data[:steps]).to include(
+      it 'returns nested structure with steps grouped by step_id' do
+        data = wizard.raw_data
+
+        expect(data[:steps]).to include(
           personal_details: { name: 'John Doe', email: 'john@example.com' },
           account_type: { account_type: 'individual' },
         )
@@ -220,24 +213,26 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
 
     context 'with data from multiple branches' do
       before do
-        state_store.save_steps(
-          personal_details: { name: 'Jane', email: 'jane@example.com' },
-          account_type: { account_type: 'business' },
-          company_details: { company_name: 'ACME', registration_number: '12345' },
-          verification_method: { verification_type: 'email' },
-          email_verification: { code: '123456' },
-          phone_verification: { code: '999999' }, # Orphaned (unreachable)
-        )
+        repository.write({
+                           name: 'Jane',
+                           email: 'jane@example.com',
+                           account_type: 'business',
+                           company_name: 'ACME',
+                           registration_number: '12345',
+                           verification_type: 'email',
+                           email_code: '123456',
+                         })
       end
 
-      it 'returns data from all branches including unreachable ones' do
-        expect(wizard.raw_data[:steps].keys).to contain_exactly(
+      it 'returns all steps including unreachable ones' do
+        data = wizard.raw_data
+
+        expect(data[:steps].keys).to contain_exactly(
           :personal_details,
           :account_type,
           :company_details,
           :verification_method,
           :email_verification,
-          :phone_verification,
         )
       end
     end
@@ -245,9 +240,10 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
 
   describe '#raw_step_data' do
     before do
-      state_store.save_steps(
-        personal_details: { name: 'John', email: 'john@example.com' },
-      )
+      repository.write({
+                         name: 'John',
+                         email: 'john@example.com',
+                       })
     end
 
     it 'returns data for existing step' do
@@ -262,15 +258,15 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
     end
 
     it 'returns data even for unreachable steps' do
-      state_store.save_steps(phone_verification: { code: '999999' })
+      repository.write({ phone_code: '999999' })
 
-      expect(wizard.raw_step_data(:phone_verification)).to eq(code: '999999')
+      expect(wizard.raw_step_data(:phone_verification)).to eq(phone_code: '999999')
     end
   end
 
   describe '#step_data_exists?' do
     before do
-      state_store.save_steps(personal_details: { name: 'John', email: 'john@example.com' })
+      repository.write({ name: 'John', email: 'john@example.com' })
     end
 
     it 'returns true when step has data' do
@@ -282,7 +278,7 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
     end
 
     it 'returns true for unreachable steps with data' do
-      state_store.save_steps(phone_verification: { code: '123' })
+      repository.write({ phone_code: '123' })
 
       expect(wizard.step_data_exists?(:phone_verification)).to be true
     end
@@ -291,10 +287,11 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
   describe '#orphaned_steps_data' do
     context 'with no unreachable data' do
       before do
-        state_store.save_steps(
-          personal_details: { name: 'John', email: 'john@example.com' },
-          account_type: { account_type: 'individual' },
-        )
+        repository.write({
+                           name: 'John',
+                           email: 'john@example.com',
+                           account_type: 'individual',
+                         })
       end
 
       let(:current_step) { :verification_method }
@@ -306,21 +303,25 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
 
     context 'with unreachable branch data' do
       before do
-        state_store.save_steps(
-          personal_details: { name: 'Jane', email: 'jane@example.com' },
-          account_type: { account_type: 'business' },
-          company_details: { company_name: 'ACME', registration_number: '12345' },
-          verification_method: { verification_type: 'email' },
-          email_verification: { code: '111111' },
-          phone_verification: { code: '999999' }, # Orphaned
-        )
+        repository.write({
+                           name: 'Jane',
+                           email: 'jane@example.com',
+                           account_type: 'business',
+                           company_name: 'ACME',
+                           registration_number: '12345',
+                           verification_type: 'email',
+                           email_code: '111111',
+                           phone_code: '999999',
+                         })
       end
 
       let(:current_step) { :review }
 
       it 'returns only unreachable steps' do
-        expect(wizard.orphaned_steps_data).to eq(
-          phone_verification: { code: '999999' },
+        orphaned = wizard.orphaned_steps_data
+
+        expect(orphaned).to eq(
+          phone_verification: { phone_code: '999999' },
         )
       end
 
@@ -337,27 +338,33 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
 
     context 'when user changes branch creating orphans' do
       before do
-        # Initial: individual path with email verification
-        state_store.save_steps(
-          personal_details: { name: 'User', email: 'user@example.com' },
-          account_type: { account_type: 'individual' },
-          verification_method: { verification_type: 'email' },
-          email_verification: { code: '111111' },
-        )
+        repository.write({
+                           name: 'User',
+                           email: 'user@example.com',
+                           account_type: 'individual',
+                           verification_type: 'email',
+                           email_code: '111111',
+                         })
 
-        # Change to business (creates orphan)
-        state_store.save_steps(
-          account_type: { account_type: 'business' },
-          company_details: { company_name: 'Corp', registration_number: '99999' },
-          verification_method: { verification_type: 'phone' },
-          phone_verification: { code: '222222' },
-        )
+        repository.write(repository.read.merge(
+                           account_type: 'business',
+                           company_name: 'Corp',
+                           registration_number: '99999',
+                         ))
+
+        repository.write(repository.read.merge(
+                           verification_type: 'phone',
+                           phone_code: '222222',
+                         ))
       end
 
       let(:current_step) { :review }
 
       it 'detects steps orphaned by branch change' do
-        expect(wizard.orphaned_steps_data.keys).to include(:email_verification)
+        orphaned = wizard.orphaned_steps_data
+
+        expect(orphaned).to include(:email_verification)
+        expect(orphaned[:email_verification]).to eq(email_code: '111111')
       end
     end
   end
@@ -365,43 +372,46 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
   describe '#data (filtered)' do
     context 'with mixed reachable and unreachable data' do
       before do
-        state_store.save_steps(
-          personal_details: { name: 'John', email: 'john@example.com' },
-          account_type: { account_type: 'individual' },
-          verification_method: { verification_type: 'phone' },
-          phone_verification: { code: '123456' },
-          review: {},
-          email_verification: { code: '999999' }, # Orphaned
-        )
+        repository.write({
+                           name: 'John',
+                           email: 'john@example.com',
+                           account_type: 'individual',
+                           verification_type: 'phone',
+                           phone_code: '123456',
+                           email_code: '999999',
+                         })
       end
 
       let(:current_step) { :review }
 
       it 'returns only reachable steps' do
-        expect(wizard.data[:steps].keys).to contain_exactly(
+        filtered = wizard.data
+
+        expect(filtered[:steps].keys).to contain_exactly(
           :personal_details,
           :account_type,
           :verification_method,
           :phone_verification,
-          :review,
         )
       end
 
       it 'excludes unreachable steps' do
         expect(wizard.data[:steps]).not_to have_key(:email_verification)
+        expect(wizard.data[:steps]).not_to have_key(:id_verification)
       end
     end
 
     context 'with business path' do
       before do
-        state_store.save_steps(
-          personal_details: { name: 'Jane', email: 'jane@example.com' },
-          account_type: { account_type: 'business' },
-          company_details: { company_name: 'ACME', registration_number: '12345' },
-          verification_method: { verification_type: 'id' },
-          id_verification: { document_number: 'ID123' },
-          review: {},
-        )
+        repository.write({
+                           name: 'Jane',
+                           email: 'jane@example.com',
+                           account_type: 'business',
+                           company_name: 'ACME',
+                           registration_number: '12345',
+                           verification_type: 'id',
+                           document_number: 'ID123',
+                         })
       end
 
       let(:current_step) { :review }
@@ -417,7 +427,6 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
           :company_details,
           :verification_method,
           :id_verification,
-          :review,
         )
       end
     end
@@ -425,12 +434,14 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
 
   describe '#step_data' do
     before do
-      state_store.save_steps(
-        personal_details: { name: 'John', email: 'john@example.com' },
-        account_type: { account_type: 'individual' },
-        verification_method: { verification_type: 'email' },
-        phone_verification: { code: '999999' }, # Orphaned
-      )
+      repository.write({
+                         name: 'John',
+                         email: 'john@example.com',
+                         account_type: 'individual',
+                         verification_type: 'email',
+                         email_code: '123456',
+                         phone_code: '999999',
+                       })
     end
 
     let(:current_step) { :email_verification }
@@ -447,17 +458,18 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
     end
 
     it 'returns {} for steps with no data' do
-      expect(wizard.step_data(:email_verification)).to eq({})
+      expect(wizard.step_data(:review)).to eq({})
     end
   end
 
   describe '#saved?' do
     before do
-      state_store.save_steps(
-        personal_details: { name: 'John', email: 'john@example.com' },
-        account_type: { account_type: 'individual' },
-        phone_verification: { code: '999999' }, # Orphaned
-      )
+      repository.write({
+                         name: 'John',
+                         email: 'john@example.com',
+                         account_type: 'individual',
+                         phone_code: '999999', # Orphaned
+                       })
     end
 
     let(:current_step) { :verification_method }
@@ -479,10 +491,11 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
   describe '#saved_path' do
     context 'with partial completion' do
       before do
-        state_store.save_steps(
-          personal_details: { name: 'John', email: 'john@example.com' },
-          account_type: { account_type: 'individual' },
-        )
+        repository.write({
+                           name: 'John',
+                           email: 'john@example.com',
+                           account_type: 'individual',
+                         })
       end
 
       let(:current_step) { :verification_method }
@@ -498,14 +511,15 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
 
     context 'with complete flow' do
       before do
-        state_store.save_steps(
-          personal_details: { name: 'Jane', email: 'jane@example.com' },
-          account_type: { account_type: 'business' },
-          company_details: { company_name: 'ACME', registration_number: '12345' },
-          verification_method: { verification_type: 'email' },
-          email_verification: { code: '123456' },
-          review: {},
-        )
+        repository.write({
+                           name: 'Jane',
+                           email: 'jane@example.com',
+                           account_type: 'business',
+                           company_name: 'ACME',
+                           registration_number: '12345',
+                           verification_type: 'email',
+                           email_code: '123456',
+                         })
       end
 
       let(:current_step) { :review }
@@ -523,14 +537,14 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
 
     context 'with orphaned data' do
       before do
-        state_store.save_steps(
-          personal_details: { name: 'User', email: 'user@example.com' },
-          account_type: { account_type: 'individual' },
-          verification_method: { verification_type: 'phone' },
-          phone_verification: { code: '123' },
-          review: {},
-          email_verification: { code: '999' }, # Orphaned
-        )
+        repository.write({
+                           name: 'User',
+                           email: 'user@example.com',
+                           account_type: 'individual',
+                           verification_type: 'phone',
+                           phone_code: '123',
+                           email_code: '999',
+                         })
       end
 
       let(:current_step) { :review }
@@ -561,7 +575,7 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
     end
 
     it 'preserves wizard data' do
-      state_store.save_steps(personal_details: { name: 'John', email: 'john@example.com' })
+      repository.write({ name: 'John', email: 'john@example.com' })
 
       wizard.mark_completed
 
@@ -616,7 +630,7 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
     end
 
     it 'does not interfere with step data' do
-      state_store.save_steps(personal_details: { name: 'John', email: 'john@example.com' })
+      repository.write({ name: 'John', email: 'john@example.com' })
       wizard.set_metadata(:user_id, 999)
 
       expect(wizard.step_data(:personal_details)).to eq(
@@ -628,7 +642,7 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
 
   describe '#all_metadata' do
     before do
-      state_store.save_steps(personal_details: { name: 'John', email: 'john@example.com' })
+      repository.write({ name: 'John', email: 'john@example.com' })
       wizard.set_metadata(:user_id, 123)
       wizard.set_metadata(:ip_address, '192.168.1.1')
       wizard.mark_completed
@@ -662,7 +676,7 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
     let(:wizard) { wizard_class.new(current_step:, state_store:, current_step_params:) }
 
     it 'saves current step data' do
-      expect(wizard).to be_current_step_valid
+      expect(wizard.current_step).to be_valid
       wizard.save
 
       expect(wizard.raw_step_data(:personal_details).symbolize_keys).to eq(
@@ -686,8 +700,8 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
       )
     end
 
-    it 'deep merges without removing existing data' do
-      state_store.save_steps(personal_details: { name: 'John', email: 'john@example.com' })
+    it 'merges without removing existing data' do
+      repository.write({ name: 'John', email: 'john@example.com' })
       wizard.write_state(user_id: 999)
 
       expect(wizard.raw_data[:steps][:personal_details]).to eq(
@@ -700,10 +714,11 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
 
   describe '#clear_state' do
     before do
-      state_store.save_steps(
-        personal_details: { name: 'John', email: 'john@example.com' },
-        account_type: { account_type: 'individual' },
-      )
+      repository.write({
+                         name: 'John',
+                         email: 'john@example.com',
+                         account_type: 'individual',
+                       })
       wizard.set_metadata(:user_id, 123)
       wizard.mark_completed
     end
@@ -711,7 +726,7 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
     it 'removes all data' do
       wizard.clear_state
 
-      expect(wizard.raw_data).to eq({})
+      expect(wizard.raw_data).to eq({ steps: {} })
     end
 
     it 'removes step data' do
@@ -735,13 +750,13 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
 
   describe 'integration: full wizard flow with branch changes' do
     it 'handles complete individual path' do
-      state_store.save_steps(
-        personal_details: { name: 'Alice', email: 'alice@example.com' },
-        account_type: { account_type: 'individual' },
-        verification_method: { verification_type: 'email' },
-        email_verification: { code: '123456' },
-        review: {},
-      )
+      repository.write({
+                         name: 'Alice',
+                         email: 'alice@example.com',
+                         account_type: 'individual',
+                         verification_type: 'email',
+                         email_code: '123456',
+                       })
 
       wizard_at_review = wizard_class.new(current_step: :review, state_store:)
 
@@ -756,20 +771,21 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
     end
 
     it 'handles branch change creating orphans' do
-      state_store.save_steps(
-        personal_details: { name: 'Bob', email: 'bob@example.com' },
-        account_type: { account_type: 'individual' },
-        verification_method: { verification_type: 'email' },
-        email_verification: { code: '111111' },
-      )
+      repository.write({
+                         name: 'Bob',
+                         email: 'bob@example.com',
+                         account_type: 'individual',
+                         verification_type: 'email',
+                         email_code: '111111',
+                       })
 
-      state_store.save_steps(
-        account_type: { account_type: 'business' },
-        company_details: { company_name: 'Corp', registration_number: '99999' },
-        verification_method: { verification_type: 'phone' },
-        phone_verification: { code: '222222' },
-        review: {},
-      )
+      repository.write(repository.read.merge(
+                         account_type: 'business',
+                         company_name: 'Corp',
+                         registration_number: '99999',
+                         verification_type: 'phone',
+                         phone_code: '222222',
+                       ))
 
       wizard_at_review = wizard_class.new(current_step: :review, state_store:)
 
@@ -782,7 +798,7 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
                                                 ])
 
       expect(wizard_at_review.orphaned_steps_data).to eq(
-        email_verification: { code: '111111' },
+        email_verification: { email_code: '111111' },
       )
     end
 
@@ -790,15 +806,28 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
       wizard.set_metadata(:user_id, 789)
       wizard.set_metadata(:started_at, Time.current)
 
-      state_store.save_steps(
-        personal_details: { name: 'Charlie', email: 'charlie@example.com' },
-        account_type: { account_type: 'individual' },
-      )
+      repository.write({
+                         name: 'Charlie',
+                         email: 'charlie@example.com',
+                         account_type: 'individual',
+                       })
 
-      state_store.save_steps(account_type: { account_type: 'business' })
+      repository.write(repository.read.merge(account_type: 'business'))
 
       expect(wizard.get_metadata(:user_id)).to eq(789)
       expect(wizard.get_metadata(:started_at)).to be_present
+    end
+  end
+
+  describe 'attribute name uniqueness constraint' do
+    it 'demonstrates unique attribute names prevent collisions' do
+      repository.write({
+                         email_code: '123456',
+                         phone_code: '789012',
+                       })
+
+      expect(wizard.raw_step_data(:email_verification)).to eq(email_code: '123456')
+      expect(wizard.raw_step_data(:phone_verification)).to eq(phone_code: '789012')
     end
   end
 end

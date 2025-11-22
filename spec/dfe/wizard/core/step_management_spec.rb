@@ -76,22 +76,23 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
 
   let(:state_store_class) do
     Class.new do
-      include DfE::Wizard::StateStore
+      include DfE::Wizard::Core::StateStore
 
       def has_qualification?(_step = nil)
-        read.dig(:steps, :qualification_type, :has_qualification) == 'yes'
+        # Solution 3: Read flat hash directly
+        read[:has_qualification] == 'yes'
       end
 
       def is_ielts?(_step = nil)
-        read.dig(:steps, :qualification_type, :qualification_type) == 'ielts'
+        read[:qualification_type] == 'ielts'
       end
 
       def is_toefl?(_step = nil)
-        read.dig(:steps, :qualification_type, :qualification_type) == 'toefl'
+        read[:qualification_type] == 'toefl'
       end
 
       def is_other?(_step = nil)
-        read.dig(:steps, :qualification_type, :qualification_type) == 'other'
+        read[:qualification_type] == 'other'
       end
     end
   end
@@ -181,7 +182,8 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
     end
   end
 
-  let(:state_store) { state_store_class.new }
+  let(:repository) { DfE::Wizard::Repository::InMemory.new }
+  let(:state_store) { state_store_class.new(repository: repository) }
   let(:wizard) { wizard_class.new(current_step:, state_store:, current_step_params:) }
   let(:current_step) { :start }
   let(:current_step_params) { {} }
@@ -333,15 +335,14 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
       let(:current_step) { :qualification_type }
 
       before do
-        state_store.save_steps(
-          qualification_type: {
-            has_qualification: 'yes',
-            qualification_type: 'ielts',
-          },
-        )
+        # Solution 3: Write flat hash directly to repository
+        repository.write({
+                           has_qualification: 'yes',
+                           qualification_type: 'ielts',
+                         })
       end
 
-      it 'returns persisted data' do
+      it 'returns persisted data for current step attributes' do
         expect(wizard.fetch_step_attributes).to include(
           has_qualification: 'yes',
           qualification_type: 'ielts',
@@ -380,12 +381,11 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
       end
 
       before do
-        state_store.save_steps(
-          ielts_details: {
-            ielts_score: 7.0,
-            test_date: '2023-01-01',
-          },
-        )
+        # Solution 3: Write flat hash
+        repository.write({
+                           ielts_score: 7.0,
+                           test_date: '2023-01-01',
+                         })
       end
 
       it 'merges with current params taking precedence' do
@@ -397,7 +397,7 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
       end
     end
 
-    context 'deep merge with nested data' do
+    context 'merge with existing flat data' do
       let(:current_step) { :qualification_type }
       let(:current_step_params) do
         {
@@ -408,15 +408,14 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
       end
 
       before do
-        state_store.save_steps(
-          qualification_type: {
-            has_qualification: 'yes',
-            qualification_type: 'ielts',
-          },
-        )
+        # Solution 3: Flat hash with both attributes
+        repository.write({
+                           has_qualification: 'yes',
+                           qualification_type: 'ielts',
+                         })
       end
 
-      it 'deep merges persisted and current data' do
+      it 'merges persisted and current data' do
         result = wizard.fetch_step_attributes
 
         # Persisted has_qualification preserved
@@ -427,7 +426,7 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
     end
   end
 
-  describe '#current_step' do
+  describe '#current_step (renamed from #current_step)' do
     context 'with no persisted data or params' do
       let(:current_step) { :start }
 
@@ -459,12 +458,11 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
       end
 
       before do
-        state_store.save_steps(
-          ielts_details: {
-            ielts_score: 7.0,
-            test_date: '2023-06-15',
-          },
-        )
+        # Solution 3: Write flat attributes
+        repository.write({
+                           ielts_score: 7.0,
+                           test_date: '2023-06-15',
+                         })
       end
 
       it 'hydrates step with merged data' do
@@ -518,12 +516,11 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
       end
 
       before do
-        state_store.save_steps(
-          ielts_details: {
-            ielts_score: 7.0,
-            test_date: '2023-06-15',
-          },
-        )
+        # Solution 3: Flat attributes
+        repository.write({
+                           ielts_score: 7.0,
+                           test_date: '2023-06-15',
+                         })
       end
 
       it 'merges persisted and current params' do
@@ -539,12 +536,11 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
       let(:current_step) { :qualification_type }
 
       before do
-        state_store.save_steps(
-          ielts_details: {
-            ielts_score: 7.5,
-            test_date: '2023-06-15',
-          },
-        )
+        # Solution 3: Flat attributes for ielts
+        repository.write({
+                           ielts_score: 7.5,
+                           test_date: '2023-06-15',
+                         })
       end
 
       it 'uses only persisted data (ignores current_step_params)' do
@@ -571,12 +567,11 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
   describe '#step' do
     context 'basic retrieval' do
       before do
-        state_store.save_steps(
-          qualification_type: {
-            has_qualification: 'yes',
-            qualification_type: 'ielts',
-          },
-        )
+        # Solution 3: Flat attributes
+        repository.write({
+                           has_qualification: 'yes',
+                           qualification_type: 'ielts',
+                         })
       end
 
       it 'returns hydrated step' do
@@ -615,12 +610,14 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
 
   describe '#flow_steps' do
     before do
-      state_store.save_steps(
-        start: {},
-        qualification_type: { has_qualification: 'yes', qualification_type: 'ielts' },
-        ielts_details: { ielts_score: 7.5, test_date: '2023-06-15' },
-        review: {},
-      )
+      # Solution 3: Write all flat attributes at once
+      repository.write({
+                         qualification_status: 'has_qualification',
+                         has_qualification: 'yes',
+                         qualification_type: 'ielts',
+                         ielts_score: 7.5,
+                         test_date: '2023-06-15',
+                       })
     end
 
     let(:current_step) { :review }
@@ -640,11 +637,14 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
 
   describe '#saved_steps' do
     before do
-      state_store.save_steps(
-        start: { qualification_status: 'has_qualification' },
-        qualification_type: { has_qualification: 'yes', qualification_type: 'ielts' },
-        ielts_details: { ielts_score: 7.5, test_date: '2023-06-15' },
-      )
+      # Solution 3: Write flat hash
+      repository.write({
+                         qualification_status: 'has_qualification',
+                         has_qualification: 'yes',
+                         qualification_type: 'ielts',
+                         ielts_score: 7.5,
+                         test_date: '2023-06-15',
+                       })
     end
 
     let(:current_step) { :ielts_details }
@@ -665,11 +665,14 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
 
   describe '#valid_steps' do
     before do
-      state_store.save_steps(
-        start: { qualification_status: 'has_qualification' },
-        qualification_type: { has_qualification: 'yes', qualification_type: 'ielts' },
-        ielts_details: { ielts_score: 7.5, test_date: '2023-06-15' },
-      )
+      # Solution 3: Write flat attributes
+      repository.write({
+                         qualification_status: 'has_qualification',
+                         has_qualification: 'yes',
+                         qualification_type: 'ielts',
+                         ielts_score: 7.5,
+                         test_date: '2023-06-15',
+                       })
     end
 
     let(:current_step) { :ielts_details }
@@ -717,12 +720,11 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
     end
 
     before do
-      state_store.save_steps(
-        qualification_type: {
-          has_qualification: 'yes',
-          qualification_type: 'ielts',
-        },
-      )
+      # Solution 3: Flat attributes
+      repository.write({
+                         has_qualification: 'yes',
+                         qualification_type: 'ielts',
+                       })
     end
 
     it 'converts string keys to symbols for step initialization' do
@@ -739,12 +741,14 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
     let(:current_step_params) { {} }
 
     before do
-      state_store.save_steps(
-        start: { qualification_status: 'has_qualification' },
-        qualification_type: { has_qualification: 'yes', qualification_type: 'ielts' },
-        ielts_details: { ielts_score: 7.5, test_date: '2023-06-15' },
-        review: {},
-      )
+      # Solution 3: Write all flat attributes
+      repository.write({
+                         qualification_status: 'has_qualification',
+                         has_qualification: 'yes',
+                         qualification_type: 'ielts',
+                         ielts_score: 7.5,
+                         test_date: '2023-06-15',
+                       })
     end
 
     it 'retrieves all steps with complete data' do
@@ -783,12 +787,14 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
       let(:current_step) { :review }
 
       before do
-        state_store.save_steps(
-          start: { qualification_status: 'has_qualification' },
-          qualification_type: { has_qualification: 'yes', qualification_type: 'toefl' },
-          toefl_details: { toefl_score: 110, test_date: '2024-06-15' },
-          review: {},
-        )
+        # Solution 3: Flat attributes for TOEFL path
+        repository.write({
+                           qualification_status: 'has_qualification',
+                           has_qualification: 'yes',
+                           qualification_type: 'toefl',
+                           toefl_score: 110,
+                           test_date: '2024-06-15',
+                         })
       end
 
       it 'returns TOEFL step with correct data' do
@@ -803,12 +809,14 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
       let(:current_step) { :review }
 
       before do
-        state_store.save_steps(
-          start: { qualification_status: 'has_qualification' },
-          qualification_type: { has_qualification: 'yes', qualification_type: 'other' },
-          other_details: { qualification_name: 'Cambridge CPE', test_date: '2023-12-01' },
-          review: {},
-        )
+        # Solution 3: Flat attributes for Other path
+        repository.write({
+                           qualification_status: 'has_qualification',
+                           has_qualification: 'yes',
+                           qualification_type: 'other',
+                           qualification_name: 'Cambridge CPE',
+                           test_date: '2023-12-01',
+                         })
       end
 
       it 'returns Other qualification step with correct data' do
@@ -823,11 +831,11 @@ RSpec.describe DfE::Wizard::Core::StepManagement do
       let(:current_step) { :review }
 
       before do
-        state_store.save_steps(
-          start: { qualification_status: 'no_qualification' },
-          qualification_type: { has_qualification: 'no' },
-          review: {},
-        )
+        # Solution 3: Flat attributes for no qualification
+        repository.write({
+                           qualification_status: 'no_qualification',
+                           has_qualification: 'no',
+                         })
       end
 
       it 'skips qualification detail steps' do

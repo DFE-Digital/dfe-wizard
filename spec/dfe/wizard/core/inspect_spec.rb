@@ -1,5 +1,6 @@
 RSpec.describe DfE::Wizard::Core::Inspect do
-  let(:state_store) { StateStores::PersonalInformation.new }
+  let(:repository) { DfE::Wizard::Repository::InMemory.new }
+  let(:state_store) { StateStores::PersonalInformation.new(repository:) }
   let(:current_step) { :name_and_date_of_birth }
 
   let(:wizard) do
@@ -39,10 +40,11 @@ RSpec.describe DfE::Wizard::Core::Inspect do
 
     context 'with partial progress: first step saved and valid' do
       before do
-        state_store.write_step(
-          :name_and_date_of_birth,
-          { first_name: 'John', last_name: 'Doe', date_of_birth: '1990-01-01' },
-        )
+        repository.write({
+                           first_name: 'John',
+                           last_name: 'Doe',
+                           date_of_birth: '1990-01-01',
+                         })
       end
 
       it 'saved path and valid path track step completion' do
@@ -64,11 +66,12 @@ RSpec.describe DfE::Wizard::Core::Inspect do
       let(:current_step) { :nationality }
 
       before do
-        state_store.write_step(
-          :name_and_date_of_birth,
-          { first_name: 'Jane', last_name: 'Gi', date_of_birth: '1990-01-01' },
-        )
-        state_store.write_step(:nationality, { nationalities: '' })
+        repository.write({
+                           first_name: 'Jane',
+                           last_name: 'Gi',
+                           date_of_birth: '1990-01-01',
+                           nationalities: '',
+                         })
       end
 
       it 'valid path stops before error step' do
@@ -92,11 +95,12 @@ RSpec.describe DfE::Wizard::Core::Inspect do
       let(:current_step) { :nationality }
 
       before do
-        state_store.write_step(
-          :name_and_date_of_birth,
-          { first_name: 'Alex', last_name: 'Vera', date_of_birth: '1992-05-12' },
-        )
-        state_store.write_step(:nationality, { nationalities: 'british' })
+        repository.write({
+                           first_name: 'Alex',
+                           last_name: 'Vera',
+                           date_of_birth: '1992-05-12',
+                           nationalities: 'british',
+                         })
       end
 
       it 'flow, saved, and valid paths grow together when no validation errors occur' do
@@ -146,6 +150,60 @@ RSpec.describe DfE::Wizard::Core::Inspect do
 
     it 'includes object header with class name and memory address for identification' do
       expect(output).to match(/#<PersonalInformationWizard:0x[0-9a-f]+>/)
+    end
+
+    context 'flat storage display' do
+      before do
+        repository.write({
+                           first_name: 'John',
+                           last_name: 'Doe',
+                           date_of_birth: '1990-01-01',
+                           nationalities: 'british',
+                           user_id: 123,
+                         })
+      end
+
+      let(:current_step) { :nationality }
+
+      it 'Raw display shows nested steps structure (transformed from flat)' do
+        expect(output).to include('Raw Steps:')
+        expect(output).to include('name_and_date_of_birth:')
+        expect(output).to include('nationality:')
+      end
+
+      it 'Filtered display shows only reachable steps in nested structure' do
+        expect(output).to include('Filtered:')
+        expect(output).to include('name_and_date_of_birth:')
+        expect(output).to include('nationality:')
+      end
+
+      it 'displays metadata separately from steps' do
+        expect(output).to include('user_id')
+        expect(output).to include('123')
+      end
+    end
+
+    context 'with orphaned data from branch switches' do
+      before do
+        repository.write({
+                           first_name: 'John',
+                           last_name: 'Doe',
+                           date_of_birth: '1990-01-01',
+                           nationalities: 'british',
+                           uk_specific_field: 'some value',
+                           non_uk_specific_field: 'other value',
+                         })
+      end
+
+      let(:current_step) { :nationality }
+
+      it 'Raw display shows all data including orphaned attributes' do
+        expect(output).to include('Raw Steps:')
+      end
+
+      it 'Filtered display excludes orphaned attributes from unreachable steps' do
+        expect(output).to include('Filtered:')
+      end
     end
   end
 end
