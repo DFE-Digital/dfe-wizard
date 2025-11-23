@@ -1,5 +1,4 @@
-# frozen_string_literal: true
-
+ENV['RAILS_ENV'] ||= 'test'
 require 'dfe/wizard'
 
 require File.expand_path('rails-dummy/config/environment', __dir__)
@@ -26,6 +25,19 @@ RSpec.configure do |config|
   end
 
   config.infer_spec_type_from_file_location!
+
+  config.before(:suite) do
+    DatabaseCleaner.clean_with(:truncation)
+  end
+
+  config.before(:each) do
+    DatabaseCleaner.strategy = :truncation
+    DatabaseCleaner.start
+  end
+
+  config.after(:each) do
+    DatabaseCleaner.clean
+  end
 end
 
 ActiveSupport::Inflector.inflections(:en) do |inflect|

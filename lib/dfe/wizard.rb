@@ -125,6 +125,8 @@ module DfE
     module Repository
       autoload :InMemory, 'dfe/wizard/repository/in_memory'
       autoload :Session, 'dfe/wizard/repository/session'
+      autoload :Redis, 'dfe/wizard/repository/redis'
+      autoload :Cache, 'dfe/wizard/repository/cache'
     end
     # @!endgroup
 
