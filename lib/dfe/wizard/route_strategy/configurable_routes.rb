@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 module DfE
   module Wizard
     module RouteStrategy
@@ -11,57 +9,24 @@ module DfE
       # Falls back to {NamedRoutes} default for unmapped steps.
       #
       # @api public
-      #
-      # @example Basic usage
-      #   strategy = ConfigurableRoutes.new(namespace: 'personal-info') do |config|
-      #     config.map_step :email, to: ->(wizard, options, h) {
-      #       h.user_email_path(wizard.step(:user).id), options)
-      #     }
-      #     config.map_step :payment, to: ->(wizard, options, h) {
-      #       h.payment_path(wizard.step(:order).id), options)
-      #     }
-      #   end
-      #
-      # @example Using helper methods
-      #   class MyWizard
-      #     include DfE::Wizard
-      #
-      #     def route_strategy
-      #       @route_strategy ||= ConfigurableRoutes.new(namespace: 'app') do |config|
-      #         config.map_step :email, to: method(:email_route)
-      #         config.map_step :payment, to: method(:payment_route)
-      #       end
-      #     end
-      #
-      #     private
-      #
-      #     def email_route(wizard, options, url_helpers)
-      #       user_id = wizard.step(:user).id
-      #
-      #       url_helpers.user_email_path(user_id, options)
-      #     end
-      #
-      #     def payment_route(wizard, options, url_helpers)
-      #       order_id = wizard.step(:order).id)
-      #
-      #       url_helpers.payment_path(order_id, options)
-      #     end
-      #   end
       class ConfigurableRoutes < NamedRoutes
         # Initialize with namespace and optional configuration block
         #
         # @param namespace [String, Symbol] The namespace for default routes
+        # @param wizard [DfE::Wizard] The wizard instance
         # @param block [Proc] Optional block to configure routes
         #
         # @example
         #   strategy = ConfigurableRoutes.new(wizard: self, namespace: 'app') do |config|
-        #     config.map_step :email, to: ->(opts, h) { ... }
+        #     config.default_path_arguments = { provider_id: 123 }
+        #     config.map_step :email, to: ->(wizard, opts, h) { ... }
         #   end
         #
         # @api public
         def initialize(namespace:, wizard:, &)
-          super(namespace:, wizard:)
+          super(namespace: namespace, wizard: wizard)
           @routes = {}
+          @default_path_arguments = {}
           configure(&) if block_given?
         end
 
@@ -73,24 +38,45 @@ module DfE
         # @param block [Proc] Block yielding self for configuration
         # @return [self]
         #
-        # @example
-        #   strategy = ConfigurableRoutes.new(namespace: 'app')
-        #   strategy.configure do |config|
-        #     config.map_step :email, to: ->(opts, h) { ... }
-        #   end
-        #
         # @api public
         def configure
           yield(self) if block_given?
           self
         end
 
+        # Set default path arguments for all routes
+        #
+        # These arguments are merged with step-specific options when
+        # generating URLs. Useful for wizards that need consistent
+        # parameters like provider_code, course_code, etc.
+        #
+        # @param args [Hash] Default arguments
+        # @return [Hash] The set default arguments
+        #
+        # @example
+        #   config.default_path_arguments = {
+        #     provider_code: 'ABC',
+        #     recruitment_cycle_year: 2024
+        #   }
+        #
+        # @api public
+        attr_writer :default_path_arguments
+
+        # Get default path arguments
+        #
+        # @return [Hash]
+        #
+        # @api public
+        def default_path_arguments
+          @default_path_arguments || {}
+        end
+
         # Map a step to a routing callable
         #
-        # The callable can be:
-        # - A lambda: `{ |wizard, options, url_helpers| ... }`
-        # - A method: `method(:my_route_method)`
-        # - Any object responding to `call(wizard, options, url_helpers)`
+        # The callable receives:
+        # - wizard: The wizard instance
+        # - options: Merged default_path_arguments + step options
+        # - url_helpers: Rails URL helper methods
         #
         # @param step [Symbol] The step identifier
         # @param to [Proc, Object] The callable that generates the route
@@ -98,14 +84,11 @@ module DfE
         #
         # @example With lambda
         #   config.map_step :email, to: ->(wizard, options, h) {
-        #     h.user_email_path(wizard.step(:user).id), options)
+        #     h.user_email_path(wizard.step(:user).id, **options)
         #   }
         #
         # @example With method
         #   config.map_step :email, to: method(:email_route)
-        #
-        # @example With custom object
-        #   config.map_step :email, to: EmailRouteResolver.new(wizard)
         #
         # @api public
         def map_step(step, to:)
@@ -118,21 +101,30 @@ module DfE
         # Looks up the step in configured routes. If not found, falls back
         # to parent {NamedRoutes} default behavior.
         #
+        # Merges default_path_arguments with step-specific options.
+        #
         # @param step [Symbol] The step identifier
         # @param options [Hash] Additional URL options
         # @return [String] The generated URL path
         #
         # @example
-        #   strategy.resolve(step: :email, options: {})
-        #   # Uses mapped route if configured, otherwise default naming
+        #   strategy.resolve(step_id: :email, options: { user_id: 5 })
+        #   # Merges { provider_code: 'ABC' } + { user_id: 5 }
         #
         # @api public
-        def resolve(step:, options: {})
-          callable = @routes[step.to_sym]
-          return super unless callable
+        def resolve(step_id:, options: {})
+          callable = @routes[step_id.to_sym]
 
-          # Call the routing lambda/method with url helpers
-          callable.call(wizard, options, url_helpers)
+          # Merge default path arguments with step options
+          merged_options = default_path_arguments.merge(options)
+
+          if callable
+            # Call the routing lambda/method with merged options
+            callable.call(wizard, merged_options, url_helpers)
+          else
+            # Fall back to NamedRoutes with merged options
+            super(step_id:, options: merged_options)
+          end
         end
 
         # Get all configured routes
