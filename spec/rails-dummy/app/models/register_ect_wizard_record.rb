@@ -1,0 +1,2 @@
+class RegisterECTWizardRecord < ApplicationRecord
+end
