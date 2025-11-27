@@ -1,5 +1,7 @@
 module StateStores
-  class RegisterECTStore < DfE::Wizard::StateStore::Session
+  class RegisterECTStore
+    include DfE::Wizard::StateStore
+
     def in_trs?
       data[:trn][:attribute] == :foo
     end
