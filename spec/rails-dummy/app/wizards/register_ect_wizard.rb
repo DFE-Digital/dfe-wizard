@@ -29,6 +29,8 @@ class RegisterECTWizard
       graph.add_node :confirmation, ConfirmationStep
       graph.add_node :email_address, EmailAddressStep
       graph.add_node :find_ect, FindECTStep
+      graph.add_node :trn_not_found, TRNNotFoundStep
+      graph.add_node :already_active_at_school, AlreadyActiveAtSchoolStep
       graph.add_node :independent_school_appropriate_body, IndependentSchoolAppropriateBodyStep
       graph.add_node :induction_completed, InductionCompletedStep
       graph.add_node :induction_exempt, InductionExemptStep
@@ -135,6 +137,7 @@ class RegisterECTWizard
 
   def route_strategy
     DfE::Wizard::RouteStrategy::NamedRoutes.new(
+      wizard: self,
       namespace: 'register-ect',
     )
   end
