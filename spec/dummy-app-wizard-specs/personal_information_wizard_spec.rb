@@ -15,11 +15,13 @@ RSpec.describe PersonalInformationWizard do
   describe 'flow path traversal' do
     context 'when British national and not answered' do
       before do
-        repository.write({
-                           first_name: 'John',
-                           last_name: 'Doe',
-                           date_of_birth: '1990-01-01',
-                         })
+        state_store.write(
+          {
+            first_name: 'John',
+            last_name: 'Doe',
+            date_of_birth: '1990-01-01',
+          }
+        )
       end
 
       context 'at nationality step' do
@@ -40,7 +42,7 @@ RSpec.describe PersonalInformationWizard do
 
     context 'when British national' do
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'John',
                            last_name: 'Doe',
                            date_of_birth: '1990-01-01',
@@ -77,7 +79,7 @@ RSpec.describe PersonalInformationWizard do
 
     context 'when Irish national' do
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'Patrick',
                            last_name: 'Murphy',
                            date_of_birth: '1988-03-17',
@@ -94,7 +96,7 @@ RSpec.describe PersonalInformationWizard do
 
     context 'when non-UK national with right to work' do
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'Jean',
                            last_name: 'Dupont',
                            date_of_birth: '1995-06-15',
@@ -162,7 +164,7 @@ RSpec.describe PersonalInformationWizard do
 
     context 'when non-UK national without right to work' do
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'Maria',
                            last_name: 'Garcia',
                            date_of_birth: '1992-03-22',
@@ -211,7 +213,7 @@ RSpec.describe PersonalInformationWizard do
 
     context 'with explicit target step' do
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'John',
                            last_name: 'Doe',
                            date_of_birth: '1990-01-01',
@@ -234,7 +236,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :name_and_date_of_birth }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'John',
                            last_name: 'Doe',
                            date_of_birth: '1990-01-01',
@@ -257,7 +259,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :nationality }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'John',
                            last_name: 'Doe',
                            date_of_birth: '1990-01-01',
@@ -318,7 +320,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :right_to_work_or_study }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'Jean',
                            last_name: 'Dupont',
                            date_of_birth: '1995-06-15',
@@ -370,7 +372,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :immigration_status }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'Test',
                            last_name: 'User',
                            date_of_birth: '1990-01-01',
@@ -398,7 +400,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :name_and_date_of_birth }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'John',
                            last_name: 'Doe',
                            date_of_birth: '1990-01-01',
@@ -421,7 +423,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :immigration_status }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'Test',
                            last_name: 'User',
                            date_of_birth: '1990-01-01',
@@ -450,7 +452,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :right_to_work_or_study }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'Test',
                            last_name: 'User',
                            date_of_birth: '1990-01-01',
@@ -473,7 +475,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :nationality }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'Test',
                            last_name: 'User',
                            date_of_birth: '1990-01-01',
@@ -497,7 +499,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :review }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'Test',
                            last_name: 'User',
                            date_of_birth: '1990-01-01',
@@ -521,7 +523,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :review }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'Test',
                            last_name: 'User',
                            date_of_birth: '1990-01-01',
@@ -567,7 +569,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step_params) { { return_to_review: origin } }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'John',
                            last_name: 'Doe',
                            date_of_birth: '1990-01-01',
@@ -606,7 +608,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :review }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'John',
                            last_name: 'Doe',
                            date_of_birth: '1990-01-01',
@@ -643,7 +645,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :nationality }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: '',
                            last_name: 'Doe',
                            date_of_birth: '1990-01-01',
@@ -667,7 +669,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :name_and_date_of_birth }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: 'John',
                            last_name: 'Doe',
                            date_of_birth: '1990-01-01',
@@ -686,7 +688,7 @@ RSpec.describe PersonalInformationWizard do
       let(:current_step) { :review }
 
       before do
-        repository.write({
+        state_store.write({
                            first_name: '',
                            last_name: '',
                            date_of_birth: '',
@@ -704,7 +706,7 @@ RSpec.describe PersonalInformationWizard do
     let(:current_step) { :nationality }
 
     before do
-      repository.write({
+      state_store.write({
                          nationalities: 'french',
                        })
     end
@@ -736,7 +738,7 @@ RSpec.describe PersonalInformationWizard do
     let(:current_step) { :nationality }
 
     before do
-      repository.write({
+      state_store.write({
                          nationalities: 'british',
                        })
     end
