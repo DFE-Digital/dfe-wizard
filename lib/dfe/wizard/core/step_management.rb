@@ -254,6 +254,66 @@ module DfE
           # Filter flat hash to only this step's attributes
           flat_data.slice(*attribute_names)
         end
+
+        # Return all step definitions from the steps processor
+        #
+        # Provides access to the complete steps structure including all step ids,
+        # their classes, and relationships.
+        #
+        # @return [Array<DfE::Wizard::StepsProcessor::Node>] Array of step definition nodes
+        #
+        # @example Get all steps in the wizard
+        #   wizard.step_definitions
+        #   # => [
+        #   #   #<Node id=:name_and_date_of_birth, klass=Steps::NameAndDateOfBirth>,
+        #   #   #<Node id=:nationality, klass=Steps::Nationality>,
+        #   #   #<Node id=:review, klass=Steps::Review>
+        #   # ]
+        #
+        # @see #attribute_names For flattened list of all attributes
+        # @api public
+        def step_definitions
+          steps_processor.step_definitions
+        end
+
+        # Return all attribute names from all step classes
+        #
+        # Flattens the step definitions to extract every attribute defined across
+        # all steps in the wizard. Used by StateStore's method_missing to determine
+        # which method calls should access repository data.
+        #
+        # Attributes are collected from each step class via its `attribute_names`
+        # class method. Steps without attributes contribute nothing to this list.
+        #
+        # @return [Array<String, Symbol>] All attribute names from all steps
+        #
+        # @example Get all available attributes
+        #   wizard.attribute_names
+        #   # => [
+        #   #   "first_name",
+        #   #   "last_name",
+        #   #   "date_of_birth",
+        #   #   "nationality",
+        #   #   "email",
+        #   #   "passport_number"
+        #   # ]
+        #
+        # @example Check if attribute exists
+        #   wizard.attribute_names.include?("first_name")  # => true
+        #   wizard.attribute_names.include?("undefined")   # => false
+        #
+        # @note Attribute names are collected lazily during wizard initialization.
+        #       This allows StateStore to build method_missing handlers only for
+        #       attributes actually defined in step classes.
+        #
+        # @see #step_definitions For step class objects themselves
+        # @see StateStore#method_missing Which uses this list to route method calls
+        # @api public
+        def attribute_names
+          step_definitions.flat_map do |node|
+            node.klass.respond_to?(:attribute_names) ? node.klass.attribute_names : []
+          end
+        end
       end
     end
   end
