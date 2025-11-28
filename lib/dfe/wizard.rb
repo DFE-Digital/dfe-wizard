@@ -249,7 +249,12 @@ module DfE
     #
     # @api public
     def after_initialize
-      @state_store.define_step_attributes_methods(self) if @state_store.define_step_attributes_methods?
+      define_step_attributes_in_state_store
+    end
+
+    def define_step_attributes_in_state_store
+      @state_store.step_definitions = step_definitions
+      @state_store.attribute_names = attribute_names
     end
 
     # The current step being displayed

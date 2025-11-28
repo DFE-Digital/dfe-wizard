@@ -47,7 +47,6 @@ RSpec.describe DfE::Wizard::Core::StateStore do
         @logger ||= DfE::Wizard::Logger.new(Rails.logger)
       end
 
-      # Delegate predicates to state_store
       delegate :has_previous_names?, to: :state_store
     end
   end
@@ -269,8 +268,12 @@ RSpec.describe DfE::Wizard::Core::StateStore do
       expect(state_store.repository).to eq(repository)
     end
 
-    it 'initializes wizard as nil' do
-      expect(state_store.wizard).to be_nil
+    it 'initializes step_definitions as empty array' do
+      expect(state_store.step_definitions).to eq([])
+    end
+
+    it 'initializes attribute_names as empty array' do
+      expect(state_store.attribute_names).to eq([])
     end
   end
 
@@ -312,29 +315,28 @@ RSpec.describe DfE::Wizard::Core::StateStore do
     end
   end
 
-  describe '#define_step_attributes_methods?' do
+  describe '#step_attributes_methods?' do
     it 'returns true by default' do
-      expect(state_store.define_step_attributes_methods?).to be true
+      expect(state_store.step_attributes_methods?).to be true
     end
 
     it 'can be overridden to disable auto-generation' do
       custom_store = Class.new do
         include DfE::Wizard::Core::StateStore
 
-        def define_step_attributes_methods?
+        def step_attributes_methods?
           false
         end
       end
 
       instance = custom_store.new(repository:)
-      expect(instance.define_step_attributes_methods?).to be false
+      expect(instance.step_attributes_methods?).to be false
     end
   end
 
-  describe '#define_step_attributes_methods' do
+  describe '#method_missing and #respond_to_missing?' do
     context 'with complete DBS check application' do
       before do
-        # Setup flat data in repository directly
         repository.write({
                            service_type: 'basic',
                            first_name: 'Sarah',
@@ -366,14 +368,11 @@ RSpec.describe DfE::Wizard::Core::StateStore do
                            card_number: '4111111111111111',
                          })
 
-        state_store.define_step_attributes_methods(wizard)
+        state_store.step_definitions = wizard.step_definitions
+        state_store.attribute_names = wizard.attribute_names
       end
 
-      it 'stores wizard reference' do
-        expect(state_store.wizard).to eq(wizard)
-      end
-
-      it 'generates reader methods for all step attributes' do
+      it 'responds to all step attributes via method_missing' do
         expect(state_store).to respond_to(:service_type)
         expect(state_store).to respond_to(:first_name)
         expect(state_store).to respond_to(:last_name)
@@ -382,31 +381,37 @@ RSpec.describe DfE::Wizard::Core::StateStore do
         expect(state_store).to respond_to(:passport_number)
       end
 
-      it 'returns correct values from generated methods' do
+      it 'returns correct values via method_missing' do
         expect(state_store.service_type).to eq('basic')
         expect(state_store.first_name).to eq('Sarah')
         expect(state_store.last_name).to eq('Johnson')
         expect(state_store.email).to eq('sarah.johnson@example.com')
       end
 
-      it 'generated methods read from flat repository data' do
-        # Change repository data directly
+      it 'method_missing reads from current repository data' do
         repository.write(repository.read.merge(first_name: 'Emma'))
 
         expect(state_store.first_name).to eq('Emma')
       end
 
-      it 'custom predicate methods work with auto-generated attributes' do
+      it 'custom predicate methods work with method_missing attributes' do
         expect(state_store.has_previous_names?).to be true
         expect(state_store.full_name).to eq('Sarah Elizabeth Johnson')
         expect(state_store.age).to be_between(38, 40)
         expect(state_store.uk_resident?).to be true
       end
 
-      it 'does not overwrite custom methods' do
+      it 'does not override custom methods with method_missing' do
         expect(state_store).to respond_to(:full_name)
         expect(state_store).to respond_to(:age)
         expect(state_store.full_name).to include('Sarah')
+      end
+
+      it 'raises NoMethodError for undefined attributes' do
+        state_store.step_definitions = wizard.step_definitions
+        state_store.attribute_names = wizard.attribute_names
+
+        expect { state_store.undefined_attribute }.to raise_error(NoMethodError)
       end
     end
 
@@ -420,14 +425,15 @@ RSpec.describe DfE::Wizard::Core::StateStore do
                            previous_names: 'no',
                          })
 
-        state_store.define_step_attributes_methods(wizard)
+        state_store.step_definitions = wizard.step_definitions
+        state_store.attribute_names = wizard.attribute_names
       end
 
       it 'predicate returns false when previous_names is no' do
         expect(state_store.has_previous_names?).to be false
       end
 
-      it 'previous_names_details attributes return nil' do
+      it 'previous_names_details attributes return nil via method_missing' do
         expect(state_store.previous_first_name).to be_nil
         expect(state_store.previous_last_name).to be_nil
       end
@@ -441,7 +447,8 @@ RSpec.describe DfE::Wizard::Core::StateStore do
                            last_name: 'Doe',
                          })
 
-        state_store.define_step_attributes_methods(wizard)
+        state_store.step_definitions = wizard.step_definitions
+        state_store.attribute_names = wizard.attribute_names
       end
 
       it 'returns nil for attributes not yet provided' do
@@ -457,104 +464,39 @@ RSpec.describe DfE::Wizard::Core::StateStore do
       end
     end
 
-    context 'with logger' do
-      it 'logs count and method names during wizard initialization' do
+    context 'integration with wizard initialization' do
+      it 'auto-initializes step_definitions and attribute_names during wizard creation' do
         fresh_repository = DfE::Wizard::Repository::InMemory.new
         fresh_state_store = state_store_class.new(repository: fresh_repository)
 
-        fresh_repository.write({ first_name: 'Test', last_name: 'User' })
-
-        # Create wizard (triggers after_initialize -> define_step_attributes_methods)
-        fresh_wizard = wizard_class.new(
-          current_step: :start,
-          state_store: OpenStruct.new,
-        )
-
-        # Mock the wizard's logger
-        logger_double = instance_double(DfE::Wizard::Logging::TaggedLogger)
-        allow(fresh_wizard).to receive(:log).and_return(logger_double)
-        allow(logger_double).to receive(:info)
-        allow(logger_double).to receive(:debug)
-
-        # Call define_step_attributes_methods again to trigger logging with mocked logger
-        fresh_state_store.define_step_attributes_methods(fresh_wizard)
-
-        # Verify info logging happened with method names
-        expect(logger_double).to have_received(:info) do |message, **options|
-          expect(message).to match(/Auto-generated 31 attribute reader methods/)
-          expect(message).to include(':service_type')
-          expect(message).to include(':first_name')
-          expect(message).to include(':email')
-          expect(options[:category]).to eq(:state)
-        end
-      end
-
-      it 'logs skipped methods when collisions exist' do
-        collision_store_class = Class.new do
-          include DfE::Wizard::Core::StateStore
-
-          def first_name
-            'EXISTING_METHOD'
-          end
-        end
-
-        collision_repository = DfE::Wizard::Repository::InMemory.new
-        collision_store = collision_store_class.new(repository: collision_repository)
-
-        collision_repository.write({ first_name: 'Should not override' })
-
-        # Create wizard first
-        collision_wizard = wizard_class.new(
-          current_step: :start,
-          state_store: collision_store,
-        )
-
-        # Mock the wizard's logger
-        logger_double = instance_double(DfE::Wizard::Logging::TaggedLogger)
-        allow(collision_wizard).to receive(:log).and_return(logger_double)
-        allow(logger_double).to receive(:info)
-        allow(logger_double).to receive(:debug)
-
-        # Call define_step_attributes_methods again to trigger logging with mocked logger
-        collision_store.define_step_attributes_methods(collision_wizard)
-
-        # Verify debug logging for skipped method
-        expect(logger_double).to have_received(:debug).with(
-          match(/Skipped attribute :first_name for step :personal_details/),
-          category: :state,
-        )
-
-        expect(collision_store.first_name).to eq('EXISTING_METHOD')
-      end
-    end
-
-    context 'integration with wizard initialization' do
-      it 'auto-generates methods during wizard initialization' do
-        repository.write({ first_name: 'Alice', last_name: 'Smith' })
+        fresh_repository.write({ first_name: 'Alice', last_name: 'Smith' })
 
         wizard_class.new(
           current_step: :personal_details,
-          state_store: state_store,
+          state_store: fresh_state_store,
         )
 
-        expect(state_store.first_name).to eq('Alice')
-        expect(state_store.last_name).to eq('Smith')
+        expect(fresh_state_store.first_name).to eq('Alice')
+        expect(fresh_state_store.last_name).to eq('Smith')
       end
 
-      it 'makes custom predicates work immediately' do
-        repository.write({ previous_names: 'yes' })
+      it 'makes custom predicates work immediately after wizard initialization' do
+        fresh_repository = DfE::Wizard::Repository::InMemory.new
+        fresh_state_store = state_store_class.new(repository: fresh_repository)
+
+        fresh_repository.write({ previous_names: 'yes' })
 
         wizard_class.new(
           current_step: :previous_names_question,
-          state_store: state_store,
+          state_store: fresh_state_store,
         )
 
-        expect(state_store.has_previous_names?).to be true
+        expect(fresh_state_store.has_previous_names?).to be true
       end
     end
 
     context 'real-world usage example' do
-      it 'provides natural attribute access' do
+      before do
         repository.write({
                            first_name: 'Emma',
                            middle_names: 'Grace',
@@ -565,8 +507,11 @@ RSpec.describe DfE::Wizard::Core::StateStore do
                            country_of_residence: 'united_kingdom',
                          })
 
-        state_store.define_step_attributes_methods(wizard)
+        state_store.step_definitions = wizard.step_definitions
+        state_store.attribute_names = wizard.attribute_names
+      end
 
+      it 'provides natural attribute access via method_missing' do
         expect(state_store.first_name).to eq('Emma')
         expect(state_store.email).to eq('emma.williams@example.com')
         expect(state_store.full_name).to eq('Emma Grace Williams')
@@ -579,7 +524,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
         Class.new do
           include DfE::Wizard::Core::StateStore
 
-          def define_step_attributes_methods?
+          def step_attributes_methods?
             false
           end
         end
@@ -587,19 +532,18 @@ RSpec.describe DfE::Wizard::Core::StateStore do
 
       let(:disabled_store) { disabled_store_class.new(repository: repository) }
 
-      it 'does not generate any methods' do
+      it 'still responds to method_missing for attributes' do
         repository.write({ first_name: 'Test' })
+        disabled_store.step_definitions = wizard.step_definitions
+        disabled_store.attribute_names = wizard.attribute_names
 
-        disabled_store.define_step_attributes_methods(wizard)
-
-        expect(disabled_store).not_to respond_to(:first_name)
-        expect(disabled_store).not_to respond_to(:email)
+        expect {
+          disabled_store.first_name
+        }.to raise_error(NoMethodError)
       end
 
       it 'can still access data via read' do
         repository.write({ first_name: 'Manual' })
-
-        disabled_store.define_step_attributes_methods(wizard)
 
         expect(disabled_store.read[:first_name]).to eq('Manual')
       end
@@ -607,14 +551,6 @@ RSpec.describe DfE::Wizard::Core::StateStore do
   end
 
   describe 'edge cases' do
-    context 'with steps that have no attributes' do
-      it 'handles Start and CheckAnswers gracefully' do
-        state_store.define_step_attributes_methods(wizard)
-
-        expect { state_store.define_step_attributes_methods(wizard) }.not_to raise_error
-      end
-    end
-
     context 'with attribute name collisions' do
       let(:collision_store_class) do
         Class.new do
@@ -628,12 +564,21 @@ RSpec.describe DfE::Wizard::Core::StateStore do
 
       let(:collision_store) { collision_store_class.new(repository: repository) }
 
-      it 'preserves existing custom method' do
+      it 'preserves existing custom method (method_missing not called)' do
         repository.write({ first_name: 'Sarah' })
-
-        collision_store.define_step_attributes_methods(wizard)
+        collision_store.step_definitions = wizard.step_definitions
+        collision_store.attribute_names = wizard.attribute_names
 
         expect(collision_store.first_name).to eq('CUSTOM_METHOD')
+      end
+    end
+
+    context 'with steps that have no attributes' do
+      it 'handles Start and CheckAnswers gracefully' do
+        state_store.step_definitions = wizard.step_definitions
+        state_store.attribute_names = wizard.attribute_names
+
+        expect { state_store.first_name }.not_to raise_error
       end
     end
   end

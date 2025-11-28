@@ -20,7 +20,7 @@ RSpec.describe PersonalInformationWizard do
             first_name: 'John',
             last_name: 'Doe',
             date_of_birth: '1990-01-01',
-          }
+          },
         )
       end
 
@@ -43,11 +43,11 @@ RSpec.describe PersonalInformationWizard do
     context 'when British national' do
       before do
         state_store.write({
-                           first_name: 'John',
-                           last_name: 'Doe',
-                           date_of_birth: '1990-01-01',
-                           nationalities: 'british',
-                         })
+                            first_name: 'John',
+                            last_name: 'Doe',
+                            date_of_birth: '1990-01-01',
+                            nationalities: 'british',
+                          })
       end
 
       context 'at nationality step' do
@@ -80,11 +80,11 @@ RSpec.describe PersonalInformationWizard do
     context 'when Irish national' do
       before do
         state_store.write({
-                           first_name: 'Patrick',
-                           last_name: 'Murphy',
-                           date_of_birth: '1988-03-17',
-                           nationalities: 'irish',
-                         })
+                            first_name: 'Patrick',
+                            last_name: 'Murphy',
+                            date_of_birth: '1988-03-17',
+                            nationalities: 'irish',
+                          })
       end
 
       let(:current_step) { :nationality }
@@ -97,15 +97,15 @@ RSpec.describe PersonalInformationWizard do
     context 'when non-UK national with right to work' do
       before do
         state_store.write({
-                           first_name: 'Jean',
-                           last_name: 'Dupont',
-                           date_of_birth: '1995-06-15',
-                           nationalities: 'french',
-                           right_to_work_or_study: 'yes',
-                           visa_type: 'work',
-                           visa_expiry: '2026-12-31',
-                           status: 'settled',
-                         })
+                            first_name: 'Jean',
+                            last_name: 'Dupont',
+                            date_of_birth: '1995-06-15',
+                            nationalities: 'french',
+                            right_to_work_or_study: 'yes',
+                            visa_type: 'work',
+                            visa_expiry: '2026-12-31',
+                            status: 'settled',
+                          })
       end
 
       context 'at right_to_work_or_study step' do
@@ -165,12 +165,12 @@ RSpec.describe PersonalInformationWizard do
     context 'when non-UK national without right to work' do
       before do
         state_store.write({
-                           first_name: 'Maria',
-                           last_name: 'Garcia',
-                           date_of_birth: '1992-03-22',
-                           nationalities: 'spanish',
-                           right_to_work_or_study: 'no',
-                         })
+                            first_name: 'Maria',
+                            last_name: 'Garcia',
+                            date_of_birth: '1992-03-22',
+                            nationalities: 'spanish',
+                            right_to_work_or_study: 'no',
+                          })
       end
 
       context 'at right_to_work_or_study step' do
@@ -214,11 +214,11 @@ RSpec.describe PersonalInformationWizard do
     context 'with explicit target step' do
       before do
         state_store.write({
-                           first_name: 'John',
-                           last_name: 'Doe',
-                           date_of_birth: '1990-01-01',
-                           nationalities: 'british',
-                         })
+                            first_name: 'John',
+                            last_name: 'Doe',
+                            date_of_birth: '1990-01-01',
+                            nationalities: 'british',
+                          })
       end
 
       let(:current_step) { :name_and_date_of_birth }
@@ -237,10 +237,10 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'John',
-                           last_name: 'Doe',
-                           date_of_birth: '1990-01-01',
-                         })
+                            first_name: 'John',
+                            last_name: 'Doe',
+                            date_of_birth: '1990-01-01',
+                          })
       end
 
       it { is_expected.to be_at_step(:name_and_date_of_birth) }
@@ -260,11 +260,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'John',
-                           last_name: 'Doe',
-                           date_of_birth: '1990-01-01',
-                           nationalities: nationality_value,
-                         })
+                            first_name: 'John',
+                            last_name: 'Doe',
+                            date_of_birth: '1990-01-01',
+                            nationalities: nationality_value,
+                          })
       end
 
       context 'UK national' do
@@ -321,14 +321,14 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'Jean',
-                           last_name: 'Dupont',
-                           date_of_birth: '1995-06-15',
-                           nationalities: 'french',
-                           right_to_work_or_study: has_right_to_work,
-                           visa_type: 'work',
-                           visa_expiry: '2026-12-31',
-                         })
+                            first_name: 'Jean',
+                            last_name: 'Dupont',
+                            date_of_birth: '1995-06-15',
+                            nationalities: 'french',
+                            right_to_work_or_study: has_right_to_work,
+                            visa_type: 'work',
+                            visa_expiry: '2026-12-31',
+                          })
       end
 
       context 'with right to work' do
@@ -373,15 +373,15 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'Test',
-                           last_name: 'User',
-                           date_of_birth: '1990-01-01',
-                           nationalities: 'french',
-                           right_to_work_or_study: 'yes',
-                           visa_type: 'work',
-                           visa_expiry: '2026-12-31',
-                           status: 'settled',
-                         })
+                            first_name: 'Test',
+                            last_name: 'User',
+                            date_of_birth: '1990-01-01',
+                            nationalities: 'french',
+                            right_to_work_or_study: 'yes',
+                            visa_type: 'work',
+                            visa_expiry: '2026-12-31',
+                            status: 'settled',
+                          })
       end
 
       it { is_expected.to be_at_step(:immigration_status) }
@@ -401,11 +401,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'John',
-                           last_name: 'Doe',
-                           date_of_birth: '1990-01-01',
-                           nationalities: 'british',
-                         })
+                            first_name: 'John',
+                            last_name: 'Doe',
+                            date_of_birth: '1990-01-01',
+                            nationalities: 'british',
+                          })
       end
 
       context 'with valid path to review' do
@@ -424,14 +424,14 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'Test',
-                           last_name: 'User',
-                           date_of_birth: '1990-01-01',
-                           nationalities: 'french',
-                           right_to_work_or_study: 'yes',
-                           visa_type: 'work',
-                           visa_expiry: '2026-12-31',
-                         })
+                            first_name: 'Test',
+                            last_name: 'User',
+                            date_of_birth: '1990-01-01',
+                            nationalities: 'french',
+                            right_to_work_or_study: 'yes',
+                            visa_type: 'work',
+                            visa_expiry: '2026-12-31',
+                          })
       end
 
       it { is_expected.to be_at_step(:immigration_status) }
@@ -453,11 +453,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'Test',
-                           last_name: 'User',
-                           date_of_birth: '1990-01-01',
-                           nationalities: 'french',
-                         })
+                            first_name: 'Test',
+                            last_name: 'User',
+                            date_of_birth: '1990-01-01',
+                            nationalities: 'french',
+                          })
       end
 
       it { is_expected.to be_at_step(:right_to_work_or_study) }
@@ -476,10 +476,10 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'Test',
-                           last_name: 'User',
-                           date_of_birth: '1990-01-01',
-                         })
+                            first_name: 'Test',
+                            last_name: 'User',
+                            date_of_birth: '1990-01-01',
+                          })
       end
 
       it { is_expected.to be_at_step(:nationality) }
@@ -500,11 +500,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'Test',
-                           last_name: 'User',
-                           date_of_birth: '1990-01-01',
-                           nationalities: 'british',
-                         })
+                            first_name: 'Test',
+                            last_name: 'User',
+                            date_of_birth: '1990-01-01',
+                            nationalities: 'british',
+                          })
       end
 
       it { is_expected.to be_at_step(:review) }
@@ -524,15 +524,15 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'Test',
-                           last_name: 'User',
-                           date_of_birth: '1990-01-01',
-                           nationalities: 'french',
-                           right_to_work_or_study: 'yes',
-                           visa_type: 'work',
-                           visa_expiry: '2026-12-31',
-                           status: 'settled',
-                         })
+                            first_name: 'Test',
+                            last_name: 'User',
+                            date_of_birth: '1990-01-01',
+                            nationalities: 'french',
+                            right_to_work_or_study: 'yes',
+                            visa_type: 'work',
+                            visa_expiry: '2026-12-31',
+                            status: 'settled',
+                          })
       end
 
       it { is_expected.to be_at_step(:review) }
@@ -570,11 +570,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'John',
-                           last_name: 'Doe',
-                           date_of_birth: '1990-01-01',
-                           nationalities: 'british',
-                         })
+                            first_name: 'John',
+                            last_name: 'Doe',
+                            date_of_birth: '1990-01-01',
+                            nationalities: 'british',
+                          })
       end
 
       context 'when at origin step' do
@@ -609,11 +609,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'John',
-                           last_name: 'Doe',
-                           date_of_birth: '1990-01-01',
-                           nationalities: 'british',
-                         })
+                            first_name: 'John',
+                            last_name: 'Doe',
+                            date_of_birth: '1990-01-01',
+                            nationalities: 'british',
+                          })
       end
 
       it { is_expected.to be_at_step(:review) }
@@ -646,11 +646,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: '',
-                           last_name: 'Doe',
-                           date_of_birth: '1990-01-01',
-                           nationalities: 'british',
-                         })
+                            first_name: '',
+                            last_name: 'Doe',
+                            date_of_birth: '1990-01-01',
+                            nationalities: 'british',
+                          })
       end
 
       it { expect(:name_and_date_of_birth).not_to be_valid_step.in(wizard) }
@@ -670,11 +670,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: 'John',
-                           last_name: 'Doe',
-                           date_of_birth: '1990-01-01',
-                           nationalities: 'british',
-                         })
+                            first_name: 'John',
+                            last_name: 'Doe',
+                            date_of_birth: '1990-01-01',
+                            nationalities: 'british',
+                          })
       end
 
       it { is_expected.to be_valid_to(:review) }
@@ -689,11 +689,11 @@ RSpec.describe PersonalInformationWizard do
 
       before do
         state_store.write({
-                           first_name: '',
-                           last_name: '',
-                           date_of_birth: '',
-                           nationalities: '',
-                         })
+                            first_name: '',
+                            last_name: '',
+                            date_of_birth: '',
+                            nationalities: '',
+                          })
       end
 
       it { expect(wizard).not_to be_valid_to(:review) }
@@ -707,8 +707,8 @@ RSpec.describe PersonalInformationWizard do
 
     before do
       state_store.write({
-                         nationalities: 'french',
-                       })
+                          nationalities: 'french',
+                        })
     end
 
     it { expect(:nationality).to be_saved.in(wizard) }
@@ -739,8 +739,8 @@ RSpec.describe PersonalInformationWizard do
 
     before do
       state_store.write({
-                         nationalities: 'british',
-                       })
+                          nationalities: 'british',
+                        })
     end
 
     it { is_expected.to be_at_step(:nationality) }
