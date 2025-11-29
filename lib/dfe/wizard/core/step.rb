@@ -91,6 +91,58 @@ module DfE
           attributes.except('wizard', 'step_id')
         end
 
+        # Value equality for step objects.
+        #
+        # Equality is based on:
+        # - Class
+        # - step_id (Symbol, may be nil)
+        # - serializable_data (all attributes of the step)
+        #
+        # This is essential for testing, as well as for correct behavior in Ruby Sets and as Hash keys.
+        #
+        # @param other [Object] The object to compare
+        # @return [Boolean] True if class, step_id, and attributes are all equal
+        def ==(other)
+          self.class == other.class &&
+            step_id == other.step_id &&
+            serializable_data == other.serializable_data
+        end
+
+        # Hash equality (used by Set/Hash)
+        #
+        # Delegates to == for semantic equality.
+        #
+        # @param other [Object] The other step
+        # @return [Boolean] True if the other step is value-equal
+        def eql?(other)
+          self == other
+        end
+
+        # Hashcode for step objects.
+        #
+        # Based on class, step_id, and serializable_data.
+        # Ensures that logically equal steps map to the same key in Hash/Set.
+        #
+        # @return [Integer]
+        def hash
+          [self.class, step_id, serializable_data].hash
+        end
+
+        # Pretty inspect for debugging
+        #
+        # Shows step class, step_id, and non-nil attributes.
+        #
+        # @return [String]
+        #
+        # @example
+        #   step.inspect
+        #   # => "#<Steps::Email step_id=:email email=\"foo@bar.com\" confirmed=true>"
+        def inspect
+          attrs = serializable_data.compact.map { |key, value| "#{key}=#{value.inspect}" }.join(' ')
+          id_info = step_id ? " step_id=#{step_id.inspect}" : ''
+          "#<#{self.class.name}#{id_info} #{attrs}>"
+        end
+
         # Class methods
         module ClassMethods
           # Define permitted parameters for strong params

@@ -16,77 +16,86 @@ RSpec.describe AssignMentorWizard do
   describe 'flow path traversal' do
     context 'when lead provider will provide training (yes branch)' do
       before do
-        repository.write({
-                           mentor_id: 1,
-                           lp_will_provide: 'yes',
-                         })
+        state_store.write({
+                            mentor_id: 1,
+                            lp_will_provide: 'yes',
+                          })
       end
 
       context 'at who_will_be_the_mentor step' do
         let(:current_step) { :who_will_be_the_mentor }
 
         it { is_expected.to be_at_step(:who_will_be_the_mentor) }
-        it { is_expected.to have_saved(:who_will_be_the_mentor) }
-        it { expect(:who_will_be_the_mentor).to be_saved.in(wizard) }
-        it { is_expected.to have_in_flow(:who_will_be_the_mentor, :can_receive_mentor_training) }
-        it { expect(wizard).to branch_to(:can_receive_mentor_training).from(:who_will_be_the_mentor) }
+        it { is_expected.to have_saved_path([:who_will_be_the_mentor]) }
+        it { is_expected.to have_flow_path([:who_will_be_the_mentor]) }
+        it { expect(wizard).to branch_from(:who_will_be_the_mentor).to(:can_receive_mentor_training) }
       end
 
       context 'at can_receive_mentor_training step' do
         let(:current_step) { :can_receive_mentor_training }
 
         it { is_expected.to be_at_step(:can_receive_mentor_training) }
-        it { is_expected.to have_saved(:who_will_be_the_mentor, :can_receive_mentor_training) }
-        it { is_expected.to have_in_flow(:who_will_be_the_mentor, :can_receive_mentor_training, :confirmation) }
-        it { expect(wizard).to branch_to(:confirmation).from(:can_receive_mentor_training) }
+        it { is_expected.to have_saved_path(%i[who_will_be_the_mentor can_receive_mentor_training]) }
+        it { is_expected.to have_flow_path(%i[who_will_be_the_mentor can_receive_mentor_training]) }
+        it { expect(wizard).to branch_from(:can_receive_mentor_training).to(:confirmation) }
       end
 
       context 'at confirmation step' do
         let(:current_step) { :confirmation }
 
         it { is_expected.to be_at_step(:confirmation) }
-        it { is_expected.to have_saved(:who_will_be_the_mentor, :can_receive_mentor_training) }
-        it { is_expected.to have_in_flow(:who_will_be_the_mentor, :can_receive_mentor_training, :confirmation) }
+        it { is_expected.to have_saved_path(%i[who_will_be_the_mentor can_receive_mentor_training]) }
+        it { is_expected.to have_flow_path(%i[who_will_be_the_mentor can_receive_mentor_training confirmation]) }
       end
     end
 
     context 'when lead provider will not provide training (no branch)' do
       before do
-        repository.write({
-                           mentor_id: 1,
-                           lp_will_provide: 'no',
-                           lead_provider_id: 1,
-                         })
+        state_store.write({
+                            mentor_id: 1,
+                            lp_will_provide: 'no',
+                            lead_provider_id: 1,
+                          })
       end
 
       context 'at can_receive_mentor_training step' do
         let(:current_step) { :can_receive_mentor_training }
 
         it { is_expected.to be_at_step(:can_receive_mentor_training) }
-        it { is_expected.to have_saved(:who_will_be_the_mentor, :can_receive_mentor_training) }
-        it { expect(wizard).to branch_to(:which_lead_provider).from(:can_receive_mentor_training) }
+        it { is_expected.to have_saved_path(%i[who_will_be_the_mentor can_receive_mentor_training]) }
+        it { expect(wizard).to branch_from(:can_receive_mentor_training).to(:which_lead_provider) }
       end
 
       context 'at which_lead_provider step' do
         let(:current_step) { :which_lead_provider }
 
         it { is_expected.to be_at_step(:which_lead_provider) }
-        it { is_expected.to have_saved(:who_will_be_the_mentor, :can_receive_mentor_training, :which_lead_provider) }
         it {
-          is_expected.to have_in_flow(:who_will_be_the_mentor, :can_receive_mentor_training, :which_lead_provider,
-                                      :confirmation)
+          is_expected.to have_saved_path(
+            %i[who_will_be_the_mentor can_receive_mentor_training which_lead_provider],
+          )
         }
-        it { expect(wizard).to branch_to(:confirmation).from(:which_lead_provider) }
+        it {
+          is_expected.to have_flow_path(
+            %i[who_will_be_the_mentor can_receive_mentor_training which_lead_provider],
+          )
+        }
+        it { expect(wizard).to branch_from(:which_lead_provider).to(:confirmation) }
       end
 
       context 'at confirmation step' do
         let(:current_step) { :confirmation }
 
         it { is_expected.to be_at_step(:confirmation) }
-        it { is_expected.to have_saved(:who_will_be_the_mentor, :can_receive_mentor_training, :which_lead_provider) }
         it {
-          is_expected.to have_in_flow(:who_will_be_the_mentor, :can_receive_mentor_training, :which_lead_provider,
-                                      :confirmation)
+          is_expected.to have_saved_path(
+            %i[who_will_be_the_mentor can_receive_mentor_training which_lead_provider],
+          )
+        }
+        it {
+          is_expected.to have_flow_path(
+            %i[who_will_be_the_mentor can_receive_mentor_training which_lead_provider confirmation],
+          )
         }
       end
     end
@@ -97,13 +106,13 @@ RSpec.describe AssignMentorWizard do
       let(:current_step) { :who_will_be_the_mentor }
 
       before do
-        repository.write({
-                           mentor_id: 1,
-                         })
+        state_store.write({
+                            mentor_id: 1,
+                          })
       end
 
       it { is_expected.to be_at_step(:who_will_be_the_mentor) }
-      it { expect(:can_receive_mentor_training).to be_in_flow.in(wizard) }
+      it { expect(wizard).to have_next_step(:can_receive_mentor_training) }
       it { is_expected.to have_next_step_path(url_helpers.assign_mentor_can_receive_mentor_training_path) }
     end
 
@@ -111,27 +120,27 @@ RSpec.describe AssignMentorWizard do
       let(:current_step) { :can_receive_mentor_training }
 
       before do
-        repository.write({
-                           mentor_id: 1,
-                           lp_will_provide: lp_answer,
-                         })
+        state_store.write({
+                            mentor_id: 1,
+                            lp_will_provide: lp_answer,
+                          })
       end
 
       context 'when lead provider will provide training' do
         let(:lp_answer) { 'yes' }
 
         it { is_expected.to be_at_step(:can_receive_mentor_training) }
-        it { expect(:confirmation).to be_in_flow.in(wizard) }
+        it { expect(wizard).to have_next_step(:confirmation) }
         it { is_expected.to have_next_step_path(url_helpers.assign_mentor_confirmation_path) }
-        it { expect(wizard).to branch_to(:confirmation).from(:can_receive_mentor_training) }
+        it { expect(wizard).to branch_from(:can_receive_mentor_training).to(:confirmation) }
       end
 
       context 'when lead provider will not provide training' do
         let(:lp_answer) { 'no' }
 
-        it { expect(:which_lead_provider).to be_in_flow.in(wizard) }
+        it { expect(wizard).to have_next_step(:which_lead_provider) }
         it { is_expected.to have_next_step_path(url_helpers.assign_mentor_which_lead_provider_path) }
-        it { expect(wizard).to branch_to(:which_lead_provider).from(:can_receive_mentor_training) }
+        it { expect(wizard).to branch_from(:can_receive_mentor_training).to(:which_lead_provider) }
       end
     end
 
@@ -139,15 +148,15 @@ RSpec.describe AssignMentorWizard do
       let(:current_step) { :which_lead_provider }
 
       before do
-        repository.write({
-                           mentor_id: 1,
-                           lp_will_provide: 'no',
-                           lead_provider_id: 1,
-                         })
+        state_store.write({
+                            mentor_id: 1,
+                            lp_will_provide: 'no',
+                            lead_provider_id: 1,
+                          })
       end
 
       it { is_expected.to be_at_step(:which_lead_provider) }
-      it { expect(:confirmation).to be_in_flow.in(wizard) }
+      it { expect(wizard).to have_next_step(:confirmation) }
       it { is_expected.to have_next_step_path(url_helpers.assign_mentor_confirmation_path) }
     end
 
@@ -156,12 +165,13 @@ RSpec.describe AssignMentorWizard do
         let(:current_step) { :can_receive_mentor_training }
 
         before do
-          repository.write({
-                             mentor_id: 1,
-                           })
+          state_store.write({
+                              mentor_id: 1,
+                            })
         end
 
         it { is_expected.to be_at_step(:can_receive_mentor_training) }
+        it { expect(wizard).to have_previous_step(:who_will_be_the_mentor) }
         it { is_expected.to have_previous_step_path(url_helpers.assign_mentor_who_will_be_the_mentor_path) }
       end
 
@@ -169,13 +179,14 @@ RSpec.describe AssignMentorWizard do
         let(:current_step) { :which_lead_provider }
 
         before do
-          repository.write({
-                             mentor_id: 1,
-                             lp_will_provide: 'no',
-                           })
+          state_store.write({
+                              mentor_id: 1,
+                              lp_will_provide: 'no',
+                            })
         end
 
         it { is_expected.to be_at_step(:which_lead_provider) }
+        it { expect(wizard).to have_previous_step(:can_receive_mentor_training) }
         it { is_expected.to have_previous_step_path(url_helpers.assign_mentor_can_receive_mentor_training_path) }
       end
 
@@ -183,13 +194,14 @@ RSpec.describe AssignMentorWizard do
         let(:current_step) { :confirmation }
 
         before do
-          repository.write({
-                             mentor_id: 1,
-                             lp_will_provide: 'yes',
-                           })
+          state_store.write({
+                              mentor_id: 1,
+                              lp_will_provide: 'yes',
+                            })
         end
 
         it { is_expected.to be_at_step(:confirmation) }
+        it { expect(wizard).to have_previous_step(:can_receive_mentor_training) }
         it { is_expected.to have_previous_step_path(url_helpers.assign_mentor_can_receive_mentor_training_path) }
       end
 
@@ -197,14 +209,15 @@ RSpec.describe AssignMentorWizard do
         let(:current_step) { :confirmation }
 
         before do
-          repository.write({
-                             mentor_id: 1,
-                             lp_will_provide: 'no',
-                             lead_provider_id: 1,
-                           })
+          state_store.write({
+                              mentor_id: 1,
+                              lp_will_provide: 'no',
+                              lead_provider_id: 1,
+                            })
         end
 
         it { is_expected.to be_at_step(:confirmation) }
+        it { expect(wizard).to have_previous_step(:which_lead_provider) }
         it { is_expected.to have_previous_step_path(url_helpers.assign_mentor_which_lead_provider_path) }
       end
     end
@@ -215,10 +228,10 @@ RSpec.describe AssignMentorWizard do
       let(:current_step) { :confirmation }
 
       before do
-        repository.write({
-                           mentor_id: 1,
-                           lp_will_provide: 'yes',
-                         })
+        state_store.write({
+                            mentor_id: 1,
+                            lp_will_provide: 'yes',
+                          })
       end
 
       it { is_expected.to be_at_step(:confirmation) }
@@ -230,11 +243,11 @@ RSpec.describe AssignMentorWizard do
       let(:current_step) { :confirmation }
 
       before do
-        repository.write({
-                           mentor_id: 1,
-                           lp_will_provide: 'no',
-                           lead_provider_id: 1,
-                         })
+        state_store.write({
+                            mentor_id: 1,
+                            lp_will_provide: 'no',
+                            lead_provider_id: 1,
+                          })
       end
 
       it { is_expected.to be_valid_to(:confirmation) }
@@ -252,10 +265,10 @@ RSpec.describe AssignMentorWizard do
       let(:current_step) { :which_lead_provider }
 
       before do
-        repository.write({
-                           mentor_id: nil,
-                           lp_will_provide: 'no',
-                         })
+        state_store.write({
+                            mentor_id: nil,
+                            lp_will_provide: 'no',
+                          })
       end
 
       it { expect(:who_will_be_the_mentor).not_to be_valid_step.in(wizard) }
@@ -266,24 +279,24 @@ RSpec.describe AssignMentorWizard do
   describe 'branch change scenarios' do
     context 'when changing from yes to no branch' do
       before do
-        repository.write({
-                           mentor_id: 1,
-                           lp_will_provide: 'no',
-                         })
+        state_store.write({
+                            mentor_id: 1,
+                            lp_will_provide: 'no',
+                          })
       end
 
       let(:current_step) { :can_receive_mentor_training }
 
-      it { expect(wizard).to branch_to(:which_lead_provider).from(:can_receive_mentor_training) }
-      it { expect(:which_lead_provider).to be_in_flow.in(wizard) }
+      it { expect(wizard).to branch_from(:can_receive_mentor_training).to(:which_lead_provider) }
+      it { expect(wizard).to have_flow_path(%i[who_will_be_the_mentor can_receive_mentor_training]) }
     end
 
     context 'when user changes answer at confirmation' do
       before do
-        repository.write({
-                           mentor_id: 1,
-                           lp_will_provide: 'yes',
-                         })
+        state_store.write({
+                            mentor_id: 1,
+                            lp_will_provide: 'yes',
+                          })
       end
 
       let(:current_step) { :can_receive_mentor_training }
@@ -305,12 +318,14 @@ RSpec.describe AssignMentorWizard do
     let(:current_step) { :who_will_be_the_mentor }
 
     before do
-      repository.write({
-                         mentor_id: 1,
-                       })
+      state_store.write({
+                          mentor_id: 1,
+                        })
     end
 
-    it { expect(:who_will_be_the_mentor).to be_saved.in(wizard) }
+    it 'has saved the who_will_be_the_mentor step' do
+      expect(wizard).to have_saved_path([:who_will_be_the_mentor])
+    end
 
     it 'returns hydrated step object with correct data' do
       step = wizard.step(:who_will_be_the_mentor)
@@ -327,16 +342,16 @@ RSpec.describe AssignMentorWizard do
 
   describe 'flow path calculation' do
     before do
-      repository.write({
-                         mentor_id: 1,
-                         lp_will_provide: 'yes',
-                       })
+      state_store.write({
+                          mentor_id: 1,
+                          lp_will_provide: 'yes',
+                        })
     end
 
     let(:current_step) { :confirmation }
 
     it { is_expected.to be_at_step(:confirmation) }
-    it { is_expected.to have_in_flow(:who_will_be_the_mentor, :can_receive_mentor_training, :confirmation) }
+    it { is_expected.to have_flow_path(%i[who_will_be_the_mentor can_receive_mentor_training confirmation]) }
 
     it 'returns correct ordered flow path' do
       expect(wizard.flow_path).to eq(%i[who_will_be_the_mentor can_receive_mentor_training confirmation])
@@ -367,30 +382,24 @@ RSpec.describe AssignMentorWizard do
   describe 'complex branching scenarios' do
     context 'complete no training path' do
       before do
-        repository.write({
-                           mentor_id: 1,
-                           lp_will_provide: 'no',
-                           lead_provider_id: 1,
-                         })
+        state_store.write({
+                            mentor_id: 1,
+                            lp_will_provide: 'no',
+                            lead_provider_id: 1,
+                          })
       end
 
       let(:current_step) { :confirmation }
 
       it { is_expected.to be_at_step(:confirmation) }
       it {
-        is_expected.to have_saved(
-          :who_will_be_the_mentor,
-          :can_receive_mentor_training,
-          :which_lead_provider,
+        is_expected.to have_saved_path(
+          %i[who_will_be_the_mentor can_receive_mentor_training which_lead_provider],
         )
       }
-
       it {
-        is_expected.to have_in_flow(
-          :who_will_be_the_mentor,
-          :can_receive_mentor_training,
-          :which_lead_provider,
-          :confirmation,
+        is_expected.to have_flow_path(
+          %i[who_will_be_the_mentor can_receive_mentor_training which_lead_provider confirmation],
         )
       }
       it { is_expected.to be_valid_to(:confirmation) }

@@ -29,67 +29,88 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
     end
   end
 
-  describe '#be_saved and #have_saved' do
+  describe 'list-based path matchers: flow, saved, valid' do
     let(:steps_data) do
       {
         first_name: 'John',
         last_name: 'Doe',
         date_of_birth: '1990-01-01',
+        nationalities: 'british',
       }
     end
-    let(:current_step) { :nationality }
+    let(:current_step) { :review }
 
-    it 'passes for single step using #be_saved' do
-      expect(:name_and_date_of_birth).to be_saved.in(wizard)
+    it 'matches flow_path exactly' do
+      expect(wizard).to have_flow_path(%i[name_and_date_of_birth nationality review])
     end
 
-    it 'passes for multiple steps using #have_saved' do
-      repository.write(repository.read.merge(nationalities: 'british'))
-      expect(wizard).to have_saved(:name_and_date_of_birth, :nationality)
+    it 'matches saved_path exactly' do
+      expect(wizard).to have_saved_path(%i[name_and_date_of_birth nationality])
     end
 
-    it 'fails if a step is missing' do
+    it 'matches valid_path exactly, even if all steps are valid' do
+      expect(wizard).to have_valid_path(%i[name_and_date_of_birth nationality review])
+    end
+
+    it 'fails if path does not match' do
       expect {
-        expect(:review).to be_saved.in(wizard)
-      }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Step not saved: :review/)
-    end
-
-    it 'fails if multiple required steps are missing' do
-      repository.write(repository.read.merge(nationalities: 'british'))
+        expect(wizard).to have_flow_path(%i[name_and_date_of_birth review])
+      }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Expected flow_path/)
       expect {
-        expect(wizard).to have_saved(:name_and_date_of_birth, :review, :nationality)
-      }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Missing: \[:review\]/)
+        expect(wizard).to have_saved_path(%i[name_and_date_of_birth review])
+      }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Expected saved_path/)
+      expect {
+        expect(wizard).to have_valid_path(%i[name_and_date_of_birth review])
+      }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Expected valid_path/)
     end
   end
 
-  describe '#be_in_flow and #have_in_flow' do
+  describe 'step object matchers for flow/saved/valid steps' do
     let(:steps_data) do
       {
         first_name: 'John',
         last_name: 'Doe',
         date_of_birth: '1990-01-01',
+        nationalities: 'british',
       }
     end
-    let(:current_step) { :nationality }
+    let(:current_step) { :review }
 
-    it 'passes if the step is in the flow' do
-      expect(:nationality).to be_in_flow.in(wizard)
+    let(:expected_steps) do
+      [
+        Steps::NameAndDateOfBirth.new(
+          steps_data.slice(:first_name, :last_name, :date_of_birth).merge(
+            step_id: :name_and_date_of_birth,
+          ),
+        ),
+        Steps::Nationality.new(
+          steps_data.slice(:nationalities).merge(
+            step_id: :nationality,
+          ),
+        ),
+        Steps::Review.new(step_id: :review),
+      ]
     end
 
-    it 'fails if the step is not in the flow' do
+    it 'matches flow_steps by class and object equality' do
+      expect(wizard).to have_flow_steps(expected_steps)
+    end
+
+    it 'matches saved_steps by class and object equality' do
+      expect(wizard).to have_saved_steps(expected_steps[0..-2])
+    end
+
+    it 'matches valid_steps by class and object equality' do
+      expect(wizard).to have_valid_steps(expected_steps)
+    end
+
+    it 'fails if expected and actual steps differ' do
+      actual = wizard.flow_steps.dup
+      bad_steps = actual.dup
+      bad_steps.pop # remove one, so they are not the same
       expect {
-        expect(:immigration_status).to be_in_flow.in(wizard)
-      }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Step not in flow: :immigration_status/)
-    end
-
-    it 'passes for all given steps with #have_in_flow' do
-      expect(wizard).to have_in_flow(:name_and_date_of_birth, :nationality)
-    end
-
-    it 'fails if any step is missing' do
-      expect {
-        expect(wizard).to have_in_flow(:name_and_date_of_birth, :immigration_status)
-      }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Missing: \[:immigration_status\]/)
+        expect(wizard).to have_flow_steps(bad_steps)
+      }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Expected flow_steps/)
     end
   end
 
@@ -117,85 +138,6 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
       expect {
         expect(wizard).to be_valid_to(:nationality)
       }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /step\(s\) invalid before reaching :nationality/)
-    end
-
-    context '#be_valid_to edge cases' do
-      let(:current_step) { :review }
-
-      context 'when target step itself is invalid' do
-        let(:steps_data) do
-          {
-            first_name: 'John',
-            last_name: 'Doe',
-            date_of_birth: '1990-01-01',
-            nationalities: '',
-          }
-        end
-
-        it 'pass if only target step is invalid' do
-          expect(wizard).to be_valid_to(:nationality)
-        end
-      end
-
-      context 'when middle step is invalid' do
-        let(:steps_data) do
-          {
-            first_name: '',
-            last_name: 'Doe',
-            date_of_birth: '1990-01-01',
-            nationalities: 'french',
-            right_to_work_or_study: 'yes',
-            visa_type: 'work',
-            visa_expiry: '2026-12-31',
-          }
-        end
-
-        it 'fails because middle step is invalid' do
-          expect {
-            expect(wizard).to be_valid_to(:right_to_work_or_study)
-          }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /step\(s\) invalid/)
-        end
-      end
-
-      context 'when all steps up to and including target are valid' do
-        let(:steps_data) do
-          {
-            first_name: 'John',
-            last_name: 'Doe',
-            date_of_birth: '1990-01-01',
-            nationalities: 'british',
-          }
-        end
-
-        it 'passes' do
-          expect(wizard).to be_valid_to(:nationality)
-        end
-      end
-
-      context 'when step not in flow path' do
-        let(:steps_data) do
-          {
-            first_name: 'John',
-            last_name: 'Doe',
-            date_of_birth: '1990-01-01',
-            nationalities: 'british',
-          }
-        end
-
-        it 'fails for unreachable step' do
-          expect {
-            expect(wizard).to be_valid_to(:immigration_status)
-          }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /not in flow path/)
-        end
-      end
-
-      context 'when checking root step' do
-        let(:current_step) { :name_and_date_of_birth }
-
-        it 'passes for root step regardless of data' do
-          expect(wizard).to be_valid_to(:name_and_date_of_birth)
-        end
-      end
     end
   end
 
@@ -225,7 +167,7 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
     end
   end
 
-  describe '#branch_to' do
+  describe '#branch_from' do
     let(:steps_data) do
       {
         first_name: 'Alice',
@@ -234,58 +176,45 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
         nationalities: nationalities,
       }
     end
-
     let(:current_step) { :nationality }
 
     context 'for UK/Irish' do
       let(:nationalities) { 'british' }
-
       it 'branches to review from nationality' do
-        expect(wizard).to branch_to(:review).from(:nationality)
+        expect(wizard).to branch_from(:nationality).to(:review).when(nationality: 'british')
       end
     end
 
     context 'for non-UK with right to work' do
       let(:nationalities) { 'french' }
-
       it 'branches to right_to_work_or_study from nationality' do
-        expect(wizard).to branch_to(:right_to_work_or_study).from(:nationality)
+        expect(wizard).to branch_from(:nationality).to(:right_to_work_or_study).when(nationality: 'french')
       end
     end
 
     context 'when actual next step is different' do
       let(:nationalities) { 'french' }
-
       it 'fails with correct details' do
         expect {
-          expect(wizard).to branch_to(:review).from(:nationality)
-        }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Expected branch from :nationality to: :review/)
+          expect(wizard).to branch_from(:nationality).to(:review).when(nationality: 'french')
+        }.to raise_error(RSpec::Expectations::ExpectationNotMetError,
+                         /Expected to branch from :nationality to: :review/)
       end
     end
   end
 
-  describe 'integration smoke tests' do
-    let(:steps_data) do
-      {
-        first_name: 'Jean',
-        last_name: 'Dupont',
-        date_of_birth: '2000-01-01',
-        nationalities: 'french',
-        right_to_work_or_study: 'yes',
-        visa_type: 'work',
-        visa_expiry: '2026-12-31',
-        status: 'settled',
-      }
-    end
+  describe 'attribute presence and value in state_store' do
+    it 'matches attributes and values' do
+      state_store.write(first_name: 'Graham', last_name: 'Lee')
+      expect(state_store).to have_step_attribute(:first_name)
+      expect(state_store).to have_step_attribute(:first_name).with_value('Graham')
 
-    let(:current_step) { :review }
-
-    it 'allows full positive path' do
-      expect(wizard).to be_at_step(:review)
-      expect(:name_and_date_of_birth).to be_saved.in(wizard)
-      expect(wizard).to have_in_flow(:review)
-      expect(wizard).to be_valid_to(:review)
-      expect(:review).to be_valid_step.in(wizard)
+      expect {
+        expect(state_store).to have_step_attribute(:undefined_method).with_value('Graham')
+      }.to raise_error(
+        RSpec::Expectations::ExpectationNotMetError,
+        /Expected :undefined_method to be "Graham", but got: nil/,
+      )
     end
   end
 end
