@@ -203,6 +203,99 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
     end
   end
 
+  describe '#resolve_step' do
+    let(:repository) { DfE::Wizard::Repository::InMemory.new }
+    let(:state_store) { StateStores::PersonalInformation.new(repository: repository) }
+    let(:url_helpers) { Rails.application.routes.url_helpers }
+
+    subject(:wizard) do
+      PersonalInformationWizard.new(
+        current_step: :nationality,
+        state_store:,
+      )
+    end
+
+    describe 'resolves step to correct path' do
+      it 'matches when step resolves to expected path' do
+        expect(wizard).to resolve_step(:nationality)
+          .to(url_helpers.personal_information_nationality_path)
+      end
+
+      it 'fails when step does not resolve to expected path' do
+        expect {
+          expect(wizard).to resolve_step(:nationality)
+            .to('/wrong-path')
+        }.to raise_error(RSpec::Expectations::ExpectationNotMetError, /Expected step :nationality to resolve to/)
+      end
+
+      it 'requires .to() chain' do
+        expect {
+          expect(wizard).to resolve_step(:nationality)
+        }.to raise_error(ArgumentError, /Must specify .to\(path\)/)
+      end
+
+      it 'resolves multiple steps correctly' do
+        expect(wizard).to resolve_step(:name_and_date_of_birth)
+          .to(url_helpers.personal_information_name_and_date_of_birth_path)
+        expect(wizard).to resolve_step(:nationality)
+          .to(url_helpers.personal_information_nationality_path)
+        expect(wizard).to resolve_step(:review)
+          .to(url_helpers.personal_information_review_path)
+      end
+    end
+
+    describe 'with different route strategies' do
+      context 'using NamedRoutes strategy' do
+        it 'resolves steps using named route convention' do
+          expect(wizard).to resolve_step(:nationality)
+            .to(url_helpers.personal_information_nationality_path)
+        end
+      end
+
+      context 'with string paths' do
+        it 'matches string path directly' do
+          actual_path = wizard.resolve_step_path(:nationality)
+          expect(wizard).to resolve_step(:nationality).to(actual_path)
+        end
+      end
+    end
+
+    describe 'failure messages' do
+      it 'includes step id in failure message' do
+        expect {
+          expect(wizard).to resolve_step(:nationality).to('/wrong')
+        }.to raise_error(/step :nationality/)
+      end
+
+      it 'includes expected and actual paths in failure message' do
+        expected = '/expected-path'
+        actual = wizard.resolve_step_path(:nationality)
+
+        expect {
+          expect(wizard).to resolve_step(:nationality).to(expected)
+        }.to raise_error(
+          /Expected step :nationality to resolve to: "#{expected}"\nGot: "#{actual}"/,
+        )
+      end
+
+      it 'includes route strategy class name in failure message' do
+        expect {
+          expect(wizard).to resolve_step(:nationality).to('/wrong')
+        }.to raise_error(/Route strategy:/)
+      end
+    end
+
+    describe 'consistency across multiple calls' do
+      it 'resolves the same step to the same path consistently' do
+        path_one = wizard.resolve_step_path(:nationality)
+        path_two = wizard.resolve_step_path(:nationality)
+
+        expect(wizard).to resolve_step(:nationality).to(path_one)
+        expect(wizard).to resolve_step(:nationality).to(path_two)
+      end
+    end
+  end
+
   describe 'attribute presence and value in state_store' do
     it 'matches attributes and values' do
       state_store.write(first_name: 'Graham', last_name: 'Lee')

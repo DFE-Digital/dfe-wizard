@@ -84,6 +84,36 @@ module DfE
           end
         end
 
+        # Matcher for step route resolution
+        #
+        # Tests that a step resolves to the expected URL/path using the route strategy.
+        #
+        # @example
+        #   expect(wizard).to resolve_step(:nationality).to(url_helpers.personal_information_nationality_path)
+        #   expect(wizard).to resolve_step(:review).to('/personal-information/review')
+        matcher :resolve_step do |step_id|
+          chain :to do |expected_path|
+            @expected_path = expected_path
+          end
+
+          match do |wizard|
+            raise ArgumentError, 'Must specify .to(path)' unless @expected_path
+
+            wizard.resolve_step_path(step_id) == @expected_path
+          end
+
+          failure_message do |wizard|
+            actual = wizard.resolve_step_path(step_id)
+            <<~MSG
+              Expected step #{step_id.inspect} to resolve to: #{@expected_path.inspect}
+              Got: #{actual.inspect}
+
+              Route strategy: #{wizard.route_strategy.class.name}
+              #{wizard_inspect(wizard)}
+            MSG
+          end
+        end
+
         # STEP SYMBOL MATCHERS
 
         # Matcher for next step symbol
