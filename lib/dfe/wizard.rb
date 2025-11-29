@@ -259,11 +259,11 @@ module DfE
 
     # The current step being displayed
     # @return [Symbol, nil]
-    attr_reader :current_step_name
+    attr_accessor :current_step_name
 
     # The state store instance
     # @return [DfE::Wizard::StateStore::Base]
-    attr_reader :state_store
+    attr_accessor :state_store
 
     # @!endgroup
     # @!group Extension Points

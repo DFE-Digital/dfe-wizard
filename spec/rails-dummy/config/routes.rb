@@ -69,7 +69,8 @@ Rails.application.routes.draw do
     get  '/working-pattern', to: 'working_pattern#new', as: :working_pattern
     post '/working-pattern', to: 'working_pattern#create'
 
-    get  '/independent-school-appropriate-body', to: 'independent_school_appropriate_body#new', as: :independent_school_appropriate_body
+    get  '/independent-school-appropriate-body', to: 'independent_school_appropriate_body#new',
+                                                 as: :independent_school_appropriate_body
     post '/independent-school-appropriate-body', to: 'independent_school_appropriate_body#create'
 
     get  '/state-school-appropriate-body', to: 'state_school_appropriate_body#new', as: :state_school_appropriate_body
