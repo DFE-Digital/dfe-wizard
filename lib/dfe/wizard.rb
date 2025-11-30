@@ -116,7 +116,16 @@ module DfE
       # @api public
       autoload :Validation, 'dfe/wizard/core/validation'
     end
+    # @!endgroup
 
+    # @!group Default operations in every step of a wizard
+    #
+    # Provide default operations
+    #
+    module Operations
+      autoload :Validate, 'dfe/wizard/operations/validate'
+      autoload :Persist, 'dfe/wizard/operations/persist'
+    end
     # @!endgroup
 
     # @!group State Persistence
@@ -134,7 +143,15 @@ module DfE
     end
     # @!endgroup
 
+    # @!group Step Operators
+    #
+    # Step operator to handle action config at any step of the wizard
+    #
+    module StepsOperator
+      autoload :Builder, 'dfe/wizard/steps_operator/builder'
+    end
     # @!endgroup
+
     # @!group Step Processors
 
     # Step processors handle wizard flow and navigation
