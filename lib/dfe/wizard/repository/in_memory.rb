@@ -82,7 +82,12 @@ module DfE
           @data = hash.deep_dup
         end
 
-        def execute_operation(operation_class, step)
+        # Execute operation in repository context
+        #
+        # @param operation_class [Class] Operation to instantiate
+        # @param step [Object] Step instance
+        # @return [Hash] Operation result
+        def execute_operation(operation_class:, step:)
           operation_class.new(repository: self, step:).execute
         end
 

@@ -582,4 +582,49 @@ RSpec.describe DfE::Wizard::Core::StateStore do
       end
     end
   end
+
+  describe '#[]' do
+    it 'retrieves value by key' do
+      state_store.write({ first_name: 'John' })
+
+      expect(state_store[:first_name]).to eq('John')
+    end
+
+    it 'returns nil for missing key' do
+      expect(state_store[:missing]).to be_nil
+    end
+  end
+
+  describe '#execute_operation' do
+    class TestOp
+      def initialize(repository:, step:)
+        @repository = repository
+        @step = step
+      end
+
+      def execute
+        @repository.write(executed: true)
+        { success: true }
+      end
+    end
+
+    class TestStep
+      include DfE::Wizard::Step
+      attribute :name
+    end
+
+    it 'executes operation and returns result' do
+      step = TestStep.new(name: 'test')
+      result = state_store.execute_operation(operation_class: TestOp, step:)
+
+      expect(result[:success]).to be true
+    end
+
+    it 'operation can write to repository' do
+      step = TestStep.new(name: 'test')
+      state_store.execute_operation(operation_class: TestOp, step:)
+
+      expect(state_store.read).to include(executed: true)
+    end
+  end
 end

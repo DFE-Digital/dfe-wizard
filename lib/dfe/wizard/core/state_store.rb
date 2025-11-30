@@ -35,6 +35,23 @@ module DfE
           @step_definitions = step_definitions
         end
 
+        # Retrieve value by key
+        #
+        # @param key [Symbol] Data key
+        # @return [Object] Stored value
+        def [](key)
+          read[key]
+        end
+
+        # Execute operation on current context
+        #
+        # @param operation_class [Class] Operation to run
+        # @param step [DfE::Wizard::Step] Step instance
+        # @return [Hash] Operation result { success:, errors: }
+        def execute_operation(operation_class:, step:)
+          @repository.execute_operation(operation_class:, step:)
+        end
+
         # @!method read
         #   Reads the current state from the repository.
         #
