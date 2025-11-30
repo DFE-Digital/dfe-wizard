@@ -174,3 +174,7 @@ Style/FetchEnvVar:
 
 Style/OpenStructUse:
   Enabled: false
+
+Style/MultilineBlockChain:
+  Exclude:
+    - 'spec/**/*'
