@@ -175,7 +175,7 @@ RSpec.describe DfE::Wizard::Operations::Persist do
     end
 
     it 'works with repository.execute_operation' do
-      result = repository.execute_operation(described_class, step)
+      result = repository.execute_operation(operation_class: described_class, step:)
 
       expect(result[:success]).to be true
       expect(repository.read).to include(first_name: 'Alice')
