@@ -18,3 +18,10 @@ spec/rails-dummy/node_modules/
 /spec/rails-dummy/app/assets/builds/*
 !/spec/rails-dummy/app/assets/builds/.keep
 spec/rails-dummy/docs/*
+
+# SQlite
+*.sqlite3
+*.sqlite3-*
+db/test.sqlite3
+spec/rails-dummy/db/*sqlite3
+spec/rails-dummy/db/test.sqlite3

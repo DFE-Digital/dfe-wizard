@@ -1,5 +1,3 @@
-# lib/dfe/wizard/route_strategy/dynamic_routes.rb
-
 module DfE
   module Wizard
     module RouteStrategy
