@@ -1,5 +1,3 @@
-# lib/dfe/wizard/repository/model.rb
-
 module DfE
   module Wizard
     module Repository

@@ -116,6 +116,51 @@ module DfE
 
         # STEP SYMBOL MATCHERS
 
+        # Matcher for root step check
+        # Use when to write to state store any attribute important to show
+        # different root steps depending on the scenario
+        #
+        # @example
+        #   expect(wizard).to have_root_step(:name_and_date_of_birth)
+        #
+        #   # Conditional root
+        #   expect(wizard).to have_root_step(
+        #     :add_a_level_to_list
+        #   ).when(a_level_subjects: [{some_a_level: 'A'}])
+        #
+        #   # Conditional root
+        #   expect(wizard).to have_root_step(
+        #     :what_a_level_is_required
+        #   ).when(a_level_subjects: [])
+        #
+        matcher :have_root_step do |expected_root|
+          match do |wizard|
+            wizard.state_store.write(@state_data) if @state_data.present?
+
+            actual_root = wizard.steps_processor.root_node
+
+            actual_root == expected_root
+          end
+
+          chain :when do |state_data|
+            @state_data = state_data
+          end
+
+          failure_message do |wizard|
+            actual_root = wizard.steps_processor.root_node
+            "expected wizard to have root node #{expected_root.inspect}, but got #{actual_root.inspect}"
+          end
+
+          failure_message_when_negated do |wizard|
+            wizard.steps_processor.root_node
+            "expected wizard not to have root node #{expected_root.inspect}, but it does"
+          end
+
+          description do
+            "have root node #{expected_root.inspect}"
+          end
+        end
+
         # Matcher for next step symbol
         #
         # @example

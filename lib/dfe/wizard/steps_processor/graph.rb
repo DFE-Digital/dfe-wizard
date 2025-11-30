@@ -21,8 +21,7 @@ module DfE
                     :edges,
                     :conditional_edges,
                     :custom_branching_edges,
-                    :multiple_conditional_edges,
-                    :root_node
+                    :multiple_conditional_edges
 
         # Builds a wizard graph, yielding the instance so the caller can add nodes/edges.
         #
@@ -55,6 +54,7 @@ module DfE
           @custom_branching_edges = []
           @multiple_conditional_edges = []
           @root_node = nil
+          @conditional_root = nil
         end
 
         # Adds a step node to the graph.
@@ -62,6 +62,43 @@ module DfE
         # @param klass [Class]
         def add_node(node_id, klass)
           @nodes[node_id] = Node.new(id: node_id, klass: klass)
+        end
+
+        def conditional_root(method_name = nil, &block)
+          if @root_node.present? || @conditional_root_block.present? || @conditional_root_method.present?
+            raise ArgumentError,
+                  'Cannot set both root and conditional_root. Use one or the other.'
+          end
+
+          if method_name.present? && block_given?
+            raise ArgumentError,
+                  'Provide either a method name (symbol) or a block, not both'
+          end
+
+          unless method_name.present? || block_given?
+            raise ArgumentError,
+                  'conditional_root requires a block or method name'
+          end
+
+          if method_name.present?
+            unless @wizard.respond_to?(method_name, include_private: true)
+              raise ArgumentError,
+                    "method :#{method_name} not found on wizard #{@wizard.class.name}. " \
+                    'Create the method or use a block instead.'
+            end
+            @conditional_root_method = method_name
+          end
+
+          if block_given?
+            @conditional_root_block = block
+          end
+        end
+
+        def root_node
+          return @root_node if @root_node.present?
+          return @conditional_root_block.call(@wizard.state_store) if @conditional_root_block.present?
+
+          @wizard.method(@conditional_root_method).call if @conditional_root_method.present?
         end
 
         def step_definitions
@@ -301,8 +338,7 @@ module DfE
         #
         def path_traversal(target_step = nil)
           target_step ||= @wizard.current_step_name
-
-          current = @root_node
+          current = root_node
 
           steps = [current]
 

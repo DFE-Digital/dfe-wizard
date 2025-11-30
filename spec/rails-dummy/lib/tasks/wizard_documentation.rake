@@ -1,6 +1,3 @@
-# lib/tasks/wizard_documentation.rake
-# frozen_string_literal: true
-
 namespace :wizard do
   namespace :docs do
     # Generate documentation for all wizards
@@ -13,6 +10,7 @@ namespace :wizard do
     #
     # @example Generate specific wizard
     #   WIZARD=PersonalInformationWizard rake wizard:docs:generate
+    desc 'Generate documentation for all wizards'
     task generate: :environment do
       generator = WizardDocumentationGenerator.new
       generator.generate_all
@@ -22,6 +20,7 @@ namespace :wizard do
     #
     # @example
     #   rake wizard:docs:list
+    desc 'List all discovered wizards'
     task list: :environment do
       loader = WizardDocumentationLoader.new
       loader.print_list
@@ -31,6 +30,7 @@ namespace :wizard do
     #
     # @example
     #   rake wizard:docs:clean
+    desc 'Clean generated documentation'
     task clean: :environment do
       cleaner = WizardDocumentationCleaner.new
       cleaner.clean
@@ -85,7 +85,6 @@ class WizardDocumentationGenerator
     puts "  🧙 #{wizard_class.name}"
 
     wizard = instantiate_wizard(wizard_class)
-    return unless wizard
 
     THEMES.each do |theme|
       generate_for_theme(wizard, wizard_class, theme)
@@ -103,9 +102,7 @@ class WizardDocumentationGenerator
     FileUtils.mkdir_p(theme_dir)
 
     begin
-      return unless wizard.respond_to?(:to_doc)
-
-      doc = wizard.to_doc(theme: theme)
+      doc = wizard.to_doc(theme:)
       svg_path = File.join(theme_dir, "#{safe_name}.svg")
       png_path = File.join(theme_dir, "#{safe_name}.png")
 
@@ -123,20 +120,7 @@ class WizardDocumentationGenerator
   # @param wizard_class [Class]
   # @return [Object, nil]
   def instantiate_wizard(wizard_class)
-    # Try with no arguments
-    begin
-      return wizard_class.new
-    rescue ArgumentError
-      # Continue
-    end
-
-    begin
-      # Try with state_store
-      state_store = Object.new
-      wizard_class.new(current_step: :start, state_store: state_store)
-    rescue StandardError
-      # Continue
-    end
+    wizard_class.new(current_step: :start, state_store: OpenStruct.new(repository: OpenStruct.new))
   end
 end
 
@@ -192,12 +176,14 @@ class WizardDocumentationLoader
   # @return [Array<Class>]
   def find_wizard_classes
     results = Object.constants.select do |const_name|
-      const_name.to_s.downcase.include? 'wizard'
+      next unless const_name.to_s.downcase.include? 'wizard'
+
+      klass = Object.const_get(const_name)
+
+      klass.respond_to?(:included_modules) && klass.included_modules.include?(DfE::Wizard)
     end
 
-    results.map { |const_name| Object.const_get(const_name) }
-  rescue StandardError
-    []
+    results.compact.map { |const_name| Object.const_get(const_name) }
   end
 end
 
