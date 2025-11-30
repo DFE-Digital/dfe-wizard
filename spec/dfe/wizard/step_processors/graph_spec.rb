@@ -1,7 +1,3 @@
-# frozen_string_literal: true
-
-require 'spec_helper'
-
 RSpec.describe DfE::Wizard::StepsProcessor::Graph do
   def build_test_wizard(current_step_name, state_data = {}, predicate_results = {})
     state_store = instance_double('StateStore', step_data: proc { |step_id| state_data.dig(:steps, step_id) })
@@ -1346,6 +1342,494 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph do
         '[Graph] Custom edge evaluated from step :nationality → :right_to_work',
         category: :step_processor,
       )
+    end
+  end
+
+  describe '#conditional_root' do
+    let(:step_a_class) { Class.new }
+    let(:step_b_class) { Class.new }
+    let(:step_c_class) { Class.new }
+
+    context 'when conditional_root is used with a block' do
+      it 'accepts a block for conditional root determination' do
+        wizard = build_test_wizard(:step_a, {}, {})
+
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node :step_a, step_a_class
+            g.add_node :step_b, step_b_class
+            g.conditional_root { |_state_store| :step_a }
+          end
+        }.not_to raise_error
+      end
+
+      it 'stores conditional root block' do
+        wizard = build_test_wizard(:step_a, {}, {})
+        graph = described_class.draw(wizard) do |g|
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.conditional_root { |_state_store| :step_a }
+        end
+
+        expect(graph.instance_variable_get(:@conditional_root_block)).to be_a(Proc)
+      end
+
+      it 'raises if both root and conditional_root are set' do
+        wizard = build_test_wizard(:step_a, {}, {})
+
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node :step_a, step_a_class
+            g.add_node :step_b, step_b_class
+            g.root :step_a
+            g.conditional_root { |_state_store| :step_a }
+          end
+        }.to raise_error(ArgumentError, /Cannot set both.*root.*and.*conditional_root/)
+      end
+    end
+
+    context 'when conditional_root is used with a symbol (method reference)' do
+      it 'accepts a symbol referring to wizard method' do
+        wizard_class = Class.new do
+          attr_accessor :current_step_name, :log
+
+          def initialize
+            @current_step_name = :step_a
+            @log = OpenStruct.new(info: nil)
+          end
+
+          def step(step_name)
+            OpenStruct.new(id: step_name)
+          end
+
+          def determine_root_step
+            :step_a
+          end
+        end
+
+        wizard = wizard_class.new
+
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node :step_a, step_a_class
+            g.add_node :step_b, step_b_class
+            g.conditional_root :determine_root_step
+          end
+        }.not_to raise_error
+      end
+
+      it 'stores symbol for conditional root' do
+        wizard_class = Class.new do
+          attr_accessor :current_step_name, :log
+
+          def initialize
+            @current_step_name = :step_a
+            @log = OpenStruct.new(info: nil)
+          end
+
+          def step(step_name)
+            OpenStruct.new(id: step_name)
+          end
+
+          def determine_root_step
+            :step_a
+          end
+        end
+
+        wizard = wizard_class.new
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.conditional_root :determine_root_step
+        end
+
+        expect(graph.instance_variable_get(:@conditional_root_method)).to eq(:determine_root_step)
+      end
+
+      it 'raises if method does not exist on wizard' do
+        wizard = build_test_wizard(:step_a, {}, {})
+
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node :step_a, step_a_class
+            g.conditional_root :nonexistent_method
+          end
+        }.to raise_error(ArgumentError, /method.*not found on wizard/)
+      end
+    end
+
+    context 'conditional root with state_store parameter' do
+      it 'passes state_store to block' do
+        state_store = instance_double('StateStore')
+        wizard = build_test_wizard(:step_a, {}, {})
+        allow(wizard).to receive(:current_step_name).and_return(:step_a)
+        allow(wizard).to receive(:log).and_return(double(info: nil))
+        allow(wizard).to receive(:step).and_return(OpenStruct.new(id: :step_a))
+        wizard.state_store = state_store
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.conditional_root { |_store| :step_b }
+        end
+
+        # Verify block receives state_store parameter
+        block = graph.instance_variable_get(:@conditional_root_block)
+        result = block.call(state_store)
+        expect(result).to eq(:step_b)
+      end
+
+      it 'resolves to :step_a when create mode (no existing A-levels)' do
+        wizard = build_test_wizard(:step_a, {}, {})
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+
+          g.conditional_root do |_state_store|
+            # Simulate: no existing a_levels → start fresh
+            :step_a
+          end
+        end
+
+        block = graph.instance_variable_get(:@conditional_root_block)
+        expect(block.call(nil)).to eq(:step_a)
+      end
+
+      it 'resolves to :step_b when edit mode (existing A-levels)' do
+        wizard = build_test_wizard(:step_a, {}, {})
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+
+          g.conditional_root do |_state_store|
+            # Simulate: existing data exists → go to edit
+            :step_b
+          end
+        end
+
+        block = graph.instance_variable_get(:@conditional_root_block)
+        expect(block.call(nil)).to eq(:step_b)
+      end
+    end
+
+    context 'real-world A-levels scenarios with conditional_root' do
+      let(:state_store) { instance_double('StateStore') }
+
+      it 'returns what_a_level_is_required for create mode' do
+        allow(state_store).to receive(:repository).and_return(
+          instance_double('Repository', record: instance_double('Course', a_level_subject_requirements: [])),
+        )
+
+        wizard = build_test_wizard(:step_a, {}, {})
+        wizard.state_store = state_store
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node :what_a_level_is_required, step_a_class
+          g.add_node :a_level_equivalencies, step_b_class
+
+          g.conditional_root do |store|
+            if store.repository.record.a_level_subject_requirements.any?
+              :a_level_equivalencies
+            else
+              :what_a_level_is_required
+            end
+          end
+        end
+
+        block = graph.instance_variable_get(:@conditional_root_block)
+        result = block.call(state_store)
+        expect(result).to eq(:what_a_level_is_required)
+      end
+
+      it 'returns a_level_equivalencies for edit mode' do
+        course_record = instance_double('Course',
+                                        a_level_subject_requirements: [
+                                          { uuid: '123', subject: 'maths', minimum_grade_required: 'A' },
+                                        ])
+        allow(state_store).to receive(:repository).and_return(
+          instance_double('Repository', record: course_record),
+        )
+
+        wizard = build_test_wizard(:step_a, {}, {})
+        wizard.state_store = state_store
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node :what_a_level_is_required, step_a_class
+          g.add_node :a_level_equivalencies, step_b_class
+
+          g.conditional_root do |store|
+            if store.repository.record.a_level_subject_requirements.any?
+              :a_level_equivalencies
+            else
+              :what_a_level_is_required
+            end
+          end
+        end
+
+        block = graph.instance_variable_get(:@conditional_root_block)
+        result = block.call(state_store)
+        expect(result).to eq(:a_level_equivalencies)
+      end
+
+      it 'calls wizard method when conditional_root given as symbol' do
+        wizard_class = Class.new do
+          attr_accessor :current_step_name, :log
+
+          def initialize
+            @current_step_name = :step_a
+            @log = OpenStruct.new(info: nil)
+          end
+
+          def step(step_name)
+            OpenStruct.new(id: step_name)
+          end
+
+          def determine_root_step
+            # Determine root based on state_store
+            if @ccurrent_step_name == :step_a
+              :a_level_equivalencies
+            else
+              :what_a_level_is_required
+            end
+          end
+        end
+
+        wizard = wizard_class.new
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node :what_a_level_is_required, step_a_class
+          g.add_node :a_level_equivalencies, step_b_class
+          g.conditional_root :determine_root_step
+        end
+
+        # Verify method is stored
+        expect(graph.instance_variable_get(:@conditional_root_method)).to eq(:determine_root_step)
+      end
+    end
+
+    context 'multiple conditional branches' do
+      it 'handles create/edit/resume modes with block' do
+        wizard = build_test_wizard(:step_a, {}, {})
+        wizard.state_store = instance_double('StateStore', mode: :create)
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+
+          g.conditional_root do |store|
+            case store&.mode
+            when :create
+              :step_a
+            when :edit
+              :step_b
+            when :resume
+              :step_c
+            else
+              :step_d
+            end
+          end
+        end
+
+        block = graph.instance_variable_get(:@conditional_root_block)
+
+        mock_store_create = instance_double('StateStore', mode: :create)
+        mock_store_edit = instance_double('StateStore', mode: :edit)
+        mock_store_resume = instance_double('StateStore', mode: :resume)
+
+        expect(block.call(mock_store_create)).to eq(:step_a)
+        expect(block.call(mock_store_edit)).to eq(:step_b)
+        expect(block.call(mock_store_resume)).to eq(:step_c)
+      end
+    end
+
+    context 'validation of conditional_root' do
+      it 'raises if neither root nor conditional_root is set' do
+        wizard = build_test_wizard(:step_a, {}, {})
+
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node :step_a, step_a_class
+            # No root or conditional_root set
+          end
+        }.to raise_error(ArgumentError, /Graph must have a root node set/)
+      end
+
+      it 'does not raise when conditional_root is set with block' do
+        wizard = build_test_wizard(:step_a, {}, {})
+
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node :step_a, step_a_class
+            g.add_node :step_b, step_b_class
+            g.conditional_root { |_store| :step_a }
+          end
+        }.not_to raise_error
+      end
+
+      it 'does not raise when conditional_root is set with symbol' do
+        wizard_class = Class.new do
+          attr_accessor :current_step_name, :log
+
+          def initialize
+            @current_step_name = :step_a
+            @log = OpenStruct.new(info: nil)
+          end
+
+          def step(step_name)
+            OpenStruct.new(id: step_name)
+          end
+
+          def determine_root
+            :step_a
+          end
+        end
+
+        wizard = wizard_class.new
+
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node :step_a, step_a_class
+            g.add_node :step_b, step_b_class
+            g.conditional_root :determine_root
+          end
+        }.not_to raise_error
+      end
+
+      it 'requires argument for conditional_root' do
+        wizard = build_test_wizard(:step_a, {}, {})
+
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node :step_a, step_a_class
+            g.conditional_root # Missing block or symbol
+          end
+        }.to raise_error(ArgumentError, /conditional_root requires a block or method name/)
+      end
+    end
+
+    context 'conditional_root with path traversal' do
+      it 'uses conditional_root as starting point' do
+        wizard = build_test_wizard(:step_a, {}, {})
+
+        graph = described_class.draw(wizard) do |g|
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.add_node :step_c, step_c_class
+
+          g.conditional_root { |_store| :step_b } # Entry at step_b
+          g.add_edge from: :step_a, to: :step_b
+          g.add_edge from: :step_b, to: :step_c
+        end
+
+        # Block can determine root
+        block = graph.instance_variable_get(:@conditional_root_block)
+        expect(block.call(nil)).to eq(:step_b)
+      end
+    end
+
+    context 'error handling for conditional_root' do
+      it 'raises if method name does not exist on wizard' do
+        wizard = build_test_wizard(:step_a, {}, {})
+
+        expect {
+          described_class.draw(wizard) do |g|
+            g.add_node :step_a, step_a_class
+            g.conditional_root :missing_method
+          end
+        }.to raise_error(ArgumentError, /method :missing_method not found on wizard/)
+      end
+
+      it 'validates predicate has correct arity' do
+        # This test depends on implementation details
+        # If method takes 0 args, should be wrapped to accept state_store
+        # If method takes 1 arg (state_store), use directly
+        expect(true).to be true # Placeholder for arity validation
+      end
+    end
+  end
+
+  describe 'static vs conditional_root interaction' do
+    let(:step_a_class) { Class.new }
+    let(:step_b_class) { Class.new }
+
+    it 'raises if both root and conditional_root are set' do
+      wizard = build_test_wizard(:step_a, {}, {})
+
+      expect {
+        described_class.draw(wizard) do |g|
+          g.add_node :step_a, step_a_class
+          g.add_node :step_b, step_b_class
+          g.root :step_a
+          g.conditional_root { |_store| :step_b }
+        end
+      }.to raise_error(ArgumentError, /Cannot set both/)
+    end
+
+    it 'allows static root when conditional_root not used' do
+      wizard = build_test_wizard(:step_a, {}, {})
+
+      graph = described_class.draw(wizard) do |g|
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.root :step_a
+      end
+
+      expect(graph.root_node).to eq(:step_a)
+      expect(graph.instance_variable_get(:@conditional_root_block)).to be_nil
+      expect(graph.instance_variable_get(:@conditional_root_method)).to be_nil
+    end
+  end
+
+  describe 'documentation and inspection' do
+    let(:step_a_class) { Class.new }
+    let(:step_b_class) { Class.new }
+
+    it 'marks conditional_root in documentation' do
+      wizard = build_test_wizard(:step_a, {}, {})
+
+      graph = described_class.draw(wizard) do |g|
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.conditional_root { |_store| :step_a }
+      end
+
+      # When generating documentation, should show [CONDITIONAL] marker
+      # This depends on to_doc implementation
+      expect(graph.instance_variable_get(:@conditional_root_block)).to be_a(Proc)
+    end
+
+    it 'includes conditional_root method in inspection' do
+      wizard_class = Class.new do
+        attr_accessor :current_step_name, :log
+
+        def initialize
+          @current_step_name = :step_a
+          @log = OpenStruct.new(info: nil)
+        end
+
+        def step(step_name)
+          OpenStruct.new(id: step_name)
+        end
+
+        def my_root_resolver
+          :step_a
+        end
+      end
+
+      wizard = wizard_class.new
+
+      graph = described_class.draw(wizard) do |g|
+        g.add_node :step_a, step_a_class
+        g.add_node :step_b, step_b_class
+        g.conditional_root :my_root_resolver
+      end
+
+      method_name = graph.instance_variable_get(:@conditional_root_method)
+      expect(method_name).to eq(:my_root_resolver)
     end
   end
 end

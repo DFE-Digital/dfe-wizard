@@ -14,6 +14,20 @@ ActiveRecord::Schema[7.2].define(version: 2025_11_27_144308) do
   # These are extensions that must be enabled in order to support this database
   enable_extension 'plpgsql'
 
+  create_table 'courses', force: :cascade do |t|
+    t.string 'course_code', null: false
+    t.string 'provider_code', null: false
+    t.integer 'recruitment_cycle_year', null: false
+    t.json 'a_level_subject_requirements', default: []
+    t.boolean 'accept_pending_a_level'
+    t.boolean 'accept_a_level_equivalency'
+    t.text 'additional_a_level_equivalencies'
+    t.datetime 'created_at', null: false
+    t.datetime 'updated_at', null: false
+    t.index %w[provider_code recruitment_cycle_year course_code], name: 'index_courses_on_provider_cycle_code',
+                                                                  unique: true
+  end
+
   create_table 'register_ect_wizard_records', force: :cascade do |t|
     t.string 'trn'
     t.string 'trs_first_name'

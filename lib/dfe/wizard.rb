@@ -90,6 +90,10 @@ module DfE
       # @api public
       autoload :Navigation, 'dfe/wizard/core/navigation'
 
+      # Virtual step for redirecting steps
+      #
+      autoload :Redirect, 'dfe/wizard/core/redirect'
+
       # All state management under wizard
       #
       # @api public

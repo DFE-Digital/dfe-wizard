@@ -23,7 +23,7 @@ module DfE
       #   repo = DfE::Wizard::Repository::Redis.new(
       #     redis: Redis.new,
       #     key: "wizards:user_123",
-      #     state_key: "assign_mentor"
+      #     state_key: params[:state_key] || SecureRandom.uuid
       #   )
       class Redis
         attr_reader :redis, :key, :state_key, :expiration

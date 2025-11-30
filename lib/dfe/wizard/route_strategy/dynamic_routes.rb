@@ -46,10 +46,10 @@ module DfE
         # @example With URL helpers
         #   DynamicRoutes.new(
         #     state_store: state_store,
-        #     path_builder: ->(step, state_key, opts) {
+        #     path_builder: ->(step_id, state_store, opts) {
         #       Rails.application.routes.url_helpers.some_wizard_step_path(
-        #         state_key: state_key,
-        #         step_id: step,
+        #         state_key: state_store.state_key, # delegates state key to repository
+        #         step_id:,
         #         **opts
         #       )
         #     }
@@ -71,7 +71,7 @@ module DfE
         #   strategy.resolve(step_id: :email, options: {})
         #   # => "/wizards/abc-123-def/email"
         def resolve(step_id:, options: {})
-          @path_builder.call(step_id, state_key, options)
+          @path_builder.call(step_id, state_store, options)
         end
 
         # Get state key from state store

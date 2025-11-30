@@ -106,8 +106,6 @@ module DfE
         def handle_back_in_check_your_answers(target_step, origin_step)
           # If at the step user originally clicked "Change" on, return to review
           target_step if current_step_name.to_s == origin_step.to_s
-
-          # previous_visited_step_in_path(target_step)
         end
 
         # Find previous visited step in path
