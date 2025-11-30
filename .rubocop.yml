@@ -29,6 +29,8 @@ Lint/MissingSuper:
 
 Lint/ConstantDefinitionInBlock:
   Enabled: true
+  Exclude:
+    - 'spec/**/*'
 
 Lint/SymbolConversion:
   Enabled: true

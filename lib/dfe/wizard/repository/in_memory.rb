@@ -82,6 +82,10 @@ module DfE
           @data = hash.deep_dup
         end
 
+        def execute_operation(operation_class, step)
+          operation_class.new(repository: self, step:).execute
+        end
+
         # Clear all stored data
         #
         # Removes everything from the repository. Useful for starting fresh
