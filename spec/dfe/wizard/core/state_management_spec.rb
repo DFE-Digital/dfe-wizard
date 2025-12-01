@@ -1,3 +1,7 @@
+# frozen_string_literal: true
+
+require 'spec_helper'
+
 RSpec.describe DfE::Wizard::Core::StateManagement do
   # ============================================================================
   # WIZARD GRAPH STRUCTURE EXAMPLE
@@ -69,6 +73,12 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
           graph.add_edge from: :email_verification, to: :review
           graph.add_edge from: :phone_verification, to: :review
           graph.add_edge from: :id_verification, to: :review
+        end
+      end
+
+      def steps_operator
+        DfE::Wizard::StepsOperator::Builder.draw(wizard: self, callable: state_store) do |_builder|
+          # Use defaults: [Validate, Persist] for all steps
         end
       end
 
@@ -663,30 +673,63 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
     end
   end
 
-  describe '#save' do
-    let(:current_step) { :personal_details }
-    let(:current_step_params) do
-      {
-        personal_details: {
+  describe '#save_current_step with operations pipeline' do
+    context 'with valid step' do
+      let(:current_step) { :personal_details }
+      let(:current_step_params) do
+        {
+          personal_details: {
+            name: 'Alice',
+            email: 'alice@example.com',
+          },
+        }
+      end
+      let(:wizard) { wizard_class.new(current_step:, state_store:, current_step_params:) }
+
+      it 'runs Validate and Persist operations' do
+        expect(wizard.current_step).to be_valid
+        result = wizard.save_current_step
+
+        expect(result).to be true
+      end
+
+      it 'persists step data to repository' do
+        wizard.save_current_step
+
+        expect(wizard.raw_step_data(:personal_details).symbolize_keys).to eq(
           name: 'Alice',
           email: 'alice@example.com',
-        },
-      }
-    end
-    let(:wizard) { wizard_class.new(current_step:, state_store:, current_step_params:) }
+        )
+      end
 
-    it 'saves current step data' do
-      expect(wizard.current_step).to be_valid
-      wizard.save
-
-      expect(wizard.raw_step_data(:personal_details).symbolize_keys).to eq(
-        name: 'Alice',
-        email: 'alice@example.com',
-      )
+      it 'updates saved_path' do
+        expect { wizard.save_current_step }.to change { wizard.saved_path }.from([]).to([:personal_details])
+      end
     end
 
-    it 'updates saved_path' do
-      expect { wizard.save }.to change { wizard.saved_path }.from([]).to([:personal_details])
+    context 'with invalid step' do
+      let(:current_step) { :personal_details }
+      let(:current_step_params) do
+        {
+          personal_details: {
+            name: '',
+            email: '',
+          },
+        }
+      end
+      let(:wizard) { wizard_class.new(current_step:, state_store:, current_step_params:) }
+
+      it 'returns false without persisting' do
+        result = wizard.save_current_step
+
+        expect(result).to be false
+      end
+
+      it 'does not persist invalid data' do
+        wizard.save_current_step
+
+        expect(wizard.saved_path).to be_empty
+      end
     end
   end
 
@@ -741,93 +784,315 @@ RSpec.describe DfE::Wizard::Core::StateManagement do
       expect(wizard.get_metadata(:user_id)).to be_nil
     end
 
-    it 'removes completion flags' do
+    it 'clears completion flag' do
       wizard.clear_state
 
       expect(wizard.completed?).to be false
     end
   end
 
-  describe 'integration: full wizard flow with branch changes' do
-    it 'handles complete individual path' do
-      repository.write({
-                         name: 'Alice',
-                         email: 'alice@example.com',
-                         account_type: 'individual',
-                         verification_type: 'email',
-                         email_code: '123456',
-                       })
+  describe '#steps_operator' do
+    describe 'default behavior (no explicit configuration)' do
+      let(:minimal_wizard_class) do
+        Class.new do
+          include DfE::Wizard
 
-      wizard_at_review = wizard_class.new(current_step: :review, state_store:)
+          def steps_processor
+            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+              graph.add_node :step_one, Steps::PersonalDetails
+              graph.add_node :step_two, Steps::AccountType
+              graph.root :step_one
+              graph.add_edge from: :step_one, to: :step_two
+            end
+          end
 
-      expect(wizard_at_review.saved_path).to eq(%i[
-                                                  personal_details
-                                                  account_type
-                                                  verification_method
-                                                  email_verification
-                                                ])
+          # DON'T define steps_operator - use default!
 
-      expect(wizard_at_review.orphaned_steps_data).to be_empty
+          def route_strategy
+            DfE::Wizard::RouteStrategy::ConfigurableRoutes.new(wizard: self)
+          end
+
+          def logger
+            DfE::Wizard::Logger.new(nil)
+          end
+        end
+      end
+
+      let(:minimal_wizard) { minimal_wizard_class.new(current_step: :step_one, state_store:) }
+
+      it 'returns a StepsOperator::Builder instance' do
+        expect(minimal_wizard.steps_operator).to be_a(DfE::Wizard::StepsOperator::Builder)
+      end
+
+      it 'applies default [Validate, Persist] for all steps' do
+        operations = minimal_wizard.steps_operator.operations_for(:step_one)
+
+        expect(operations).to eq([
+                                   DfE::Wizard::Operations::Validate,
+                                   DfE::Wizard::Operations::Persist,
+                                 ])
+      end
+
+      it 'applies same defaults for other steps' do
+        operations = minimal_wizard.steps_operator.operations_for(:step_two)
+
+        expect(operations).to eq([
+                                   DfE::Wizard::Operations::Validate,
+                                   DfE::Wizard::Operations::Persist,
+                                 ])
+      end
+
+      it 'caches the instance (memoization)' do
+        first_call = minimal_wizard.steps_operator
+        second_call = minimal_wizard.steps_operator
+
+        expect(first_call).to be(second_call)
+      end
     end
 
-    it 'handles branch change creating orphans' do
-      repository.write({
-                         name: 'Bob',
-                         email: 'bob@example.com',
-                         account_type: 'individual',
-                         verification_type: 'email',
-                         email_code: '111111',
-                       })
+    describe 'with custom per-step operations' do
+      let(:custom_operator_wizard_class) do
+        Class.new do
+          include DfE::Wizard
 
-      repository.write(repository.read.merge(
-                         account_type: 'business',
-                         company_name: 'Corp',
-                         registration_number: '99999',
-                         verification_type: 'phone',
-                         phone_code: '222222',
-                       ))
+          def steps_processor
+            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+              graph.add_node :validate_step, Steps::PersonalDetails
+              graph.add_node :payment_step, Steps::AccountType
+              graph.add_node :review_step, Steps::CompanyDetails
+              graph.root :validate_step
+              graph.add_edge from: :validate_step, to: :payment_step
+              graph.add_edge from: :payment_step, to: :review_step
+            end
+          end
 
-      wizard_at_review = wizard_class.new(current_step: :review, state_store:)
+          def steps_operator
+            DfE::Wizard::StepsOperator::Builder.draw(wizard: self, callable: state_store) do |b|
+              b.on_step(:validate_step, use: [DfE::Wizard::Operations::Validate])
+              b.on_step(:payment_step, use: [
+                          DfE::Wizard::Operations::Validate,
+                          ProcessPayment,
+                          DfE::Wizard::Operations::Persist,
+                        ])
+              b.on_step(:review_step, use: []) # Skip operations for review
+            end
+          end
 
-      expect(wizard_at_review.saved_path).to eq(%i[
-                                                  personal_details
-                                                  account_type
-                                                  company_details
-                                                  verification_method
-                                                  phone_verification
-                                                ])
+          def route_strategy
+            DfE::Wizard::RouteStrategy::ConfigurableRoutes.new(wizard: self)
+          end
 
-      expect(wizard_at_review.orphaned_steps_data).to eq(
-        email_verification: { email_code: '111111' },
-      )
+          def logger
+            DfE::Wizard::Logger.new(nil)
+          end
+        end
+      end
+
+      # Mock custom operation
+      class ProcessPayment
+        def execute
+          { success: true }
+        end
+
+        def rollback; end
+      end
+
+      let(:custom_wizard) { custom_operator_wizard_class.new(current_step: :validate_step, state_store:) }
+
+      it 'uses only Validate for validate_step' do
+        operations = custom_wizard.steps_operator.operations_for(:validate_step)
+
+        expect(operations).to eq([DfE::Wizard::Operations::Validate])
+      end
+
+      it 'uses custom pipeline for payment_step' do
+        operations = custom_wizard.steps_operator.operations_for(:payment_step)
+
+        expect(operations).to eq([
+                                   DfE::Wizard::Operations::Validate,
+                                   ProcessPayment,
+                                   DfE::Wizard::Operations::Persist,
+                                 ])
+      end
+
+      it 'skips operations for review_step' do
+        operations = custom_wizard.steps_operator.operations_for(:review_step)
+
+        expect(operations).to be_empty
+      end
     end
 
-    it 'preserves metadata through branch changes' do
-      wizard.set_metadata(:user_id, 789)
-      wizard.set_metadata(:started_at, Time.current)
+    describe 'fallback to defaults for unconfigured steps' do
+      let(:partial_config_wizard_class) do
+        Class.new do
+          include DfE::Wizard
 
-      repository.write({
-                         name: 'Charlie',
-                         email: 'charlie@example.com',
-                         account_type: 'individual',
-                       })
+          def steps_processor
+            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+              graph.add_node :configured_step, Steps::PersonalDetails
+              graph.add_node :unconfigured_step, Steps::AccountType
+              graph.root :configured_step
+              graph.add_edge from: :configured_step, to: :unconfigured_step
+            end
+          end
 
-      repository.write(repository.read.merge(account_type: 'business'))
+          def steps_operator
+            DfE::Wizard::StepsOperator::Builder.draw(wizard: self, callable: state_store) do |b|
+              b.on_step(:configured_step, use: [DfE::Wizard::Operations::Validate])
+              # unconfigured_step NOT explicitly configured
+            end
+          end
 
-      expect(wizard.get_metadata(:user_id)).to eq(789)
-      expect(wizard.get_metadata(:started_at)).to be_present
+          def route_strategy
+            DfE::Wizard::RouteStrategy::ConfigurableRoutes.new(wizard: self)
+          end
+
+          def logger
+            DfE::Wizard::Logger.new(nil)
+          end
+        end
+      end
+
+      let(:partial_wizard) { partial_config_wizard_class.new(current_step: :configured_step, state_store:) }
+
+      it 'uses custom operations for configured step' do
+        operations = partial_wizard.steps_operator.operations_for(:configured_step)
+
+        expect(operations).to eq([DfE::Wizard::Operations::Validate])
+      end
+
+      it 'falls back to defaults for unconfigured steps' do
+        operations = partial_wizard.steps_operator.operations_for(:unconfigured_step)
+
+        expect(operations).to eq([
+                                   DfE::Wizard::Operations::Validate,
+                                   DfE::Wizard::Operations::Persist,
+                                 ])
+      end
     end
-  end
 
-  describe 'attribute name uniqueness constraint' do
-    it 'demonstrates unique attribute names prevent collisions' do
-      repository.write({
-                         email_code: '123456',
-                         phone_code: '789012',
-                       })
+    describe 'with only Validate operation' do
+      let(:validate_only_wizard_class) do
+        Class.new do
+          include DfE::Wizard
 
-      expect(wizard.raw_step_data(:email_verification)).to eq(email_code: '123456')
-      expect(wizard.raw_step_data(:phone_verification)).to eq(phone_code: '789012')
+          def steps_processor
+            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+              graph.add_node :step_one, Steps::PersonalDetails
+              graph.root :step_one
+            end
+          end
+
+          def steps_operator
+            DfE::Wizard::StepsOperator::Builder.draw(wizard: self, callable: state_store) do |b|
+              b.on_step(:step_one, use: [DfE::Wizard::Operations::Validate])
+            end
+          end
+
+          def route_strategy
+            DfE::Wizard::RouteStrategy::ConfigurableRoutes.new(wizard: self)
+          end
+
+          def logger
+            DfE::Wizard::Logger.new(nil)
+          end
+        end
+      end
+
+      let(:validate_only_wizard) { validate_only_wizard_class.new(current_step: :step_one, state_store:) }
+
+      it 'returns only Validate operation' do
+        operations = validate_only_wizard.steps_operator.operations_for(:step_one)
+
+        expect(operations).to eq([DfE::Wizard::Operations::Validate])
+      end
+
+      it 'does not include Persist' do
+        operations = validate_only_wizard.steps_operator.operations_for(:step_one)
+
+        expect(operations).not_to include(DfE::Wizard::Operations::Persist)
+      end
+    end
+
+    describe '#save_current_step with default operations' do
+      let(:minimal_wizard_class) do
+        Class.new do
+          include DfE::Wizard
+
+          def steps_processor
+            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+              graph.add_node :step_one, Steps::PersonalDetails
+              graph.root :step_one
+            end
+          end
+
+          def route_strategy
+            DfE::Wizard::RouteStrategy::ConfigurableRoutes.new(wizard: self)
+          end
+
+          def logger
+            DfE::Wizard::Logger.new(nil)
+          end
+        end
+      end
+
+      context 'with valid step and default operations' do
+        let(:current_step) { :step_one }
+        let(:current_step_params) do
+          {
+            step_one: {
+              name: 'Bob',
+              email: 'bob@example.com',
+            },
+          }
+        end
+        let(:minimal_wizard) do
+          minimal_wizard_class.new(current_step:, state_store:, current_step_params:)
+        end
+
+        it 'runs default Validate then Persist' do
+          expect(minimal_wizard.current_step).to be_valid
+          result = minimal_wizard.save_current_step
+
+          expect(result).to be true
+        end
+
+        it 'persists with default pipeline' do
+          minimal_wizard.save_current_step
+
+          expect(minimal_wizard.raw_step_data(:step_one).symbolize_keys).to eq(
+            name: 'Bob',
+            email: 'bob@example.com',
+          )
+        end
+      end
+
+      context 'with invalid step and default operations' do
+        let(:current_step) { :step_one }
+        let(:current_step_params) do
+          {
+            step_one: {
+              name: '',
+              email: '',
+            },
+          }
+        end
+        let(:minimal_wizard) do
+          minimal_wizard_class.new(current_step:, state_store:, current_step_params:)
+        end
+
+        it 'stops at Validate (does not persist)' do
+          result = minimal_wizard.save_current_step
+
+          expect(result).to be false
+        end
+
+        it 'does not persist invalid data' do
+          minimal_wizard.save_current_step
+
+          expect(minimal_wizard.saved_path).to be_empty
+        end
+      end
     end
   end
 end

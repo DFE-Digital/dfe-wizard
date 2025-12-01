@@ -75,6 +75,40 @@ module DfE
           end
         end
 
+        # Execute an operation in the repository context
+        #
+        # Instantiates the operation class with this repository and the step,
+        # then calls its `execute` method. This integrates the operations framework
+        # with session-based storage.
+        #
+        # @param operation_class [Class] Operation class to instantiate and execute
+        #   Must respond to `new(repository:, step:).execute`
+        # @param step [Object] Step instance containing data to operate on
+        # @return [Hash] Operation result hash
+        #   - `:success` [Boolean] Whether operation succeeded
+        #   - `:errors` [Hash] Validation errors if success is false
+        #
+        # @example Execute validation operation
+        #   result = repo.execute_operation(
+        #     operation_class: DfE::Wizard::Operations::Validate,
+        #     step: step_instance
+        #   )
+        #   # => { success: true } or { success: false, errors: {...} }
+        #
+        # @example Execute persistence operation
+        #   result = repo.execute_operation(
+        #     operation_class: DfE::Wizard::Operations::Persist,
+        #     step: step_instance
+        #   )
+        #   # => { success: true }
+        #
+        # @see DfE::Wizard::Operations::Validate For validation operation
+        # @see DfE::Wizard::Operations::Persist For persistence operation
+        # @api public
+        def execute_operation(operation_class:, step:)
+          operation_class.new(repository: self, step:).execute
+        end
+
         # Save state atomically by replacing entire data
         #
         # Overwrites all previous data for this wizard instance.

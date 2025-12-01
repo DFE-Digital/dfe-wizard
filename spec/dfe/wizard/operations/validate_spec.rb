@@ -155,7 +155,7 @@ RSpec.describe DfE::Wizard::Operations::Validate do
       it 'only has error for date_of_birth' do
         result = validator.execute
 
-        expect(result[:errors].keys).to eq([:date_of_birth])
+        expect(result[:errors].messages.keys).to eq([:date_of_birth])
       end
     end
   end
@@ -225,7 +225,7 @@ RSpec.describe DfE::Wizard::Operations::Validate do
     it 'returns all errors' do
       result = validator.execute
 
-      expect(result[:errors].keys).to include(:last_name, :date_of_birth)
+      expect(result[:errors].messages.keys).to include(:last_name, :date_of_birth)
     end
 
     it 'returns false' do

@@ -303,7 +303,7 @@ RSpec.describe AssignMentorWizard do
       let(:current_step_params) { { can_receive_mentor_training: { lp_will_provide: 'no' } } }
 
       it 'changes branch to include which_lead_provider' do
-        wizard.save
+        wizard.save_current_step
         expect(wizard.flow_path(:confirmation)).to eq(%i[
                                                         who_will_be_the_mentor
                                                         can_receive_mentor_training
