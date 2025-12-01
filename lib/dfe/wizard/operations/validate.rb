@@ -43,7 +43,7 @@ module DfE
           if @step.valid?
             { success: true }
           else
-            { success: false, errors: @step.errors.messages }
+            { success: false, errors: @step.errors }
           end
         end
 

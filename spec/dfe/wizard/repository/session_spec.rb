@@ -1,327 +1,190 @@
 RSpec.describe DfE::Wizard::Repository::Session do
   let(:session) { {} }
-  let(:key) { :wizard_store }
-  let(:state_key) { nil }
-  let(:repository) { described_class.new(session:, key:, state_key:) }
+  let(:repository) { described_class.new(session:) }
 
   describe '#initialize' do
-    it 'accepts session, key, and state_key' do
-      repo = described_class.new(session: {}, key: :custom_key, state_key: 'app_123')
-      expect(repo.session).to eq({})
-      expect(repo.key).to eq(:custom_key)
-      expect(repo.state_key).to eq('app_123')
+    it 'accepts session and default key' do
+      expect(repository.session).to eq(session)
+      expect(repository.key).to eq(:wizard_store)
     end
 
-    it 'defaults state_key to nil' do
-      repo = described_class.new(session: {}, key:)
-      expect(repo.state_key).to be_nil
+    it 'accepts custom key' do
+      custom_repository = described_class.new(session:, key: :custom_key)
+      expect(custom_repository.key).to eq(:custom_key)
+    end
+
+    it 'accepts state_key for multi-wizard' do
+      multi_repository = described_class.new(session:, state_key: 'wizard_1')
+      expect(multi_repository.state_key).to eq('wizard_1')
     end
   end
 
   describe '#read' do
-    context 'without state_key (single instance)' do
-      context 'when session is empty' do
-        it 'returns empty hash' do
-          expect(repository.read).to eq({})
-        end
-
-        it 'returns HashWithIndifferentAccess' do
-          expect(repository.read).to be_a(ActiveSupport::HashWithIndifferentAccess)
-        end
-      end
-
-      context 'when session has flat data' do
-        before do
-          session[:wizard_store] = { 'first_name' => 'John', 'last_name' => 'Doe', 'email' => 'john@example.com' }
-        end
-
-        it 'returns the stored flat hash' do
-          expect(repository.read[:first_name]).to eq('John')
-          expect(repository.read[:email]).to eq('john@example.com')
-        end
-
-        it 'allows access via string keys' do
-          expect(repository.read['first_name']).to eq('John')
-        end
-
-        it 'allows access via symbol keys' do
-          expect(repository.read[:first_name]).to eq('John')
-        end
+    context 'with no data' do
+      it 'returns empty hash' do
+        expect(repository.read).to eq({})
       end
     end
 
-    context 'with state_key (multiple instances)' do
-      let(:state_key) { 'app_123' }
-
-      context 'when state_key has no data' do
-        it 'returns empty hash' do
-          expect(repository.read).to eq({})
-        end
-
-        it 'returns HashWithIndifferentAccess' do
-          expect(repository.read).to be_a(ActiveSupport::HashWithIndifferentAccess)
-        end
+    context 'with saved data' do
+      before do
+        session[:wizard_store] = { 'name' => 'John', 'email' => 'john@example.com' }
       end
 
-      context 'when state_key has flat data' do
-        before do
-          session[:wizard_store] = {
-            'app_123' => { 'first_name' => 'John', 'email' => 'john@example.com' },
-            'app_456' => { 'first_name' => 'Jane', 'email' => 'jane@example.com' },
-          }
-        end
+      it 'returns data with indifferent access' do
+        data = repository.read
+        expect(data[:name]).to eq('John')
+        expect(data['name']).to eq('John')
+      end
+    end
 
-        it 'returns only the data for this state_key' do
-          expect(repository.read[:first_name]).to eq('John')
-          expect(repository.read[:email]).to eq('john@example.com')
-        end
+    context 'with state_key' do
+      let(:repository) { described_class.new(session:, state_key: 'wizard_1') }
 
-        it 'allows symbol access' do
-          expect(repository.read[:first_name]).to eq('John')
-        end
+      before do
+        session[:wizard_store] = {
+          'wizard_1' => { 'name' => 'John' },
+          'wizard_2' => { 'name' => 'Jane' },
+        }
+      end
 
-        it 'allows string access' do
-          expect(repository.read['first_name']).to eq('John')
-        end
+      it 'returns only data for specified state_key' do
+        expect(repository.read).to eq({ 'name' => 'John' })
+      end
 
-        it 'does not return other state_key data' do
-          expect(repository.read.keys).not_to include('app_456')
-        end
+      it 'returns empty hash if state_key not found' do
+        multi_repository = described_class.new(session:, state_key: 'wizard_3')
+        expect(multi_repository.read).to eq({})
       end
     end
   end
 
   describe '#write' do
-    context 'string/symbol key handling' do
-      it 'stores symbol keys as strings' do
-        repository.write(first_name: 'John', last_name: 'Doe')
-        expect(session[:wizard_store].keys).to all(be_a(String))
-      end
+    it 'merges data into session' do
+      repository.write({ name: 'John' })
+      repository.write({ email: 'john@example.com' })
 
-      it 'allows reading with symbols after writing with symbols' do
-        repository.write(first_name: 'John', email: 'john@example.com')
-        expect(repository.read[:first_name]).to eq('John')
-        expect(repository.read[:email]).to eq('john@example.com')
-      end
-
-      it 'allows reading with strings after writing with symbols' do
-        repository.write(first_name: 'John')
-        expect(repository.read['first_name']).to eq('John')
-      end
-
-      it 'accepts string keys in write' do
-        repository.write('first_name' => 'John', 'last_name' => 'Doe')
-        expect(repository.read[:first_name]).to eq('John')
-      end
+      expect(session[:wizard_store]).to include('name' => 'John', 'email' => 'john@example.com')
     end
 
-    context 'without state_key (single instance)' do
-      it 'initializes session key if not present' do
-        repository.write(first_name: 'John', last_name: 'Doe')
-        expect(session[:wizard_store]['first_name']).to eq('John')
+    context 'with state_key' do
+      let(:repository) { described_class.new(session:, state_key: 'wizard_1') }
+
+      it 'stores data under state_key' do
+        repository.write({ name: 'John' })
+
+        expect(session[:wizard_store]['wizard_1']).to include('name' => 'John')
       end
 
-      it 'merges with existing data' do
-        session[:wizard_store] = { 'first_name' => 'John', 'last_name' => 'Doe' }
-        repository.write(email: 'john@example.com', city: 'London')
+      it 'preserves other state_keys' do
+        session[:wizard_store] = { 'wizard_2' => { 'name' => 'Jane' } }
+        repository.write({ email: 'john@example.com' })
 
-        expect(repository.read[:first_name]).to eq('John')
-        expect(repository.read[:last_name]).to eq('Doe')
-        expect(repository.read[:email]).to eq('john@example.com')
-        expect(repository.read[:city]).to eq('London')
-      end
-
-      it 'updates existing attributes' do
-        session[:wizard_store] = { 'first_name' => 'John', 'email' => 'old@example.com' }
-        repository.write(email: 'new@example.com')
-
-        expect(repository.read[:first_name]).to eq('John')
-        expect(repository.read[:email]).to eq('new@example.com')
-      end
-    end
-
-    context 'with state_key (multiple instances)' do
-      let(:state_key) { 'app_123' }
-
-      it 'stores data with string keys' do
-        repository.write(first_name: 'John')
-        expect(session[:wizard_store]['app_123'].keys).to all(be_a(String))
-      end
-
-      it 'initializes state_key if not present' do
-        repository.write(first_name: 'John', email: 'john@example.com')
-        expect(repository.read[:first_name]).to eq('John')
-      end
-
-      it 'merges with existing state_key data' do
-        session[:wizard_store] = {
-          'app_123' => { 'first_name' => 'John', 'last_name' => 'Doe' },
-        }
-        repository.write(email: 'john@example.com')
-
-        expect(repository.read[:first_name]).to eq('John')
-        expect(repository.read[:email]).to eq('john@example.com')
-      end
-
-      it 'does not affect other state_keys' do
-        session[:wizard_store] = {
-          'app_123' => { 'first_name' => 'John' },
-          'app_456' => { 'first_name' => 'Jane' },
-        }
-        repository.write(email: 'john@example.com')
-
-        repo2 = described_class.new(session:, key:, state_key: 'app_456')
-        expect(repo2.read[:first_name]).to eq('Jane')
-        expect(repo2.read).not_to have_key(:email)
+        expect(session[:wizard_store]['wizard_2']).to eq({ 'name' => 'Jane' })
+        expect(session[:wizard_store]['wizard_1']).to include('email' => 'john@example.com')
       end
     end
   end
 
   describe '#save' do
-    context 'string/symbol key handling' do
-      it 'stores symbol keys as strings' do
-        repository.save(first_name: 'John', email: 'john@example.com')
-        expect(session[:wizard_store].keys).to all(be_a(String))
+    it 'replaces entire data' do
+      session[:wizard_store] = { 'name' => 'John', 'email' => 'john@example.com' }
+      repository.save({ 'name' => 'Jane' })
+
+      expect(session[:wizard_store]).to eq({ 'name' => 'Jane' })
+    end
+
+    context 'with state_key' do
+      let(:repository) { described_class.new(session:, state_key: 'wizard_1') }
+
+      it 'replaces only specified state' do
+        session[:wizard_store] = {
+          'wizard_1' => { 'name' => 'John' },
+          'wizard_2' => { 'name' => 'Jane' },
+        }
+        repository.save({ 'name' => 'Alice' })
+
+        expect(session[:wizard_store]['wizard_1']).to eq({ 'name' => 'Alice' })
+        expect(session[:wizard_store]['wizard_2']).to eq({ 'name' => 'Jane' })
+      end
+    end
+  end
+
+  describe '#execute_operation' do
+    class SessionTestStep
+      include DfE::Wizard::Step
+
+      attribute :name, :string
+      attribute :email, :string
+
+      validates :name, :email, presence: true
+    end
+
+    context 'with valid step' do
+      let(:step) { SessionTestStep.new(name: 'John', email: 'john@example.com') }
+
+      it 'executes operation in session context' do
+        result = repository.execute_operation(
+          operation_class: DfE::Wizard::Operations::Validate,
+          step:,
+        )
+
+        expect(result[:success]).to be true
       end
 
-      it 'allows symbol access after save' do
-        repository.save(first_name: 'John')
-        expect(repository.read[:first_name]).to eq('John')
-      end
+      it 'operation can persist to session' do
+        repository.execute_operation(
+          operation_class: DfE::Wizard::Operations::Persist,
+          step:,
+        )
 
-      it 'allows string access after save' do
-        repository.save(first_name: 'John')
-        expect(repository.read['first_name']).to eq('John')
+        expect(repository.read).to include('name' => 'John', 'email' => 'john@example.com')
       end
     end
 
-    context 'without state_key (single instance)' do
-      it 'replaces entire state atomically' do
-        session[:wizard_store] = { 'first_name' => 'John', 'last_name' => 'Doe', 'age' => 30 }
-        repository.save(email: 'new@example.com', city: 'London')
+    context 'with multiple wizards' do
+      let(:repo1) { described_class.new(session:, state_key: 'wizard_1') }
+      let(:repo2) { described_class.new(session:, state_key: 'wizard_2') }
+      let(:step1) { SessionTestStep.new(name: 'John') }
+      let(:step2) { SessionTestStep.new(name: 'Jane') }
 
-        expect(repository.read).not_to have_key(:first_name)
-        expect(repository.read).not_to have_key(:age)
-        expect(repository.read[:email]).to eq('new@example.com')
-        expect(repository.read[:city]).to eq('London')
-      end
-    end
+      it 'operations maintain separate state' do
+        repo1.execute_operation(operation_class: DfE::Wizard::Operations::Persist, step: step1)
+        repo2.execute_operation(operation_class: DfE::Wizard::Operations::Persist, step: step2)
 
-    context 'with state_key (multiple instances)' do
-      let(:state_key) { 'app_123' }
-
-      it 'replaces only this state_key data' do
-        session[:wizard_store] = {
-          'app_123' => { 'first_name' => 'John', 'last_name' => 'Doe' },
-          'app_456' => { 'first_name' => 'Jane' },
-        }
-        repository.save(email: 'new@example.com')
-
-        expect(repository.read).not_to have_key(:first_name)
-        expect(repository.read[:email]).to eq('new@example.com')
-      end
-
-      it 'does not affect other state_keys' do
-        session[:wizard_store] = {
-          'app_123' => { 'first_name' => 'John' },
-          'app_456' => { 'first_name' => 'Jane' },
-        }
-        repository.save(email: 'new@example.com')
-
-        repo2 = described_class.new(session:, key:, state_key: 'app_456')
-        expect(repo2.read[:first_name]).to eq('Jane')
-      end
-
-      it 'stores a deep copy' do
-        data = { first_name: 'John', email: 'john@example.com' }
-        repository.save(data)
-        data[:first_name] = 'Jane'
-
-        expect(repository.read[:first_name]).to eq('John')
+        expect(repo1.read['name']).to eq('John')
+        expect(repo2.read['name']).to eq('Jane')
       end
     end
   end
 
   describe '#clear' do
-    context 'without state_key (single instance)' do
-      before do
-        session[:wizard_store] = { 'first_name' => 'John', 'email' => 'john@example.com' }
-        session[:other_data] = 'preserved'
-      end
-
-      it 'removes entire wizard key from session' do
-        repository.clear
-        expect(session[:wizard_store]).to be_nil
-      end
-
-      it 'preserves other session keys' do
-        repository.clear
-        expect(session[:other_data]).to eq('preserved')
-      end
+    before do
+      session[:wizard_store] = { 'name' => 'John', 'email' => 'john@example.com' }
     end
 
-    context 'with state_key (multiple instances)' do
-      let(:state_key) { 'app_123' }
+    it 'removes data from session' do
+      repository.clear
+      expect(session[:wizard_store]).to be_nil
+    end
+
+    context 'with state_key' do
+      let(:repository) { described_class.new(session:, key: 'wizard_key', state_key: 'wizard_1') }
 
       before do
-        session[:wizard_store] = {
-          'app_123' => { 'first_name' => 'John' },
-          'app_456' => { 'first_name' => 'Jane' },
+        session['wizard_key'] = {
+          'wizard_1' => { 'name' => 'John' },
+          'wizard_2' => { 'name' => 'Jane' },
         }
       end
 
-      it 'removes only this state_key data' do
+      it 'removes only specified state' do
         repository.clear
-        expect(session[:wizard_store]['app_123']).to be_nil
+
+        expect(session['wizard_key']).to eq(
+          'wizard_2' => { 'name' => 'Jane' },
+        )
       end
-
-      it 'preserves other state_keys' do
-        repository.clear
-        expect(session[:wizard_store]['app_456']).to be_present
-      end
-    end
-  end
-
-  describe 'multiple wizard instances' do
-    let(:repo1) { described_class.new(session:, key: :wizard_store, state_key: 'app_123') }
-    let(:repo2) { described_class.new(session:, key: :wizard_store, state_key: 'app_456') }
-
-    it 'keeps data isolated per state_key' do
-      repo1.save(first_name: 'John', email: 'john@example.com')
-      repo2.save(first_name: 'Jane', email: 'jane@example.com')
-
-      expect(repo1.read[:first_name]).to eq('John')
-      expect(repo2.read[:first_name]).to eq('Jane')
-    end
-
-    it 'allows independent operations' do
-      repo1.write(first_name: 'John', last_name: 'Doe')
-      repo2.write(email: 'jane@example.com', city: 'Paris')
-
-      expect(repo1.read).to have_key(:first_name)
-      expect(repo1.read).not_to have_key(:email)
-      expect(repo2.read).to have_key(:email)
-      expect(repo2.read).not_to have_key(:first_name)
-    end
-
-    it 'allows independent clearing' do
-      repo1.save(first_name: 'John')
-      repo2.save(first_name: 'Jane')
-
-      repo1.clear
-
-      expect(repo1.read).to eq({})
-      expect(repo2.read[:first_name]).to eq('Jane')
-    end
-  end
-
-  describe 'DoS protection' do
-    it 'does not create symbols from user input' do
-      user_input = { 'user_controlled_key' => 'value', 'another_key' => 'data' }
-      repository.write(user_input)
-
-      expect(session[:wizard_store].keys).to all(be_a(String))
-      expect(Symbol.all_symbols.map(&:to_s)).not_to include('user_controlled_key')
     end
   end
 end

@@ -26,6 +26,10 @@ module DfE
         # @return [DfE::Wizard::StepsOperator::Config] The configuration object
         attr_reader :config
 
+        # @return [Object] The callable object that will be call to execute
+        # operations.
+        attr_reader :callable
+
         # Default operations applied to all steps
         DEFAULT_OPERATIONS = [Operations::Validate, Operations::Persist].freeze
 
@@ -33,9 +37,9 @@ module DfE
         #
         # @param wizard [DfE::Wizard] The wizard instance
         # @param callable [Object] The state_store or repository (used for operation context)
-        def initialize(wizard:, callable:)
+        def initialize(wizard:, callable: nil)
           @wizard = wizard
-          @callable = callable
+          @callable = callable || wizard.state_store
           @config = Config.new
         end
 

@@ -47,7 +47,6 @@ module DfE
         # @return [Hash] Flat hash of wizard attributes
         def read
           data = cache.read(cache_key, namespace:)
-
           return {} if data.nil?
 
           data.deep_symbolize_keys
@@ -59,16 +58,61 @@ module DfE
         # @return [void]
         def write(hash)
           normalized = hash.deep_stringify_keys
-
           current_data = cache.read(cache_key, namespace:) || {}
           merged_data = current_data.merge(normalized)
-
           cache.write(
             cache_key,
             merged_data,
             namespace:,
             expires_in:,
           )
+        end
+
+        # Save state atomically by replacing entire data
+        #
+        # @param hash [Hash] Complete state to save
+        # @return [void]
+        def save(hash)
+          normalized = hash.deep_stringify_keys
+          cache.write(
+            cache_key,
+            normalized,
+            namespace:,
+            expires_in:,
+          )
+        end
+
+        # Execute an operation in the repository context
+        #
+        # Instantiates the operation class with this repository and the step,
+        # then calls its `execute` method.
+        #
+        # @param operation_class [Class] Operation class to instantiate and execute
+        #   Must respond to `new(repository:, step:).execute`
+        # @param step [Object] Step instance containing data to operate on
+        # @return [Hash] Operation result hash
+        #   - `:success` [Boolean] Whether operation succeeded
+        #   - `:errors` [Hash] Validation errors if success is false
+        #
+        # @example Execute validation operation
+        #   result = repo.execute_operation(
+        #     operation_class: DfE::Wizard::Operations::Validate,
+        #     step: step_instance
+        #   )
+        #   # => { success: true } or { success: false, errors: {...} }
+        #
+        # @example Execute persistence operation
+        #   result = repo.execute_operation(
+        #     operation_class: DfE::Wizard::Operations::Persist,
+        #     step: step_instance
+        #   )
+        #   # => { success: true }
+        #
+        # @see DfE::Wizard::Operations::Validate For validation operation
+        # @see DfE::Wizard::Operations::Persist For persistence operation
+        # @api public
+        def execute_operation(operation_class:, step:)
+          operation_class.new(repository: self, step:).execute
         end
 
         # Clear all wizard data from cache
@@ -94,7 +138,7 @@ module DfE
           return false unless expires_in
           return false unless cache.respond_to?(:touch)
 
-          cache.touch(cache_key, namespace: namespace, expires_in: expires_in)
+          cache.touch(cache_key, namespace:, expires_in:)
         end
 
         private

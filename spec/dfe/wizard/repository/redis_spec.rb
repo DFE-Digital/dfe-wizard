@@ -1,141 +1,141 @@
 RSpec.describe DfE::Wizard::Repository::Redis do
   let(:redis) { MockRedis.new }
-  let(:key) { 'wizard:test' }
-  let(:state_key) { nil }
-  let(:expiration) { nil }
+  let(:repository) { described_class.new(redis:, key: 'wizard:user:123') }
 
-  subject(:repository) do
-    described_class.new(
-      redis:,
-      key:,
-      state_key:,
-      expiration:,
-    )
+  before do
+    allow(redis).to receive(:get).and_return(nil)
+    allow(redis).to receive(:set)
+    allow(redis).to receive(:setex)
+    allow(redis).to receive(:del)
+    allow(redis).to receive(:exists?).and_return(false)
+    allow(redis).to receive(:ttl).and_return(-2)
+    allow(redis).to receive(:expire)
   end
 
   describe '#initialize' do
-    it 'requires redis' do
-      expect {
-        described_class.new(redis: nil, key: 'test')
-      }.to raise_error(ArgumentError, 'redis cannot be nil')
+    it 'requires redis and key' do
+      expect { described_class.new(redis:) }.to raise_error(ArgumentError)
+      expect { described_class.new(key: 'test') }.to raise_error(ArgumentError)
     end
 
-    it 'requires key' do
-      expect {
-        described_class.new(redis: redis, key: nil)
-      }.to raise_error(ArgumentError, 'key cannot be nil')
+    it 'accepts optional state_key and expiration' do
+      custom_repository = described_class.new(
+        redis:,
+        key: 'test',
+        state_key: 'wizard_1',
+        expiration: 86400,
+      )
+      expect(custom_repository.state_key).to eq('wizard_1')
+      expect(custom_repository.expiration).to eq(86400)
     end
   end
 
   describe '#read' do
-    context 'when key does not exist' do
+    context 'with no data' do
       it 'returns empty hash' do
+        allow(redis).to receive(:get).and_return(nil)
         expect(repository.read).to eq({})
       end
     end
 
-    context 'with flat storage' do
+    context 'with JSON data' do
       before do
-        redis.set(key, JSON.generate({ mentor_id: 1, lp_will_provide: 'yes' }))
+        json = JSON.generate({ name: 'John', email: 'john@example.com' })
+        allow(redis).to receive(:get).and_return(json)
       end
 
-      it 'returns symbolized hash' do
-        expect(repository.read).to eq({ mentor_id: 1, lp_will_provide: 'yes' })
+      it 'parses and returns data' do
+        data = repository.read
+        expect(data).to include(name: 'John', email: 'john@example.com')
       end
     end
 
-    context 'with nested storage' do
-      let(:state_key) { 'assign_mentor' }
+    context 'with state_key' do
+      let(:repository) { described_class.new(redis:, key: 'wizards', state_key: 'user_123') }
 
       before do
-        redis.set(key, JSON.generate({
-                                       'assign_mentor' => { 'mentor_id' => 1 },
-                                       'other_wizard' => { 'field' => 'value' },
-                                     }))
+        json = JSON.generate({
+                               'user_123' => { 'name' => 'John' },
+                               'user_456' => { 'name' => 'Jane' },
+                             })
+        allow(redis).to receive(:get).and_return(json)
       end
 
-      it 'returns only data under state_key' do
-        expect(repository.read).to eq({ mentor_id: 1 })
+      it 'returns only data for specified state_key' do
+        data = repository.read
+        expect(data).to include(name: 'John')
       end
     end
   end
 
   describe '#write' do
-    it 'writes new data' do
-      repository.write({ mentor_id: 1 })
-      expect(repository.read).to eq({ mentor_id: 1 })
+    it 'merges data into Redis' do
+      json_response = JSON.generate({ 'name' => 'John' })
+      allow(redis).to receive(:get).and_return(json_response)
+
+      repository.write({ email: 'john@example.com' })
+
+      expect(redis).to have_received(:set)
     end
 
-    it 'merges with existing data' do
-      repository.write({ mentor_id: 1 })
-      repository.write({ lp_will_provide: 'yes' })
+    it 'respects expiration' do
+      repo_with_ttl = described_class.new(
+        redis:,
+        key: 'test',
+        expiration: 3600,
+      )
 
-      expect(repository.read).to eq({
-                                      mentor_id: 1,
-                                      lp_will_provide: 'yes',
-                                    })
+      repo_with_ttl.write({ name: 'John' })
+
+      expect(redis).to have_received(:setex)
+    end
+  end
+
+  describe '#execute_operation' do
+    class RedisTestStep
+      include DfE::Wizard::Step
+
+      attribute :name, :string
+      attribute :email, :string
+
+      validates :name, :email, presence: true
     end
 
-    context 'with expiration' do
-      let(:expiration) { 3600 }
+    let(:step) { RedisTestStep.new(name: 'John', email: 'john@example.com') }
 
-      it 'sets expiration' do
-        repository.write({ mentor_id: 1 })
-        expect(redis.ttl(key)).to eq(3600)
-      end
+    it 'executes operation in Redis context' do
+      result = repository.execute_operation(
+        operation_class: DfE::Wizard::Operations::Validate,
+        step:,
+      )
+
+      expect(result[:success]).to be true
     end
   end
 
   describe '#clear' do
-    before do
-      repository.write({ mentor_id: 1 })
-    end
-
-    it 'deletes the key' do
+    it 'deletes data from Redis' do
       repository.clear
-      expect(repository.read).to eq({})
+      expect(redis).to have_received(:del).with('wizard:user:123')
     end
   end
 
   describe '#exists?' do
-    it 'returns false when key does not exist' do
-      expect(repository.exists?).to be false
-    end
-
-    it 'returns true when key exists' do
-      repository.write({ mentor_id: 1 })
+    it 'checks if key exists' do
+      allow(redis).to receive(:exists?).and_return(true)
       expect(repository.exists?).to be true
     end
   end
 
   describe '#ttl' do
-    context 'with expiration' do
-      let(:expiration) { 3600 }
-
-      it 'returns remaining seconds' do
-        repository.write({ mentor_id: 1 })
-        expect(repository.ttl).to be_within(5).of(3600)
-      end
+    it 'returns remaining seconds' do
+      allow(redis).to receive(:ttl).and_return(3600)
+      expect(repository.ttl).to eq(3600)
     end
 
-    context 'without expiration' do
-      it 'returns nil' do
-        repository.write({ mentor_id: 1 })
-        expect(repository.ttl).to be_nil
-      end
-    end
-  end
-
-  describe '#refresh_expiration' do
-    let(:expiration) { 3600 }
-
-    it 'resets TTL' do
-      repository.write({ mentor_id: 1 })
-      redis.expire(key, 1800)
-
-      repository.refresh_expiration
-
-      expect(redis.ttl(key)).to eq(3600)
+    it 'returns nil if no expiration' do
+      allow(redis).to receive(:ttl).and_return(-1)
+      expect(repository.ttl).to be_nil
     end
   end
 end

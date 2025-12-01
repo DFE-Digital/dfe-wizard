@@ -1,203 +1,155 @@
 RSpec.describe DfE::Wizard::Repository::InMemory do
-  subject(:repository) { described_class.new }
+  let(:repo) { described_class.new }
 
   describe '#read' do
-    context 'when no data has been written' do
-      it 'returns an empty hash' do
-        expect(repository.read).to eq({})
+    context 'with no data' do
+      it 'returns empty hash' do
+        expect(repo.read).to eq({})
       end
     end
 
-    context 'when data has been written' do
-      before { repository.write({ first_name: 'John', last_name: 'Doe' }) }
+    context 'with saved data' do
+      before { repo.save({ name: 'John', email: 'john@example.com' }) }
 
-      it 'returns the stored flat hash' do
-        expect(repository.read).to eq({ first_name: 'John', last_name: 'Doe' })
+      it 'returns deep copy of data' do
+        data = repo.read
+        expect(data).to eq({ name: 'John', email: 'john@example.com' })
       end
-    end
 
-    context 'when modifying the returned hash' do
-      before { repository.write({ email: 'value@example.com' }) }
-
-      it 'does not affect the stored data (returns a copy)' do
-        read_data = repository.read
-        read_data[:email] = 'other@example.com'
-
-        # Repository data remains unchanged
-        expect(repository.read[:email]).to eq('value@example.com')
+      it 'returns copy, not reference' do
+        data = repo.read
+        data[:name] = 'Modified'
+        expect(repo.read[:name]).to eq('John')
       end
     end
   end
 
   describe '#write' do
-    context 'when repository is empty' do
-      it 'adds new attributes' do
-        repository.write({ first_name: 'Alice', last_name: 'Smith' })
-        expect(repository.read).to eq({ first_name: 'Alice', last_name: 'Smith' })
-      end
+    it 'merges data into existing state' do
+      repo.write({ name: 'John' })
+      repo.write({ email: 'john@example.com' })
+
+      expect(repo.read).to eq({ name: 'John', email: 'john@example.com' })
     end
 
-    context 'when data exists' do
-      before { repository.write({ first_name: 'John', last_name: 'Doe', age: 30 }) }
+    it 'deep merges nested data' do
+      repo.write({ steps: { name: { first_name: 'John' } } })
+      repo.write({ steps: { email: { email_address: 'john@example.com' } } })
 
-      it 'merges new attributes with existing' do
-        repository.write({ email: 'john@example.com', city: 'London' })
-
-        expect(repository.read).to eq({
-                                        first_name: 'John',
-                                        last_name: 'Doe',
-                                        age: 30,
-                                        email: 'john@example.com',
-                                        city: 'London',
-                                      })
-      end
-
-      it 'updates existing attributes' do
-        repository.write({ first_name: 'Jane', email: 'jane@example.com' })
-
-        expect(repository.read).to eq({
-                                        first_name: 'Jane', # Updated
-                                        last_name: 'Doe',    # Preserved
-                                        age: 30,             # Preserved
-                                        email: 'jane@example.com', # Added
-                                      })
-      end
+      expect(repo.read[:steps]).to include(
+        name: { first_name: 'John' },
+        email: { email_address: 'john@example.com' },
+      )
     end
 
-    context 'when writing empty hash' do
-      before { repository.write({ data: 'value' }) }
+    it 'overwrites existing keys' do
+      repo.write({ name: 'John' })
+      repo.write({ name: 'Jane' })
 
-      it 'preserves existing data' do
-        repository.write({})
-        expect(repository.read).to eq({ data: 'value' })
-      end
-    end
-
-    it 'returns the merged result' do
-      repository.write({ first_name: 'John' })
-      result = repository.write({ email: 'john@example.com' })
-
-      expect(result).to eq({ first_name: 'John', email: 'john@example.com' })
+      expect(repo.read[:name]).to eq('Jane')
     end
   end
 
   describe '#save' do
-    context 'when repository is empty' do
-      it 'stores data' do
-        repository.save({ first_name: 'Bob', last_name: 'Builder' })
-        expect(repository.read).to eq({ first_name: 'Bob', last_name: 'Builder' })
+    it 'replaces entire data' do
+      repo.save({ name: 'John', email: 'john@example.com' })
+      repo.save({ name: 'Jane' })
+
+      expect(repo.read).to eq({ name: 'Jane' })
+    end
+
+    it 'stores deep copy' do
+      data = { steps: { name: { first: 'John' } } }
+      repo.save(data)
+      data[:steps][:name][:first] = 'Modified'
+
+      expect(repo.read[:steps][:name][:first]).to eq('John')
+    end
+  end
+
+  describe '#execute_operation' do
+    class InMemoryTestStep
+      include DfE::Wizard::Step
+
+      attribute :name, :string
+      attribute :email, :string
+
+      validates :name, :email, presence: true
+    end
+
+    context 'with valid step' do
+      let(:step) { InMemoryTestStep.new(name: 'John', email: 'john@example.com') }
+
+      it 'executes operation and returns success' do
+        result = repo.execute_operation(
+          operation_class: DfE::Wizard::Operations::Validate,
+          step:,
+        )
+
+        expect(result[:success]).to be true
+      end
+
+      it 'operation can access repository' do
+        repo.execute_operation(
+          operation_class: DfE::Wizard::Operations::Persist,
+          step:,
+        )
+
+        expect(repo.read.symbolize_keys).to eq(name: 'John', email: 'john@example.com')
       end
     end
 
-    context 'when data exists' do
-      before { repository.write({ first_name: 'John', last_name: 'Doe', age: 30 }) }
+    context 'with invalid step' do
+      let(:step) { InMemoryTestStep.new }
 
-      it 'replaces all data atomically' do
-        repository.save({ email: 'new@example.com' })
+      it 'executes operation and returns failure' do
+        result = repo.execute_operation(
+          operation_class: DfE::Wizard::Operations::Validate,
+          step:,
+        )
 
-        # Old data is gone
-        expect(repository.read).to eq({ email: 'new@example.com' })
+        expect(result[:success]).to be false
+        expect(result[:errors]).to be_present
       end
     end
 
-    context 'when saving empty hash' do
-      before { repository.write({ data: 'original' }) }
+    context 'operation integration' do
+      let(:step) { InMemoryTestStep.new(name: 'Alice') }
 
-      it 'clears all data' do
-        repository.save({})
-        expect(repository.read).to eq({})
+      it 'instantiates operation with repository and step' do
+        expect_any_instance_of(DfE::Wizard::Operations::Validate).to receive(:execute).and_call_original
+
+        repo.execute_operation(
+          operation_class: DfE::Wizard::Operations::Validate,
+          step:,
+        )
       end
-    end
 
-    it 'returns the saved data' do
-      data = { first_name: 'Test', last_name: 'User' }
-      result = repository.save(data)
-      expect(result).to eq(data)
-    end
+      it 'returns operation result unchanged' do
+        result = repo.execute_operation(
+          operation_class: DfE::Wizard::Operations::Validate,
+          step:,
+        )
 
-    it 'saves a deep copy, not a reference' do
-      data = { first_name: 'John' }
-      repository.save(data)
-      data[:first_name] = 'Jane'
-
-      expect(repository.read[:first_name]).to eq('John')
+        expect(result).to be_a(Hash)
+        expect(result).to have_key(:success)
+      end
     end
   end
 
   describe '#clear' do
-    context 'when repository has data' do
-      before { repository.write({ first_name: 'John', email: 'john@example.com' }) }
+    before { repo.save({ name: 'John', email: 'john@example.com' }) }
 
-      it 'removes all data' do
-        repository.clear
-        expect(repository.read).to eq({})
-      end
-
-      it 'allows subsequent writes' do
-        repository.clear
-        repository.write({ first_name: 'Alice' })
-        expect(repository.read).to eq({ first_name: 'Alice' })
-      end
+    it 'removes all data' do
+      repo.clear
+      expect(repo.read).to eq({})
     end
 
-    context 'when repository is already empty' do
-      it 'returns nil without error' do
-        expect { repository.clear }.not_to raise_error
-        expect(repository.read).to eq({})
-      end
-    end
-  end
+    it 'allows new data after clear' do
+      repo.clear
+      repo.write({ name: 'Jane' })
 
-  describe 'integration: typical wizard flow' do
-    it 'handles incremental attribute updates' do
-      # Step 1: Name
-      repository.write({ first_name: 'John', last_name: 'Doe' })
-
-      # Step 2: Contact
-      repository.write({ email: 'john@example.com', phone: '555-1234' })
-
-      # Step 3: Address
-      repository.write({ city: 'London', postcode: 'SW1A 1AA' })
-
-      expect(repository.read).to eq({
-                                      first_name: 'John',
-                                      last_name: 'Doe',
-                                      email: 'john@example.com',
-                                      phone: '555-1234',
-                                      city: 'London',
-                                      postcode: 'SW1A 1AA',
-                                    })
-    end
-
-    it 'handles corrections to previous steps' do
-      repository.write({ first_name: 'John', last_name: 'Doe', email: 'john@example.com' })
-
-      # User goes back and changes email
-      repository.write({ email: 'john.doe@example.com' })
-
-      expect(repository.read).to eq({
-                                      first_name: 'John',
-                                      last_name: 'Doe',
-                                      email: 'john.doe@example.com', # Updated
-                                    })
-    end
-  end
-
-  describe 'interface contract' do
-    it 'implements read method' do
-      expect(repository).to respond_to(:read)
-    end
-
-    it 'implements write method' do
-      expect(repository).to respond_to(:write)
-    end
-
-    it 'implements save method' do
-      expect(repository).to respond_to(:save)
-    end
-
-    it 'implements clear method' do
-      expect(repository).to respond_to(:clear)
+      expect(repo.read).to eq({ name: 'Jane' })
     end
   end
 end

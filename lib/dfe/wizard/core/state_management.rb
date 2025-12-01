@@ -36,6 +36,74 @@ module DfE
       #
       # @api public
       module StateManagement
+        # Get or create the steps operator configuration
+        #
+        # Returns the wizard's configured steps_operator, or creates a default one
+        # if the wizard doesn't explicitly define {#steps_operator}.
+        #
+        # ## Default Behavior
+        #
+        # If your wizard doesn't define a `steps_operator` method, this provides:
+        # - **All steps**: Default to [Validate, Persist] operations
+        # - **No filtering**: Same operations run for all steps
+        # - **Extensible**: Override `steps_operator` in your wizard to customize
+        #
+        # ## Examples
+        #
+        # ### No custom steps_operator (uses default)
+        # ```
+        # class MyWizard
+        #   include DfE::Wizard
+        # Don't define steps_operator - uses defaults!
+        # All steps: [Validate, Persist]
+        # end
+        # ```
+        #
+        # ### Custom operations for specific steps
+        #
+        # ```
+        # class MyWizard
+        #   include DfE::Wizard
+        #
+        #   def steps_operator
+        #       StepsOperator::Builder.draw(wizard: self, callable: state_store) do |b|
+        #         # use: option replaces all defaults so you need to add Validate
+        #         b.on_step(:payment, use: [Validate, ProcessPayment, Persist])
+        #         b.on_step(:notification, use: [SendNotification])
+        #
+        #         # add just add to Validate, Persist defaults,
+        #         # you can use to do extra tasks
+        #         b.on_step(:notification, add: [SomeAPICall])
+        #       end
+        #     end
+        #   end
+        # ```
+        #
+        # ### Per-step operation override
+        # ```
+        # def steps_operator
+        #   StepsOperator::Builder.draw(wizard: self, callable: state_store) do |b|
+        #     b.on_step(:review, use: [])  # Skip all operations
+        #     b.on_step(:final, use: [Validate, Persist, SubmitToAPI])
+        #   end
+        # end
+        # ```
+        #
+        # @return [DfE::Wizard::StepsOperator::Builder] Configured steps operator
+        # @raise [NotImplementedError] If wizard doesn't define steps_operator and no default available
+        #
+        # @see StepsOperator::Builder For custom configuration
+        # @api public
+        def steps_operator
+          @steps_operator ||= DfE::Wizard::StepsOperator::Builder.draw(
+            wizard: self,
+            callable: state_store,
+          ) do |_builder|
+            # Default: all steps use [Validate, Persist]
+            # No explicit configuration needed
+          end
+        end
+
         # Read complete wizard data with nested step structure
         #
         # Returns all persisted state transformed from flat repository storage
@@ -129,30 +197,93 @@ module DfE
           all_steps.except(*flow_path)
         end
 
-        # Save current step data to repository
+        # Save current step using configured operations pipeline
         #
-        # Validates current step, extracts serializable data, flattens it,
-        # and merges into repository. Returns false if validation fails.
+        # Gets the configured operations for the current step from `steps_operator`,
+        # then executes them in sequence via the callable (typically state_store).
+        # Returns true only if all operations succeed.
         #
-        # @return [Boolean] true if save successful, false if validation failed
+        # Default pipeline: [Validate, Persist]
+        # - Validate runs first (can be skipped with `use: [...]`)
+        # - Persist runs after (can be replaced entirely)
         #
-        # @example
-        #   if wizard.current_step.valid?
-        #     wizard.save
+        # **Fails fast**: stops and returns false on first failed operation.
+        #
+        # @return [Boolean] true if all operations succeeded, false if any failed
+        #
+        # @example With default operations
+        #   wizard.save_current_step  # Runs Validate, then Persist
+        #   # => true if valid and persisted, false if validation failed
+        #
+        # @example With custom operations (see steps_operator in your wizard)
+        #   def steps_operator
+        #     StepsOperator::Builder.draw(wizard: self, callable: state_store) do |b|
+        #       b.on_step(:payment, use: [Validate, ProcessPayment, Persist])
+        #     end
         #   end
         #
-        # @example Idiomatic usage
-        #   wizard.save if wizard.current_step_valid?
-        #
-        # @see Validation#current_step_valid?
+        # @see StepsOperator::Builder
+        # @see Operations
         # @api public
-        def save
-          return false unless current_step.valid?
+        def save_current_step
+          operations = steps_operator.operations_for(current_step_name)
 
-          step_data = current_step.serializable_data
+          operations.each do |operation_class|
+            result = execute_operation(operation_class:, step: current_step)
 
-          state_store.write(step_data) # Repository merges flat attributes
+            return false unless result[:success]
+          end
+
           true
+        end
+
+        # Executes a given operation class on a specific step, delegating to
+        # the configured callable.
+        #
+        # This method acts as a thin wrapper around the actual execution call,
+        # respecting the concept of encapsulation.
+        #
+        # It forwards the operation class and step object to the current steps
+        # operator's callable, which typically is a repository or similar
+        # persistence layer capable of executing operations.
+        #
+        # It simplifies the process of executing an operation within the
+        # wizard's context, allowing you to invoke operations directly and
+        # inline, while adhering to the law of demeter.
+        #
+        # @param operation_class [Class] The class of the operation to execute.
+        # Must respond to `new(repository:, step:).execute`.
+        #   Example: `Validate`, `CreateMyRecordOnSpecificConditions`.
+        #
+        # @param step [Object] The current step object instance (or step data object)
+        #   that contains the data to be validated, persisted, or manipulated.
+        #   Example: an instance including `ActiveModel::Model` or custom step class.
+        #
+        # @return [Hash] The result hash returned by the operation's `execute` method.
+        #   Typically contains at least:
+        #   - `:success` [Boolean] indicating the success of the operation.
+        #   - Optional `:errors` [Hash] with validation errors if success is false.
+        #
+        # @example Basic usage
+        #   result = execute_operation(operation_class: Validate, step: current_step)
+        #   if result[:success]
+        #     # Proceed
+        #   else
+        #     # Handle errors
+        #   end
+        #
+        # @example Usage within wizard context
+        #   def save_current_step
+        #     result = execute_operation(operation_class: Validate, step: current_step)
+        #     unless result[:success]
+        #       # handle validation errors
+        #     end
+        #   end
+        #
+        # @see #steps_operator for accessing the current operations configuration
+        #
+        def execute_operation(operation_class:, step:)
+          steps_operator.callable.execute_operation(operation_class:, step:)
         end
 
         # Write arbitrary data to state (merge)
