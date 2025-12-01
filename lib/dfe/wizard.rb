@@ -136,6 +136,7 @@ module DfE
     #
     # @api public
     module Repository
+      autoload :Base, 'dfe/wizard/repository/base'
       autoload :InMemory, 'dfe/wizard/repository/in_memory'
       autoload :Session, 'dfe/wizard/repository/session'
       autoload :Redis, 'dfe/wizard/repository/redis'

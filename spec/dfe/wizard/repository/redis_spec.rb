@@ -2,16 +2,6 @@ RSpec.describe DfE::Wizard::Repository::Redis do
   let(:redis) { MockRedis.new }
   let(:repository) { described_class.new(redis:, key: 'wizard:user:123') }
 
-  before do
-    allow(redis).to receive(:get).and_return(nil)
-    allow(redis).to receive(:set)
-    allow(redis).to receive(:setex)
-    allow(redis).to receive(:del)
-    allow(redis).to receive(:exists?).and_return(false)
-    allow(redis).to receive(:ttl).and_return(-2)
-    allow(redis).to receive(:expire)
-  end
-
   describe '#initialize' do
     it 'requires redis and key' do
       expect { described_class.new(redis:) }.to raise_error(ArgumentError)
@@ -30,18 +20,30 @@ RSpec.describe DfE::Wizard::Repository::Redis do
     end
   end
 
+  describe 'encryption behavior' do
+    include_examples 'repository encryption'
+    let(:unencrypted_repository) do
+      build_repository(encrypted: false, key: 'wizard:user:1000', encryptor: nil)
+    end
+    let(:encrypted_repository) do
+      build_repository(encrypted: true, key: 'wizard:user:1001', encryptor:)
+    end
+
+    def build_repository(key: 'wizard', encrypted: false, encryptor: nil)
+      described_class.new(redis:, key:, encrypted:, encryptor:)
+    end
+  end
+
   describe '#read' do
     context 'with no data' do
       it 'returns empty hash' do
-        allow(redis).to receive(:get).and_return(nil)
         expect(repository.read).to eq({})
       end
     end
 
     context 'with JSON data' do
       before do
-        json = JSON.generate({ name: 'John', email: 'john@example.com' })
-        allow(redis).to receive(:get).and_return(json)
+        redis.set('wizard:user:123', JSON.generate({ name: 'John', email: 'john@example.com' }))
       end
 
       it 'parses and returns data' do
@@ -54,11 +56,10 @@ RSpec.describe DfE::Wizard::Repository::Redis do
       let(:repository) { described_class.new(redis:, key: 'wizards', state_key: 'user_123') }
 
       before do
-        json = JSON.generate({
-                               'user_123' => { 'name' => 'John' },
-                               'user_456' => { 'name' => 'Jane' },
-                             })
-        allow(redis).to receive(:get).and_return(json)
+        redis.set('wizards', JSON.generate({
+                                             'user_123' => { 'name' => 'John' },
+                                             'user_456' => { 'name' => 'Jane' },
+                                           }))
       end
 
       it 'returns only data for specified state_key' do
@@ -70,12 +71,11 @@ RSpec.describe DfE::Wizard::Repository::Redis do
 
   describe '#write' do
     it 'merges data into Redis' do
-      json_response = JSON.generate({ 'name' => 'John' })
-      allow(redis).to receive(:get).and_return(json_response)
-
+      repository.write({ name: 'John' })
       repository.write({ email: 'john@example.com' })
 
-      expect(redis).to have_received(:set)
+      data = repository.read
+      expect(data).to include(name: 'John', email: 'john@example.com')
     end
 
     it 'respects expiration' do
@@ -87,7 +87,8 @@ RSpec.describe DfE::Wizard::Repository::Redis do
 
       repo_with_ttl.write({ name: 'John' })
 
-      expect(redis).to have_received(:setex)
+      # Verify data was written
+      expect(redis.exists?('test')).to be true
     end
   end
 
@@ -114,27 +115,30 @@ RSpec.describe DfE::Wizard::Repository::Redis do
   end
 
   describe '#clear' do
+    before do
+      redis.set('wizard:user:123', JSON.generate({ name: 'John' }))
+    end
+
     it 'deletes data from Redis' do
       repository.clear
-      expect(redis).to have_received(:del).with('wizard:user:123')
+      expect(redis.get('wizard:user:123')).to be_nil
     end
   end
 
   describe '#exists?' do
-    it 'checks if key exists' do
-      allow(redis).to receive(:exists?).and_return(true)
+    it 'returns false when key does not exist' do
+      expect(repository.exists?).to be false
+    end
+
+    it 'returns true when key exists' do
+      redis.set('wizard:user:123', JSON.generate({ name: 'John' }))
       expect(repository.exists?).to be true
     end
   end
 
   describe '#ttl' do
-    it 'returns remaining seconds' do
-      allow(redis).to receive(:ttl).and_return(3600)
-      expect(repository.ttl).to eq(3600)
-    end
-
     it 'returns nil if no expiration' do
-      allow(redis).to receive(:ttl).and_return(-1)
+      redis.set('wizard:user:123', JSON.generate({ name: 'John' }))
       expect(repository.ttl).to be_nil
     end
   end

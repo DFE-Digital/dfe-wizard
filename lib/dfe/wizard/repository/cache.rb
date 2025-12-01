@@ -5,146 +5,180 @@ module DfE
       #
       # Stores wizard data using Rails caching duck typing.
       # Works with any Rails cache store (Memory, Redis, Solid Cache, Memcached, etc.)
+      # Supports optional encryption for sensitive data.
+      # Developer MUST provide encryptor when encryption is enabled.
       #
-      # @example Basic usage
-      #   repo = DfE::Wizard::Repository::Cache.new(
+      # ## Configuration Options
+      #
+      # - `cache` (required) - Rails cache store instance (e.g., Rails.cache)
+      # - `key` (required) - Cache key for storage (e.g., "wizard:user_123")
+      # - `namespace` (optional) - Cache namespace prefix
+      # - `expires_in` (optional) - TTL in seconds or ActiveSupport::Duration
+      # - `encrypted` (optional) - Enable encryption (default: false)
+      # - `encryptor` (optional) - Encryptor instance (required if encrypted: true)
+      #
+      # ## Encryption
+      #
+      # When `encrypted: true`, all string values are encrypted before storage
+      # and decrypted transparently on read. Non-string values (nil, integers, booleans)
+      # are NOT encrypted, only stored as-is.
+      #
+      # To use encryption, provide an encryptor implementing:
+      # - `encrypt_and_sign(value)` → encrypted string
+      # - `decrypt_and_verify(value)` → original value
+      #
+      # Raises `RuntimeError` if decryption fails.
+      #
+      # ## Inheritance
+      #
+      # Inherits from Base and implements the repository pattern for cache storage.
+      # The Base class handles all encryption/decryption orchestration.
+      #
+      # @example Basic usage (no encryption)
+      #   repository = DfE::Wizard::Repository::Cache.new(
       #     cache: Rails.cache,
       #     key: "wizard:assign_mentor:user_123"
       #   )
+      #   repository.write({ first_name: 'John', last_name: 'Doe' })
+      #   repository.read  # => { first_name: 'John', last_name: 'Doe' }
+      #
+      # @example With namespace for multiple wizards
+      #   repository = DfE::Wizard::Repository::Cache.new(
+      #     cache: Rails.cache,
+      #     key: "wizard:data",
+      #     namespace: "user_#{user_id}:wizard_session"
+      #   )
       #
       # @example With expiration
-      #   repo = DfE::Wizard::Repository::Cache.new(
+      #   repository = DfE::Wizard::Repository::Cache.new(
       #     cache: Rails.cache,
-      #     key: "wizard:user_123",
-      #     expires_in: 24.hours
+      #     key: "wizard:temporary",
+      #     expires_in: 1.hour
       #   )
       #
-      # @example With namespace
-      #   repo = DfE::Wizard::Repository::Cache.new(
+      # @example With encryption
+      #   encryptor = Rails.application.message_encryptor
+      #   repository = DfE::Wizard::Repository::Cache.new(
       #     cache: Rails.cache,
-      #     key: "user_123",
-      #     namespace: "wizards:assign_mentor"
+      #     key: "wizard:sensitive",
+      #     encrypted: true,
+      #     encryptor: encryptor
       #   )
-      class Cache
-        attr_reader :cache, :key, :namespace, :expires_in
+      #   repository.write({ ssn: '123-45-6789' })  # Encrypted in cache
+      #   repository.read[:ssn]                      # => '123-45-6789' (decrypted)
+      #
+      # @api public
+      class Cache < Base
+        attr_reader :cache, :cache_key, :namespace, :expires_in
 
+        # Initialize cache repository
+        #
         # @param cache [ActiveSupport::Cache::Store] Rails cache instance
         # @param key [String] Cache key for storage
         # @param namespace [String, nil] Optional namespace prefix
-        # @param expires_in [Integer, ActiveSupport::Duration, nil] TTL
-        def initialize(cache:, key:, namespace: nil, expires_in: nil)
+        # @param expires_in [Integer, ActiveSupport::Duration, nil] TTL in seconds
+        # @param encrypted [Boolean] Enable encryption (default: false)
+        # @param encryptor [Object, nil] Encryptor instance (required if encrypted: true)
+        #
+        # @return [void]
+        #
+        # @raise [ArgumentError] if cache is nil
+        # @raise [ArgumentError] if key is nil
+        # @raise [ArgumentError] if encrypted: true but no encryptor provided
+        #
+        # @example
+        #   cache = Rails.cache
+        #   repository = DfE::Wizard::Repository::Cache.new(
+        #     cache: cache,
+        #     key: "wizard:user:123"
+        #   )
+        def initialize(cache:, key:, namespace: nil, expires_in: nil, encrypted: false, encryptor: nil)
           raise ArgumentError, 'cache cannot be nil' if cache.nil?
           raise ArgumentError, 'key cannot be nil' if key.nil?
 
+          super(encrypted: encrypted, encryptor: encryptor)
           @cache = cache
-          @key = key
+          @cache_key = key
           @namespace = namespace
           @expires_in = expires_in
         end
 
-        # Read wizard data from cache
+        # Check if wizard data exists in cache
         #
-        # @return [Hash] Flat hash of wizard attributes
-        def read
-          data = cache.read(cache_key, namespace:)
-          return {} if data.nil?
-
-          data.deep_symbolize_keys
-        end
-
-        # Write wizard data to cache
-        #
-        # @param hash [Hash] Flat hash of attributes to merge
-        # @return [void]
-        def write(hash)
-          normalized = hash.deep_stringify_keys
-          current_data = cache.read(cache_key, namespace:) || {}
-          merged_data = current_data.merge(normalized)
-          cache.write(
-            cache_key,
-            merged_data,
-            namespace:,
-            expires_in:,
-          )
-        end
-
-        # Save state atomically by replacing entire data
-        #
-        # @param hash [Hash] Complete state to save
-        # @return [void]
-        def save(hash)
-          normalized = hash.deep_stringify_keys
-          cache.write(
-            cache_key,
-            normalized,
-            namespace:,
-            expires_in:,
-          )
-        end
-
-        # Execute an operation in the repository context
-        #
-        # Instantiates the operation class with this repository and the step,
-        # then calls its `execute` method.
-        #
-        # @param operation_class [Class] Operation class to instantiate and execute
-        #   Must respond to `new(repository:, step:).execute`
-        # @param step [Object] Step instance containing data to operate on
-        # @return [Hash] Operation result hash
-        #   - `:success` [Boolean] Whether operation succeeded
-        #   - `:errors` [Hash] Validation errors if success is false
-        #
-        # @example Execute validation operation
-        #   result = repo.execute_operation(
-        #     operation_class: DfE::Wizard::Operations::Validate,
-        #     step: step_instance
-        #   )
-        #   # => { success: true } or { success: false, errors: {...} }
-        #
-        # @example Execute persistence operation
-        #   result = repo.execute_operation(
-        #     operation_class: DfE::Wizard::Operations::Persist,
-        #     step: step_instance
-        #   )
-        #   # => { success: true }
-        #
-        # @see DfE::Wizard::Operations::Validate For validation operation
-        # @see DfE::Wizard::Operations::Persist For persistence operation
-        # @api public
-        def execute_operation(operation_class:, step:)
-          operation_class.new(repository: self, step:).execute
-        end
-
-        # Clear all wizard data from cache
-        #
-        # @return [void]
-        def clear
-          cache.delete(cache_key, namespace:)
-        end
-
-        # Check if wizard data exists
-        #
-        # @return [Boolean]
+        # @return [Boolean] true if data exists in cache
         def exists?
-          cache.exist?(cache_key, namespace:)
+          @cache.exist?(@cache_key, namespace: @namespace)
         end
 
-        # Refresh expiration timer
+        # Refresh the expiration timer on cached data
         #
-        # Only works if cache store supports touch (e.g., Redis, Memcached)
+        # Only works if the cache store supports touch (e.g., Redis, Memcached).
+        # Memory store does not support touch.
         #
-        # @return [Boolean] true if expiration was refreshed
+        # @return [Boolean] true if expiration was refreshed, false if not supported
+        #
+        # @example
+        #   if repository.refresh_expiration
+        #     puts "Cache expiration refreshed"
+        #   else
+        #     puts "Cache store doesn't support expiration refresh"
+        #   end
         def refresh_expiration
-          return false unless expires_in
-          return false unless cache.respond_to?(:touch)
+          return false unless @expires_in
+          return false unless @cache.respond_to?(:touch)
 
-          cache.touch(cache_key, namespace:, expires_in:)
+          @cache.touch(@cache_key, namespace: @namespace, expires_in: @expires_in)
         end
 
-        private
+        # Read raw data from cache
+        #
+        # Called by Base#read to fetch raw (potentially encrypted) data.
+        # Symbolizes keys for Ruby convenience.
+        #
+        # @return [Hash] Raw data from cache (empty hash if not cached)
+        # @api public
+        def read_data
+          data = @cache.read(@cache_key, namespace: @namespace)
+          data ? data.deep_symbolize_keys : {}
+        end
 
-        def cache_key
-          key
+        # Write raw data to cache
+        #
+        # Called by Base#write to persist raw (potentially encrypted) data.
+        # Respects namespace and expiration settings.
+        #
+        # @param hash [Hash] Raw data to write
+        # @return [void]
+        # @api public
+        def write_data(hash)
+          @cache.write(
+            @cache_key,
+            hash,
+            namespace: @namespace,
+            expires_in: @expires_in,
+          )
+        end
+
+        # Delete data from cache
+        #
+        # Called by Base#clear to remove all wizard data.
+        #
+        # @return [void]
+        # @api public
+        def delete_data
+          @cache.delete(@cache_key, namespace: @namespace)
+        end
+
+        # Transform data before encryption
+        #
+        # Converts symbol keys to string keys for Rails cache compatibility.
+        # Called by Base#write before encryption.
+        #
+        # @param data [Hash] Data to transform
+        # @return [Hash] Transformed data with string keys
+        # @api public
+        def transform_for_write(data)
+          data.deep_stringify_keys
         end
       end
     end

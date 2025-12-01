@@ -24,6 +24,20 @@ RSpec.describe DfE::Wizard::Repository::InMemory do
     end
   end
 
+  describe 'encryption behavior' do
+    include_examples 'repository encryption'
+    let(:unencrypted_repository) do
+      build_repository(encrypted: false, encryptor: nil)
+    end
+    let(:encrypted_repository) do
+      build_repository(encrypted: true, encryptor:)
+    end
+
+    def build_repository(encrypted: false, encryptor: nil)
+      described_class.new(encrypted:, encryptor:)
+    end
+  end
+
   describe '#write' do
     it 'merges data into existing state' do
       repo.write({ name: 'John' })
