@@ -19,6 +19,20 @@ RSpec.describe DfE::Wizard::Repository::Session do
     end
   end
 
+  describe 'encryption behavior' do
+    include_examples 'repository encryption'
+    let(:unencrypted_repository) do
+      build_repository(key: 'wizard:1', encrypted: false, encryptor: nil)
+    end
+    let(:encrypted_repository) do
+      build_repository(key: 'wizard:2', encrypted: true, encryptor:)
+    end
+
+    def build_repository(key: 'wizard_state', encrypted: false, encryptor: nil)
+      described_class.new(session:, key:, encrypted:, encryptor:)
+    end
+  end
+
   describe '#read' do
     context 'with no data' do
       it 'returns empty hash' do

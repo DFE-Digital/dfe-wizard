@@ -25,12 +25,14 @@ module DfE
       #   )
       #
       # @api public
-      class InMemory
+      class InMemory < Base
         # Initialize empty in-memory store
         #
         # @return [void]
-        def initialize
+        def initialize(encrypted: false, encryptor: nil)
           @data = {}
+
+          super
         end
 
         # Read complete wizard state from memory
@@ -40,8 +42,8 @@ module DfE
         # @return [Hash] Complete wizard state (empty hash if never written)
         #
         # @example
-        #   repo.read  # => { steps: { name: { first_name: 'John' } } }
-        def read
+        #   repo.read_data  # => { steps: { name: { first_name: 'John' } } }
+        def read_data
           @data.deep_dup
         end
 
@@ -58,7 +60,7 @@ module DfE
         #   repo.write({ steps: { email: { email: 'john@example.com' } } })
         #   repo.read[:steps]
         #   # => { name: { first_name: 'John' }, email: { email: 'john@example.com' } }
-        def write(hash)
+        def write_data(hash)
           @data.deep_merge!(hash)
         end
 
@@ -79,7 +81,9 @@ module DfE
         #     completed: true
         #   })
         def save(hash)
-          @data = hash.deep_dup
+          encrypted_data = encrypted? ? encrypt_hash(hash) : hash
+
+          @data = encrypted_data.deep_dup
         end
 
         # Execute operation in repository context

@@ -1,16 +1,27 @@
 module DfE
   module Wizard
     module Repository
-      # Redis-backed repository for wizard state storage
+      # Redis-backed repository for wizard state storage.
       #
       # Stores wizard data in Redis with automatic expiration and JSON serialization.
       # Supports optional nested state structure for multi-wizard scenarios.
       #
-      # @example Basic usage
+      # @attr_reader [Redis, ConnectionPool] redis
+      #   The Redis client or connection pool used for all operations.
+      # @attr_reader [String] key
+      #   The Redis key used as the global identifier for this wizard state.
+      # @attr_reader [String, nil] state_key
+      #   Optional: a nested key, allowing for multiple wizard states under the same Redis key.
+      # @attr_reader [Integer, nil] expiration
+      #   Optional: expiration (TTL in seconds) for the Redis key or state.
+      #
+      # @example Simple single-wizard usage with no expiration
       #   repo = DfE::Wizard::Repository::Redis.new(
       #     redis: Redis.new,
       #     key: "wizard:assign_mentor:user_123"
       #   )
+      #   repo.write(name: "Maria")
+      #   repo.read # => { name: "Maria" }
       #
       # @example With expiration
       #   repo = DfE::Wizard::Repository::Redis.new(
@@ -25,14 +36,30 @@ module DfE
       #     key: "wizards:user_123",
       #     state_key: params[:state_key] || SecureRandom.uuid
       #   )
-      class Redis
+      #
+      # @example With encryption
+      #   repo = DfE::Wizard::Repository::Redis.new(
+      #     redis: Redis.new,
+      #     key: "wizard:user_123",
+      #     encrypted: true,
+      #     encryptor: MyEncryptor.new(secret)
+      #   )
+      #
+      # @api public
+      class Redis < Base
         attr_reader :redis, :key, :state_key, :expiration
 
-        # @param redis [Redis, ConnectionPool] Redis client or connection pool
-        # @param key [String] Redis key for storage
-        # @param state_key [String, nil] Optional nested key for multi-wizard scenarios
-        # @param expiration [Integer, ActiveSupport::Duration, nil] TTL in seconds
-        def initialize(redis:, key:, state_key: nil, expiration: nil)
+        # Initialize with Redis client, key, and additional options.
+        #
+        # @param redis [Redis, ConnectionPool] Redis client or connection pool.
+        # @param key [String] Primary Redis key for the wizard state.
+        # @param state_key [String, nil] Optional nested state key (for multi-wizard support).
+        # @param expiration [Integer, ActiveSupport::Duration, nil] TTL in seconds or duration.
+        # @param encrypted [Boolean] Enable encryption (default: false).
+        # @param encryptor [Object, nil] Encryptor instance (required if encrypted: true).
+        #
+        # @raise [ArgumentError] if redis or key are nil.
+        def initialize(redis:, key:, state_key: nil, expiration: nil, encrypted: false, encryptor: nil)
           raise ArgumentError, 'redis cannot be nil' if redis.nil?
           raise ArgumentError, 'key cannot be nil' if key.nil?
 
@@ -40,129 +67,98 @@ module DfE
           @key = key
           @state_key = state_key
           @expiration = normalize_expiration(expiration)
+
+          super(encrypted: encrypted, encryptor: encryptor)
         end
 
-        # Read wizard data from Redis
-        #
-        # @return [Hash] Flat hash of wizard attributes
-        def read
-          with_redis do |conn|
-            json_data = conn.get(key)
-            return {} if json_data.nil?
+        # @return [Boolean] Whether the primary Redis key exists.
+        def exists?
+          with_redis { |conn| conn.exists?(@key) }
+        end
 
-            parsed = JSON.parse(json_data)
-            if state_key
-              parsed.fetch(state_key, {}).deep_symbolize_keys
-            else
-              parsed.deep_symbolize_keys
-            end
+        # @return [Integer, nil] Time-to-live in seconds for the Redis key, or nil if not set.
+        def ttl
+          with_redis do |conn|
+            ttl_value = conn.ttl(@key)
+            ttl_value >= 0 ? ttl_value : nil
           end
         end
 
-        # Write wizard data to Redis
-        #
-        # @param hash [Hash] Flat hash of attributes to merge
-        # @return [void]
-        def write(hash)
-          normalized = hash.deep_stringify_keys
+        # Refresh the expiration TTL on the Redis key.
+        # @return [Boolean] True if expiration was set, false if not configured.
+        def refresh_expiration
+          return false unless @expiration
+
+          with_redis { |conn| conn.expire(@key, @expiration) }
+        end
+
+        # @api public
+        # @return [Hash] Raw (possibly encrypted) data stored in Redis, symbolized keys.
+        def read_data
           with_redis do |conn|
-            if state_key
-              write_nested(conn, normalized)
-            else
-              write_flat(conn, normalized)
-            end
+            json_data = conn.get(@key)
+            return {} if json_data.nil?
+
+            parsed = JSON.parse(json_data)
+            @state_key ? parsed.fetch(@state_key, {}).deep_symbolize_keys : parsed.deep_symbolize_keys
+          end
+        end
+
+        # @api public
+        # Write raw (already-encrypted if needed) data to Redis.
+        # @param hash [Hash] Flat or nested structure to persist.
+        # @return [void]
+        def write_data(hash)
+          with_redis do |conn|
+            @state_key ? write_nested(conn, hash) : write_flat(conn, hash)
           end
         end
 
         # Save state atomically by replacing entire data
         #
+        # Overwrites all previous data. Use when you have a complete snapshot
+        # or want to replace state entirely (e.g., during testing setup).
+        # Data is encrypted if encryption is enabled.
+        #
         # @param hash [Hash] Complete state to save
         # @return [void]
+        #
+        # @example Replace entire wizard state
+        #   repository.save({ name: 'Jane', email: 'jane@example.com' })
         def save(hash)
-          normalized = hash.deep_stringify_keys
+          return if hash.nil?
+
+          data_to_save = transform_for_write(hash)
+          encrypted_data = encrypted? ? encrypt_hash(data_to_save) : data_to_save
+
           with_redis do |conn|
-            if state_key
-              save_nested(conn, normalized)
+            if @state_key
+              save_nested(conn, encrypted_data)
             else
-              save_flat(conn, normalized)
+              save_flat(conn, encrypted_data)
             end
           end
         end
 
-        # Execute an operation in the repository context
-        #
-        # Instantiates the operation class with this repository and the step,
-        # then calls its `execute` method.
-        #
-        # @param operation_class [Class] Operation class to instantiate and execute
-        #   Must respond to `new(repository:, step:).execute`
-        # @param step [Object] Step instance containing data to operate on
-        # @return [Hash] Operation result hash
-        #   - `:success` [Boolean] Whether operation succeeded
-        #   - `:errors` [Hash] Validation errors if success is false
-        #
-        # @example Execute validation operation
-        #   result = repo.execute_operation(
-        #     operation_class: DfE::Wizard::Operations::Validate,
-        #     step: step_instance
-        #   )
-        #   # => { success: true } or { success: false, errors: {...} }
-        #
-        # @example Execute persistence operation
-        #   result = repo.execute_operation(
-        #     operation_class: DfE::Wizard::Operations::Persist,
-        #     step: step_instance
-        #   )
-        #   # => { success: true }
-        #
-        # @see DfE::Wizard::Operations::Validate For validation operation
-        # @see DfE::Wizard::Operations::Persist For persistence operation
         # @api public
-        def execute_operation(operation_class:, step:)
-          operation_class.new(repository: self, step:).execute
-        end
-
-        # Clear all wizard data from Redis
-        #
+        # Remove the wizard state from Redis.
         # @return [void]
-        def clear
-          with_redis do |conn|
-            conn.del(key)
-          end
+        def delete_data
+          with_redis { |conn| conn.del(@key) }
         end
 
-        # Check if wizard data exists
-        #
-        # @return [Boolean]
-        def exists?
-          with_redis do |conn|
-            conn.exists?(key)
-          end
+        # @api public
+        # Prepare data before saving (stringify keys for JSON/Redis).
+        # @param data [Hash]
+        # @return [Hash] Same structure with string keys.
+        def transform_for_write(data)
+          data.deep_stringify_keys
         end
 
-        # Get remaining TTL
-        #
-        # @return [Integer, nil] Seconds until expiration, nil if no expiration
-        def ttl
-          with_redis do |conn|
-            ttl_value = conn.ttl(key)
-            ttl_value >= 0 ? ttl_value : nil
-          end
-        end
-
-        # Refresh expiration timer
-        #
-        # @return [Boolean] true if expiration was set
-        def refresh_expiration
-          return false unless expiration
-
-          with_redis do |conn|
-            conn.expire(key, expiration)
-          end
-        end
-
-        private
-
+        # @api public
+        # Normalize expiration input into seconds.
+        # @param value [Integer, ActiveSupport::Duration, nil]
+        # @return [Integer, nil] seconds or nil.
         def normalize_expiration(value)
           return nil if value.nil?
           return value if value.is_a?(Integer)
@@ -170,58 +166,66 @@ module DfE
           value.respond_to?(:to_i) ? value.to_i : value
         end
 
-        def with_redis(&)
-          if redis.is_a?(ConnectionPool)
-            redis.with(&)
+        # @api public
+        # Execute Redis command, using ConnectionPool if available.
+        # @yieldparam conn [Redis] The connection instance.
+        def with_redis
+          if @redis.is_a?(ConnectionPool)
+            @redis.with { |conn| yield conn }
           else
-            yield redis
+            yield @redis
           end
         end
 
-        def write_flat(conn, normalized)
-          current_json = conn.get(key)
+        # @api public
+        # Merges new data with existing JSON for flat keys.
+        def write_flat(conn, data)
+          current_json = conn.get(@key)
           current_data = current_json ? JSON.parse(current_json) : {}
-          merged_data = current_data.merge(normalized)
+          merged_data = current_data.merge(data)
           json_output = JSON.generate(merged_data)
-          if expiration
-            conn.setex(key, expiration, json_output)
-          else
-            conn.set(key, json_output)
-          end
+
+          persist_to_redis(json_output)
         end
 
-        def write_nested(conn, normalized)
-          current_json = conn.get(key)
+        # @api public
+        # Merges new nested state for state_key scenario.
+        def write_nested(conn, data)
+          current_json = conn.get(@key)
           current_data = current_json ? JSON.parse(current_json) : {}
-          current_state = current_data.fetch(state_key, {})
-          merged_state = current_state.merge(normalized)
-          current_data[state_key] = merged_state
+          current_state = current_data.fetch(@state_key, {})
+          merged_state = current_state.merge(data)
+          current_data[@state_key] = merged_state
           json_output = JSON.generate(current_data)
-          if expiration
-            conn.setex(key, expiration, json_output)
-          else
-            conn.set(key, json_output)
-          end
+
+          persist_to_redis(json_output)
         end
 
-        def save_flat(conn, normalized)
-          json_output = JSON.generate(normalized)
-          if expiration
-            conn.setex(key, expiration, json_output)
-          else
-            conn.set(key, json_output)
-          end
+        # @api public
+        # Save (atomic replace) for flat keys - replaces entire data
+        def save_flat(_conn, data)
+          json_output = JSON.generate(data)
+          persist_to_redis(json_output)
         end
 
-        def save_nested(conn, normalized)
-          current_json = conn.get(key)
+        # @api public
+        # Save (atomic replace) for nested state - replaces only the state_key data
+        def save_nested(conn, data)
+          current_json = conn.get(@key)
           current_data = current_json ? JSON.parse(current_json) : {}
-          current_data[state_key] = normalized
+          current_data[@state_key] = data
           json_output = JSON.generate(current_data)
-          if expiration
-            conn.setex(key, expiration, json_output)
+
+          persist_to_redis(json_output)
+        end
+
+        # @api public
+        # Save into redis, passing expiration if any.
+        def persist_to_redis(json)
+          if @expiration
+            with_redis { |conn| conn.setex(@key, @expiration, json) }
           else
-            conn.set(key, json_output)
+            with_redis { |conn| conn.set(@key, json) }
           end
         end
       end

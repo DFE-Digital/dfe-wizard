@@ -20,6 +20,20 @@ RSpec.describe DfE::Wizard::Repository::Cache do
     end
   end
 
+  describe 'encryption behavior' do
+    include_examples 'repository encryption'
+    let(:unencrypted_repository) do
+      build_repository(encrypted: false, key: 'wizard:user:1000', encryptor: nil)
+    end
+    let(:encrypted_repository) do
+      build_repository(encrypted: true, key: 'wizard:user:1001', encryptor:)
+    end
+
+    def build_repository(encrypted: false, key: 'wizard:user:123', encryptor: nil)
+      described_class.new(cache:, key:, encrypted:, encryptor:)
+    end
+  end
+
   describe '#read' do
     context 'with no data' do
       it 'returns empty hash' do
@@ -56,8 +70,8 @@ RSpec.describe DfE::Wizard::Repository::Cache do
       repository.write({ name: 'John' })
       repository.write({ email: 'john@example.com' })
 
-      data = cache.read('wizard:user:123')
-      expect(data).to include('name' => 'John', 'email' => 'john@example.com')
+      data = repository.read
+      expect(data).to include(name: 'John', email: 'john@example.com')
     end
 
     it 'respects expiration' do
