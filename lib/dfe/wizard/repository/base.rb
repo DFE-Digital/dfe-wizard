@@ -7,9 +7,9 @@ module DfE
       # All repository implementations should inherit from this class.
       #
       # Subclasses MUST implement:
-      # - read_data (private) → Returns raw data from storage
-      # - write_data(hash) (private) → Writes raw data to storage
-      # - delete_data (private) → Removes data from storage
+      # - read_data → Returns raw data from storage
+      # - write_data(hash) → Writes raw data to storage
+      # - delete_data → Removes data from storage
       #
       # Subclasses MAY override:
       # - encrypted? → Boolean to enable/disable encryption
