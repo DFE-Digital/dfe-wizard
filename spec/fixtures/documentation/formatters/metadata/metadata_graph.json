@@ -1,0 +1,253 @@
+{
+  "structure_type": "graph",
+  "root_step": "organization_type",
+  "steps": {
+    "organization_type": {
+      "label": "Organization Type",
+      "class": "DfE::Wizard::StepsProcessor::Steps::OrganizationType",
+      "attributes": [
+        {
+          "name": "org_type",
+          "type": "Enum",
+          "required": true,
+          "description": "Type of organization: public_sector, private_sector, charity"
+        },
+        {
+          "name": "company_number",
+          "type": "String",
+          "required": false,
+          "description": "Companies House registration number (optional)"
+        }
+      ],
+      "validators": [
+        {
+          "name": "org_type",
+          "type": "presence",
+          "message": "cannot be blank",
+          "code": "validates :org_type, presence: true, inclusion: { in: %i[public_sector private_sector charity] }"
+        }
+      ],
+      "operations": [
+        {
+          "name": "format_company_number",
+          "hook": "before_save",
+          "description": "Format company number to remove spaces",
+          "code": "before_save :format_company_number\n\nprivate\ndef format_company_number\n  self.company_number = company_number&.gsub(/\\s+/, '')\nend"
+        }
+      ]
+    },
+    "waste_category": {
+      "label": "Waste Category",
+      "class": "DfE::Wizard::StepsProcessor::Steps::WasteCategory",
+      "attributes": [
+        {
+          "name": "category",
+          "type": "Enum",
+          "required": true,
+          "description": "Waste classification: upper_tier, lower_tier"
+        }
+      ],
+      "validators": [
+        {
+          "name": "category",
+          "type": "inclusion",
+          "message": "must be a valid waste category",
+          "code": "validates :category, presence: true, inclusion: { in: %i[upper_tier lower_tier] }"
+        }
+      ],
+      "operations": []
+    },
+    "activity_type": {
+      "label": "Activity Type",
+      "class": "DfE::Wizard::StepsProcessor::Steps::ActivityType",
+      "attributes": [
+        {
+          "name": "activity",
+          "type": "Enum",
+          "required": true,
+          "description": "Activity classification: listed, non_listed, exempt"
+        }
+      ],
+      "validators": [],
+      "operations": []
+    },
+    "office_address": {
+      "label": "Office Address",
+      "class": "DfE::Wizard::StepsProcessor::Steps::OfficeAddress",
+      "attributes": [
+        {
+          "name": "address_line_1",
+          "type": "String",
+          "required": true,
+          "description": "First line of address"
+        },
+        {
+          "name": "address_line_2",
+          "type": "String",
+          "required": false,
+          "description": "Second line of address"
+        },
+        {
+          "name": "city",
+          "type": "String",
+          "required": true,
+          "description": "City or town"
+        },
+        {
+          "name": "postcode",
+          "type": "String",
+          "required": true,
+          "description": "UK postcode format"
+        }
+      ],
+      "validators": [
+        {
+          "name": "address_line_1",
+          "type": "presence",
+          "message": "cannot be blank",
+          "code": "validates :address_line_1, presence: true"
+        },
+        {
+          "name": "postcode",
+          "type": "format",
+          "message": "must be valid UK postcode",
+          "code": "validates :postcode, format: { with: /\\A[A-Z]{1,2}\\d[A-Z\\d]? ?\\d[A-Z]{2}\\z/i }"
+        }
+      ],
+      "operations": [
+        {
+          "name": "geocode_address",
+          "hook": "after_save",
+          "description": "Lookup coordinates for address",
+          "code": "after_save :geocode_address"
+        }
+      ]
+    },
+    "review": {
+      "label": "Review Application",
+      "class": "DfE::Wizard::StepsProcessor::Steps::Review",
+      "attributes": [],
+      "validators": [],
+      "operations": [
+        {
+          "name": "validate_completeness",
+          "hook": "before_save",
+          "description": "Check all required fields are populated",
+          "code": "before_save :validate_completeness"
+        }
+      ]
+    },
+    "issue_certificate": {
+      "label": "Issue Certificate",
+      "class": "DfE::Wizard::StepsProcessor::Steps::IssueCertificate",
+      "attributes": [],
+      "validators": [],
+      "operations": [
+        {
+          "name": "generate_certificate",
+          "hook": "after_save",
+          "description": "Generate PDF certificate",
+          "code": "after_save :generate_certificate"
+        },
+        {
+          "name": "send_certificate_email",
+          "hook": "after_save",
+          "description": "Email certificate to applicant",
+          "code": "after_save :send_certificate_email"
+        }
+      ]
+    },
+    "rejection_notice": {
+      "label": "Rejection Notice",
+      "class": "DfE::Wizard::StepsProcessor::Steps::RejectionNotice",
+      "attributes": [],
+      "validators": [],
+      "operations": [
+        {
+          "name": "send_rejection_email",
+          "hook": "after_save",
+          "description": "Notify applicant of rejection",
+          "code": "after_save :send_rejection_email"
+        }
+      ]
+    },
+    "pending_info": {
+      "label": "Pending Information",
+      "class": "DfE::Wizard::StepsProcessor::Steps::PendingInfo",
+      "attributes": [],
+      "validators": [],
+      "operations": []
+    }
+  },
+  "transitions": [
+    {
+      "type": "simple",
+      "from": "organization_type",
+      "to": "waste_category",
+      "label": null
+    },
+    {
+      "type": "conditional",
+      "from": "waste_category",
+      "then": "activity_type",
+      "else": "office_address",
+      "label": "Upper tier waste?"
+    },
+    {
+      "type": "multiple_conditional",
+      "from": "activity_type",
+      "branches": [
+        {
+          "label": "Listed Activity",
+          "then": "office_address"
+        },
+        {
+          "label": "Non-listed Activity",
+          "then": "office_address"
+        },
+        {
+          "label": "Exempt Activity",
+          "then": "review"
+        }
+      ],
+      "default": "office_address",
+      "label": "Activity Classification"
+    },
+    {
+      "type": "simple",
+      "from": "office_address",
+      "to": "review",
+      "label": null
+    },
+    {
+      "type": "custom_branching",
+      "from": "review",
+      "conditional": "determine_status_path",
+      "potential_transitions": [
+        {
+          "label": "Submitted",
+          "nodes": ["review"]
+        },
+        {
+          "label": "Approved",
+          "nodes": ["issue_certificate"]
+        },
+        {
+          "label": "Rejected",
+          "nodes": ["rejection_notice"]
+        },
+        {
+          "label": "Pending",
+          "nodes": ["pending_info"]
+        }
+      ]
+    }
+  ],
+  "counts": {
+    "steps": 8,
+    "simple_transitions": 2,
+    "conditional_transitions": 1,
+    "multiple_conditional_transitions": 1,
+    "custom_branching_transitions": 1
+  }
+}

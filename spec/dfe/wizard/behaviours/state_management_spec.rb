@@ -1,8 +1,4 @@
-# frozen_string_literal: true
-
-require 'spec_helper'
-
-RSpec.describe DfE::Wizard::Core::StateManagement do
+RSpec.describe DfE::Wizard::Behaviours::StateManagement do
   # ============================================================================
   # WIZARD GRAPH STRUCTURE EXAMPLE
   # ============================================================================

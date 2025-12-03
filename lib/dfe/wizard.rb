@@ -1,5 +1,3 @@
-# frozen_string_literal: true
-
 require 'active_support/all'
 require 'active_model'
 
@@ -58,46 +56,47 @@ module DfE
   #
   # @since 2.0.0
   module Wizard
-    # @!group Core Modules
-
-    # Core wizard capabilities - provides the main contract for wizard behavior
+    # @!group Core classes
     #
-    # Includes:
-    # - StepManagement: Step lookup, instantiation, attribute extraction
-    # - Navigation: Next/previous step calculation, path traversal
-    # - Validation: Step and path validation
-    # - CheckYourAnswers: Return-to-review and edit mode handling
+    # Provides the main contract on wizard objects
     #
-    # @api public
-    module Core
+    module Behaviours
       # Check-your-answers pattern support
       # @api public
-      autoload :CheckYourAnswers, 'dfe/wizard/core/check_your_answers'
-
-      # Auto generated documentation management
-      # @api public
-      autoload :Documentation, 'dfe/wizard/core/documentation'
-
-      # Inspect class to understand the whole wizard management in development
-      # @api public
-      autoload :Inspect, 'dfe/wizard/core/inspect'
-
-      # Logging capabilities
-      # @api public
-      autoload :LogManagement, 'dfe/wizard/core/log_management'
+      autoload :CheckYourAnswers, 'dfe/wizard/behaviours/check_your_answers'
 
       # Navigation through wizard steps
       # @api public
-      autoload :Navigation, 'dfe/wizard/core/navigation'
-
-      # Virtual step for redirecting steps
-      #
-      autoload :Redirect, 'dfe/wizard/core/redirect'
+      autoload :Navigation, 'dfe/wizard/behaviours/navigation'
 
       # All state management under wizard
       #
       # @api public
-      autoload :StateManagement, 'dfe/wizard/core/state_management'
+      autoload :StateManagement, 'dfe/wizard/behaviours/state_management'
+
+      # Step lifecycle management
+      # @api public
+      autoload :StepManagement, 'dfe/wizard/behaviours/step_management'
+
+      # Step and path validation
+      # @api public
+      autoload :Validation, 'dfe/wizard/behaviours/validation'
+    end
+    # @!endgroup
+
+    # @!group Core classes
+
+    # Core wizard capabilities - provides the main objects
+    #
+    # @api public
+    module Core
+      # Full metadata of the wizard
+      # @api public
+      autoload :Metadata, 'dfe/wizard/core/metadata'
+
+      # Virtual step for redirecting steps
+      #
+      autoload :Redirect, 'dfe/wizard/core/redirect'
 
       # Define a State store to manage all data and business logic
       #
@@ -108,13 +107,17 @@ module DfE
       # @api public
       autoload :Step, 'dfe/wizard/core/step'
 
-      # Step lifecycle management
-      # @api public
-      autoload :StepManagement, 'dfe/wizard/core/step_management'
+    end
+    # @!endgroup
 
-      # Step and path validation
-      # @api public
-      autoload :Validation, 'dfe/wizard/core/validation'
+    # @!group Auto generate Documentation for any wizard
+    module Documentation
+      autoload :Generator, 'dfe/wizard/documentation/generator'
+
+      module Formatters
+        # Generate the documentation in markdown
+        autoload :MarkdownFormatter, 'dfe/wizard/documentation/formatters/markdown_formatter'
+      end
     end
     # @!endgroup
 
@@ -143,6 +146,16 @@ module DfE
       autoload :Cache, 'dfe/wizard/repository/cache'
     end
     # @!endgroup
+
+    module Tooling
+      # Inspect class to understand the whole wizard management in development
+      # @api public
+      autoload :Inspect, 'dfe/wizard/tooling/inspect'
+
+      # Logging capabilities
+      # @api public
+      autoload :LogManagement, 'dfe/wizard/tooling/log_management'
+    end
 
     # @!group Step Operators
     #
@@ -195,11 +208,6 @@ module DfE
       autoload :NullLogger, 'dfe/wizard/logging/null_logger'
     end
 
-    module Documentation
-      autoload :GraphRenderer, 'dfe/wizard/documentation/graph_renderer'
-      autoload :Styles, 'dfe/wizard/documentation/styles'
-    end
-
     module Test
       autoload :RSpecMatchers, 'dfe/wizard/test/r_spec_matchers'
     end
@@ -213,14 +221,15 @@ module DfE
     # @!group Main API
 
     include Core
-    include Core::Navigation
-    include Core::Validation
-    include Core::StepManagement
-    include Core::StateManagement
-    include Core::CheckYourAnswers
-    include Core::LogManagement
-    include Core::Documentation
+    include Tooling
+    include Tooling::LogManagement
     include Logging
+
+    include Behaviours::Navigation
+    include Behaviours::Validation
+    include Behaviours::StepManagement
+    include Behaviours::StateManagement
+    include Behaviours::CheckYourAnswers
 
     # Initializes a new wizard instance
     #
@@ -238,7 +247,7 @@ module DfE
     #   )
     #
     # @return [self]
-    def initialize(current_step:, state_store:, current_step_params: {})
+    def initialize(state_store:, current_step: nil, current_step_params: {})
       @current_step_name = current_step&.to_sym
       @current_step_params = current_step_params
       @state_store = state_store

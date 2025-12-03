@@ -1,6 +1,6 @@
 module DfE
   module Wizard
-    module Core
+    module Tooling
       # Logging support for wizard operations
       #
       # Provides structured logging with automatic sensitive data filtering

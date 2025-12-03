@@ -1,6 +1,6 @@
 module DfE
   module Wizard
-    module Core
+    module Behaviours
       # Step and path validation for wizard flows
       #
       # Provides methods to validate individual steps and check accessibility.
@@ -77,7 +77,7 @@ module DfE
         #
         # @api public
         def valid_path_to?(target_step)
-          return true if target_step == steps_processor.root_node
+          return true if target_step == steps_processor.root_step
 
           path = flow_path(target_step)
           idx = path.index(target_step)

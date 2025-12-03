@@ -1,4 +1,4 @@
-RSpec.describe DfE::Wizard::Core::StepManagement do
+RSpec.describe DfE::Wizard::Behaviours::StepManagement do
   # ============================================================================
   # WIZARD GRAPH STRUCTURE: English Foreign Language Wizard
   # ============================================================================
