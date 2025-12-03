@@ -1,6 +1,6 @@
 module DfE
   module Wizard
-    module Core
+    module Behaviours
       # Navigation through wizard steps
       #
       # Manages step traversal, paths, and direction based on:

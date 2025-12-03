@@ -1,4 +1,4 @@
-RSpec.describe DfE::Wizard::Core::LogManagement do
+RSpec.describe DfE::Wizard::Tooling::LogManagement do
   let(:repository) { DfE::Wizard::Repository::InMemory.new }
   let(:state_store) { StateStores::PersonalInformation.new(repository: repository) }
 

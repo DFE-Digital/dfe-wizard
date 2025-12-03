@@ -1,6 +1,6 @@
 module DfE
   module Wizard
-    module Core
+    module Behaviours
       # Check-your-answers pattern support
       #
       # Implements the standard "check your answers" / review page pattern where:

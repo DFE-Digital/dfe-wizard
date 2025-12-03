@@ -1,4 +1,4 @@
-RSpec.describe DfE::Wizard::Core::Inspect do
+RSpec.describe DfE::Wizard::Tooling::Inspect do
   let(:repository) { DfE::Wizard::Repository::InMemory.new }
   let(:state_store) { StateStores::PersonalInformation.new(repository:) }
   let(:current_step) { :name_and_date_of_birth }
@@ -10,7 +10,7 @@ RSpec.describe DfE::Wizard::Core::Inspect do
     )
   end
 
-  subject(:output) { DfE::Wizard::Core::Inspect.new(wizard:).inspect }
+  subject(:output) { described_class.new(wizard:).inspect }
 
   describe '#inspect' do
     context 'with empty wizard, no data saved' do

@@ -1,6 +1,6 @@
 module DfE
   module Wizard
-    module Core
+    module Tooling
       # Comprehensive wizard introspection for development/debugging
       #
       # Shows all wizard state: flow, saved, valid paths, validation status,
@@ -11,7 +11,7 @@ module DfE
       # @example
       #   # In wizard class
       #   def inspect
-      #     DfE::Wizard::Core::Inspect.new(wizard: self) if Rails.env.local?
+      #     DfE::Wizard::Inspect.new(wizard: self) if Rails.env.local?
       #   end
       #
       #   # Usage

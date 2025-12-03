@@ -1,1835 +1,500 @@
-RSpec.describe DfE::Wizard::StepsProcessor::Graph do
-  def build_test_wizard(current_step_name, state_data = {}, predicate_results = {})
-    state_store = instance_double('StateStore', step_data: proc { |step_id| state_data.dig(:steps, step_id) })
+RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph' do
+  # Waste Exemption Wizard - DEFRA use case
+  # Simplified from: https://github.com/DEFRA/waste-exemptions-engine
+  #
+  # This wizard determines the waste exemption application path based on:
+  # - Organization type (simple edge)
+  # - Waste category (conditional edge)
+  # - Activity type (multiple conditional edge)
+  # - Application status (custom branching edge)
+  class WasteExemptionWizard
+    include DfE::Wizard
 
-    wizard_class = Class.new do
-      attr_accessor :current_step_name, :state_store, :predicate_results, :log
+    delegate :is_upper_tier_waste?,
+             :is_listed_activity?,
+             :is_non_listed_activity?,
+             :is_exempt_activity?,
+             to: :state_store
 
-      def initialize(step_name, store, predicates, logger)
-        @current_step_name = step_name
-        @state_store = store
-        @predicate_results = predicates
-        @log = logger
-      end
-
-      def step(step_name)
-        OpenStruct.new(id: step_name)
-      end
-
-      def method_missing(method_name, *args)
-        if @predicate_results.key?(method_name)
-          @predicate_results[method_name]
-        else
-          super
-        end
-      end
-
-      def respond_to_missing?(method_name, include_private = false)
-        @predicate_results.key?(method_name) || super
-      end
-
-      def logger
-        @log
-      end
+    def initialize
+      @state_store = WasteStateStore.new
+      @current_step_name = :organization_type
     end
 
-    logger = double('Logger', debug: nil)
-    wizard_class.new(current_step_name, state_store, predicate_results, logger)
-  end
+    def steps_processor
+      DfE::Wizard::StepsProcessor::Graph.draw(self) do |g|
+        # Nodes
+        g.add_node :organization_type, Steps::OrganizationType, label: 'Organization Type'
+        g.add_node :account_login, Steps::AccountLogin, label: 'Account Login'
+        g.add_node :waste_category, Steps::WasteCategory, label: 'Waste Category'
+        g.add_node :activity_type, Steps::ActivityType, label: 'Activity Type'
+        g.add_node :office_address, Steps::OfficeAddress, label: 'Office Address'
+        g.add_node :review, Steps::Review, label: 'Review Application'
+        g.add_node :issue_certificate, Steps::IssueCertificate, label: 'Issue Certificate'
+        g.add_node :rejection_notice, Steps::RejectionNotice, label: 'Rejection Notice'
+        g.add_node :pending_info, Steps::PendingInfo, label: 'Pending Information'
 
-  let(:step_a_class) { Class.new }
-  let(:step_b_class) { Class.new }
-  let(:step_c_class) { Class.new }
-  let(:step_d_class) { Class.new }
-  let(:step_review_class) { Class.new }
+        # Dynamic root: returning users go to login, new users to organization type
+        g.conditional_root { |state| state.is_returning_user? ? :account_login : :organization_type }
 
-  describe '.draw' do
-    let(:wizard) { build_test_wizard(:step_a, {}, {}) }
+        # Simple edges (linear progression)
+        g.add_edge from: :organization_type, to: :waste_category
+        g.add_edge from: :account_login, to: :waste_category
 
-    context 'validation' do
-      it 'raises ArgumentError if no block given' do
-        expect { described_class.draw(wizard) }
-          .to raise_error(ArgumentError, /A block must be given/)
-      end
-
-      it 'raises ArgumentError if root node not set after block executes' do
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-          end
-        }.to raise_error(ArgumentError, /Graph must have a root node set/)
-      end
-
-      it 'does not raise when root node is properly set' do
-        expect {
-          described_class.draw(wizard) do |g|
-            g.root :step_a
-            g.add_node :step_a, step_a_class
-          end
-        }.not_to raise_error
-      end
-    end
-
-    context 'graph construction' do
-      it 'returns a Graph instance' do
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.root :step_a
-        end
-
-        expect(graph).to be_a(described_class)
-      end
-
-      it 'yields the graph instance to the block' do
-        expect { |b|
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.root :step_a
-            b.to_proc.call(g)
-          end
-        }.to yield_with_args(described_class)
-      end
-
-      it 'sets the wizard instance' do
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.root :step_a
-        end
-
-        expect(graph.instance_variable_get(:@wizard)).to eq(wizard)
-      end
-    end
-  end
-
-  describe '#add_node and #find_step' do
-    let(:wizard) { build_test_wizard(:step_a, {}, {}) }
-
-    it 'adds a node to the graph' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.root :step_a
-      end
-
-      expect(graph.nodes[:step_a]).to be_a(DfE::Wizard::StepsProcessor::Graph::Node)
-      expect(graph.nodes[:step_a].id).to eq(:step_a)
-      expect(graph.nodes[:step_a].klass).to eq(step_a_class)
-    end
-
-    it 'stores multiple nodes' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_node :step_c, step_c_class
-        g.root :step_a
-      end
-
-      expect(graph.nodes.keys).to contain_exactly(:step_a, :step_b, :step_c)
-    end
-
-    it 'finds a step class by node id' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.root :step_a
-      end
-
-      expect(graph.find_step(:step_a)).to eq(step_a_class)
-      expect(graph.find_step(:step_b)).to eq(step_b_class)
-    end
-
-    it 'returns nil for non-existent step' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.root :step_a
-      end
-
-      expect(graph.find_step(:missing)).to be_nil
-    end
-  end
-
-  describe '#root' do
-    let(:wizard) { build_test_wizard(:step_a, {}, {}) }
-
-    it 'sets the root node' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.root :step_a
-      end
-
-      expect(graph.root_node).to eq(:step_a)
-    end
-
-    it 'allows changing root node' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.root :step_a
-        g.root :step_b
-      end
-
-      expect(graph.root_node).to eq(:step_b)
-    end
-  end
-
-  describe '#add_edge' do
-    let(:wizard) { build_test_wizard(:step_a, {}, {}) }
-
-    it 'creates a simple edge between two nodes' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_edge from: :step_a, to: :step_b
-        g.root :step_a
-      end
-
-      expect(graph.edges.size).to eq(1)
-      expect(graph.edges.first.from).to eq(:step_a)
-      expect(graph.edges.first.to).to eq(:step_b)
-    end
-
-    it 'creates multiple edges for a linear path' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_node :step_c, step_c_class
-        g.add_edge from: :step_a, to: :step_b
-        g.add_edge from: :step_b, to: :step_c
-        g.root :step_a
-      end
-
-      expect(graph.edges.size).to eq(2)
-      expect(graph.edges.map(&:from)).to eq(%i[step_a step_b])
-      expect(graph.edges.map(&:to)).to eq(%i[step_b step_c])
-    end
-  end
-
-  describe '#add_conditional_edge' do
-    let(:wizard) { build_test_wizard(:step_a, {}, { is_eligible?: true }) }
-
-    it 'creates a conditional edge' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_node :step_c, step_c_class
+        # Conditional edge (if/else): upper tier vs lower tier waste
         g.add_conditional_edge(
-          from: :step_a,
-          when: :is_eligible?,
-          then: :step_b,
-          else: :step_c,
-          label: 'Eligibility check',
+          from: :waste_category,
+          when: :is_upper_tier_waste?,
+          then: :activity_type,
+          else: :office_address,
+          label: 'Upper tier waste?',
         )
-        g.root :step_a
-      end
 
-      expect(graph.conditional_edges.size).to eq(1)
-      edge = graph.conditional_edges.first
-      expect(edge.from).to eq(:step_a)
-      expect(edge.then).to eq(:step_b)
-      expect(edge.else).to eq(:step_c)
-      expect(edge.label).to eq('Eligibility check')
-    end
-
-    it 'accepts a proc as predicate' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_node :step_c, step_c_class
-        g.add_conditional_edge(
-          from: :step_a,
-          when: proc { |_step| true },
-          then: :step_b,
-          else: :step_c,
+        # Multiple conditional edges (N-way branching): 3 activity paths
+        g.add_multiple_conditional_edges(
+          from: :activity_type,
+          branches: [
+            { when: :is_listed_activity?, then: :office_address, label: 'Listed Activity' },
+            { when: :is_non_listed_activity?, then: :office_address, label: 'Non-listed Activity' },
+            { when: :is_exempt_activity?, then: :review, label: 'Exempt Activity' },
+          ],
+          default: :office_address,
+          label: 'Activity Classification',
         )
-        g.root :step_a
-      end
 
-      expect(graph.conditional_edges.size).to eq(1)
-      expect(graph.conditional_edges.first.when).to be_a(Proc)
-    end
+        # Simple edge continuation
+        g.add_edge from: :office_address, to: :review
 
-    it 'stores multiple conditional edges' do
-      wizard = build_test_wizard(:step_a, {}, { is_eligible?: true, another_check?: false })
-
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_node :step_c, step_c_class
-        g.add_node :step_d, step_d_class
-        g.add_conditional_edge(from: :step_a, when: :is_eligible?, then: :step_b, else: :step_c)
-        g.add_conditional_edge(from: :step_b, when: :another_check?, then: :step_c, else: :step_d)
-        g.root :step_a
-      end
-
-      expect(graph.conditional_edges.size).to eq(2)
-    end
-  end
-
-  describe '#add_custom_branching_edge' do
-    let(:wizard) { build_test_wizard(:step_a, {}, {}) }
-
-    it 'creates a custom branching edge' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_node :step_c, step_c_class
+        # Custom branching edge: application status determines path
         g.add_custom_branching_edge(
-          from: :step_a,
-          conditional: proc { |_step| :step_b },
+          from: :review,
+          conditional: :determine_status_path,
           potential_transitions: [
-            { label: 'Path 1', nodes: [:step_b] },
-            { label: 'Path 2', nodes: [:step_c] },
+            { label: 'Submitted', nodes: [:review] },
+            { label: 'Approved', nodes: [:issue_certificate] },
+            { label: 'Rejected', nodes: [:rejection_notice] },
+            { label: 'Pending', nodes: [:pending_info] },
           ],
         )
-        g.root :step_a
-      end
-
-      expect(graph.custom_branching_edges.size).to eq(1)
-      edge = graph.custom_branching_edges.first
-      expect(edge.from).to eq(:step_a)
-      expect(edge.conditional).to be_a(Proc)
-      expect(edge.potential_transitions.size).to eq(2)
-    end
-  end
-
-  describe '#next_step_without_callbacks' do
-    context 'with simple linear edges' do
-      it 'follows linear path' do
-        wizard = build_test_wizard(:step_a, {}, {})
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_edge from: :step_a, to: :step_b
-          g.add_edge from: :step_b, to: :step_c
-          g.root :step_a
-        end
-
-        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_b)
-        expect(graph.next_step_without_callbacks(:step_b)).to eq(:step_c)
-      end
-
-      it 'returns nil when no edge exists' do
-        wizard = build_test_wizard(:step_b, {}, {})
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_edge from: :step_a, to: :step_b
-          g.root :step_a
-        end
-
-        expect(graph.next_step_without_callbacks(:step_b)).to be_nil
-      end
-
-      it 'uses current_step_name when no argument given' do
-        wizard = build_test_wizard(:step_a, {}, {})
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_edge from: :step_a, to: :step_b
-          g.root :step_a
-        end
-
-        expect(graph.next_step_without_callbacks).to eq(:step_b)
       end
     end
 
-    context 'with conditional edges' do
-      it 'follows then branch when condition is true' do
-        wizard = build_test_wizard(:step_a, {}, { is_uk?: true })
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_conditional_edge(
-            from: :step_a,
-            when: :is_uk?,
-            then: :step_b,
-            else: :step_c,
-          )
-          g.root :step_a
-        end
+    def logger
+      DfE::Wizard::Logger.new(Rails.logger)
+    end
 
-        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_b)
-      end
-
-      it 'follows else branch when condition is false' do
-        wizard = build_test_wizard(:step_a, {}, { is_uk?: false })
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_conditional_edge(
-            from: :step_a,
-            when: :is_uk?,
-            then: :step_b,
-            else: :step_c,
-          )
-          g.root :step_a
-        end
-
-        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_c)
-      end
-
-      it 'evaluates proc predicates' do
-        wizard = build_test_wizard(:step_a, {}, {})
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_conditional_edge(
-            from: :step_a,
-            when: proc { |_step| true },
-            then: :step_b,
-            else: :step_c,
-          )
-          g.root :step_a
-        end
-
-        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_b)
+    def determine_status_path(_step_obj)
+      case state_store.application_status
+      when :submitted
+        :review
+      when :approved
+        :issue_certificate
+      when :rejected
+        :rejection_notice
+      else
+        :pending_info
       end
     end
 
-    context 'with custom branching edges' do
-      it 'evaluates custom branching logic' do
-        wizard = build_test_wizard(:step_a, {}, {})
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_custom_branching_edge(
-            from: :step_a,
-            conditional: proc { |_step| :step_c },
-            potential_transitions: [{ label: 'Custom', nodes: %i[step_b step_c] }],
-          )
-          g.root :step_a
-        end
-
-        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_c)
-      end
+    def conditional_entry_point
+      state_store.is_returning_user? ? :account_login : :organization_type
     end
 
-    context 'edge priority' do
-      it 'prioritizes custom branching over conditional over simple edges' do
-        wizard = build_test_wizard(:step_a, {}, { check?: true })
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_node :step_d, step_d_class
-          g.add_edge from: :step_a, to: :step_b
-          g.add_conditional_edge(from: :step_a, when: :check?, then: :step_c, else: :step_d)
-          g.add_custom_branching_edge(
-            from: :step_a,
-            conditional: proc { |_step| :step_d },
-            potential_transitions: [{ label: 'Custom', nodes: [:step_d] }],
-          )
-          g.root :step_a
-        end
+    class WasteStateStore
+      include DfE::Wizard::StateStore
 
-        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_d)
+      attr_accessor :waste_category, :activity_type, :application_status, :is_returning_user
+
+      def initialize
+        @waste_category = :upper_tier
+        @activity_type = :listed
+        @application_status = :submitted
+        @is_returning_user = false
+
+        super
+      end
+
+      def is_returning_user?
+        @is_returning_user.present?
+      end
+
+      def is_upper_tier_waste?
+        @waste_category == :upper_tier
+      end
+
+      def is_lower_tier_waste?
+        @waste_category == :lower_tier
+      end
+
+      def is_listed_activity?
+        @activity_type == :listed
+      end
+
+      def is_non_listed_activity?
+        @activity_type == :non_listed
+      end
+
+      def is_exempt_activity?
+        @activity_type == :exempt
       end
     end
   end
 
-  describe '#previous_step_without_callbacks' do
-    context 'linear wizard' do
-      it 'returns previous step in path' do
-        wizard = build_test_wizard(:step_b, {}, {})
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_edge from: :step_a, to: :step_b
-          g.add_edge from: :step_b, to: :step_c
-          g.root :step_a
-        end
+  # rubocop:disable Lint/EmptyClass
+  module Steps
+    class ConditionalEntry; end
+    class OrganizationType; end
+    class AccountLogin; end
+    class WasteCategory; end
+    class ActivityType; end
+    class OfficeAddress; end
+    class Review; end
+    class IssueCertificate; end
+    class RejectionNotice; end
+    class PendingInfo; end
+  end
+  # rubocop:enable Lint/EmptyClass
 
-        expect(graph.previous_step_without_callbacks(:step_b)).to eq(:step_a)
-        expect(graph.previous_step_without_callbacks(:step_c)).to eq(:step_b)
+  subject(:graph) do
+    wizard.steps_processor
+  end
+
+  let(:wizard) { WasteExemptionWizard.new }
+
+  describe '#root_step' do
+    context 'with conditional root (dynamic)' do
+      it 'returns entry point for new users' do
+        wizard.state_store.is_returning_user = false
+        expect(graph.root_step).to eq(:organization_type)
       end
 
-      it 'returns nil for root node' do
-        wizard = build_test_wizard(:step_a, {}, {})
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_edge from: :step_a, to: :step_b
-          g.root :step_a
-        end
-
-        expect(graph.previous_step_without_callbacks(:step_a)).to be_nil
+      it 'returns login for returning users' do
+        wizard.state_store.is_returning_user = true
+        expect(graph.root_step).to eq(:account_login)
       end
+    end
+  end
 
-      it 'uses current_step_name when no argument given' do
-        wizard = build_test_wizard(:step_b, {}, {})
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_edge from: :step_a, to: :step_b
-          g.root :step_a
-        end
-
-        expect(graph.previous_step_without_callbacks).to eq(:step_a)
+  describe '#next_step' do
+    context 'with simple edges' do
+      it 'navigates through linear progression' do
+        wizard.current_step_name = :organization_type
+        expect(graph.next_step(:organization_type)).to eq(:waste_category)
       end
     end
 
-    context 'conditional wizard' do
-      it 'returns previous step respecting conditions' do
-        wizard = build_test_wizard(:step_c, {}, { is_eligible?: true })
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_conditional_edge(from: :step_a, when: :is_eligible?, then: :step_b, else: :step_c)
-          g.add_edge from: :step_b, to: :step_c
-          g.root :step_a
-        end
-
-        expect(graph.previous_step_without_callbacks(:step_c)).to eq(:step_b)
+    context 'with conditional edge' do
+      it 'routes to activity_type for upper tier waste' do
+        wizard.state_store.waste_category = :upper_tier
+        expect(graph.next_step(:waste_category)).to eq(:activity_type)
       end
 
-      it 'handles skipped steps (direct path)' do
-        wizard = build_test_wizard(:step_c, {}, { is_eligible?: false })
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_conditional_edge(from: :step_a, when: :is_eligible?, then: :step_b, else: :step_c)
-          g.root :step_a
-        end
-
-        expect(graph.previous_step_without_callbacks(:step_c)).to eq(:step_a)
+      it 'routes to office_address for lower tier waste' do
+        wizard.state_store.waste_category = :lower_tier
+        expect(graph.next_step(:waste_category)).to eq(:office_address)
       end
+    end
+
+    context 'with multiple conditional edges' do
+      it 'routes to office_address for listed activity' do
+        wizard.state_store.activity_type = :listed
+        expect(graph.next_step(:activity_type)).to eq(:office_address)
+      end
+
+      it 'routes to review for exempt activity' do
+        wizard.state_store.activity_type = :exempt
+        expect(graph.next_step(:activity_type)).to eq(:review)
+      end
+    end
+
+    context 'with custom branching edge' do
+      it 'routes to review for submitted status' do
+        wizard.state_store.application_status = :submitted
+        expect(graph.next_step(:review)).to eq(:review)
+      end
+
+      it 'routes to issue_certificate for approved status' do
+        wizard.state_store.application_status = :approved
+        expect(graph.next_step(:review)).to eq(:issue_certificate)
+      end
+
+      it 'routes to rejection_notice for rejected status' do
+        wizard.state_store.application_status = :rejected
+        expect(graph.next_step(:review)).to eq(:rejection_notice)
+      end
+
+      it 'routes to pending_info for unknown status' do
+        wizard.state_store.application_status = :unknown
+        expect(graph.next_step(:review)).to eq(:pending_info)
+      end
+    end
+
+    it 'returns nil when no outgoing edge' do
+      expect(graph.next_step(:issue_certificate)).to be_nil
+    end
+  end
+
+  describe '#previous_step' do
+    it 'navigates back through path' do
+      wizard.state_store.is_returning_user = false
+      graph.path_traversal(:review)
+      # Simulate wizard having traversed the path
+      expect(graph.previous_step(:review)).to eq(:office_address)
+    end
+
+    it 'returns nil at root' do
+      expect(graph.previous_step(:organization_type)).to be_nil
     end
   end
 
   describe '#path_traversal' do
-    context 'linear path' do
-      let(:wizard) { build_test_wizard(:step_a, {}, {}) }
-
-      it 'returns full path to target' do
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_edge from: :step_a, to: :step_b
-          g.add_edge from: :step_b, to: :step_c
-          g.root :step_a
-        end
-
-        expect(graph.path_traversal(:step_c)).to eq(%i[step_a step_b step_c])
+    context 'new user - upper tier - listed activity' do
+      before do
+        wizard.state_store.is_returning_user = false
+        wizard.state_store.waste_category = :upper_tier
+        wizard.state_store.activity_type = :listed
       end
 
-      it 'returns partial path' do
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_edge from: :step_a, to: :step_b
-          g.add_edge from: :step_b, to: :step_c
-          g.root :step_a
-        end
-
-        expect(graph.path_traversal(:step_b)).to eq(%i[step_a step_b])
-      end
-
-      it 'returns empty array for unreachable target' do
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_edge from: :step_a, to: :step_b
-          g.root :step_a
-        end
-
-        expect(graph.path_traversal(:step_c)).to eq([])
-      end
-
-      it 'uses current_step_name when no target given' do
-        wizard = build_test_wizard(:step_b, {}, {})
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_edge from: :step_a, to: :step_b
-          g.root :step_a
-        end
-
-        expect(graph.path_traversal).to eq(%i[step_a step_b])
+      it 'traverses correct path' do
+        path = graph.path_traversal(:review)
+        expect(path).to eq(%i[
+                             organization_type
+                             waste_category
+                             activity_type
+                             office_address
+                             review
+                           ])
       end
     end
 
-    context 'conditional path' do
-      it 'follows conditional branches (then path)' do
-        wizard = build_test_wizard(:step_a, {}, { is_uk?: true })
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_node :step_review, step_review_class
-          g.add_conditional_edge(from: :step_a, when: :is_uk?, then: :step_review, else: :step_b)
-          g.add_edge from: :step_b, to: :step_c
-          g.add_edge from: :step_c, to: :step_review
-          g.root :step_a
-        end
-
-        expect(graph.path_traversal(:step_review)).to eq(%i[step_a step_review])
+    context 'returning user - lower tier' do
+      before do
+        wizard.state_store.is_returning_user = true
+        wizard.state_store.waste_category = :lower_tier
       end
 
-      it 'follows else branch' do
-        wizard = build_test_wizard(:step_a, {}, { is_uk?: false })
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_node :step_review, step_review_class
-          g.add_conditional_edge(from: :step_a, when: :is_uk?, then: :step_review, else: :step_b)
-          g.add_edge from: :step_b, to: :step_c
-          g.add_edge from: :step_c, to: :step_review
-          g.root :step_a
-        end
-
-        expect(graph.path_traversal(:step_review)).to eq(%i[step_a step_b step_c step_review])
+      it 'traverses correct path' do
+        path = graph.path_traversal(:review)
+        expect(path).to eq(%i[
+                             account_login
+                             waste_category
+                             office_address
+                             review
+                           ])
       end
     end
 
-    context 'cycle detection' do
-      it 'stops at depth limit to prevent infinite loops' do
-        wizard = build_test_wizard(:step_a, {}, {})
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_edge from: :step_a, to: :step_b
-          g.add_edge from: :step_b, to: :step_a
-          g.root :step_a
-        end
-
-        result = graph.path_traversal(:step_c)
-        expect(result).to eq([])
-      end
-
-      it 'stops on revisiting same node' do
-        wizard = build_test_wizard(:step_a, {}, {})
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_edge from: :step_a, to: :step_b
-          g.add_edge from: :step_b, to: :step_a
-          g.root :step_a
-        end
-
-        result = graph.path_traversal(:step_a)
-        expect(result).to eq([:step_a])
+    context 'unreachable step' do
+      it 'returns empty array' do
+        expect(graph.path_traversal(:nonexistent)).to eq([])
       end
     end
   end
 
-  describe '#before_next_step callbacks' do
-    let(:wizard) { build_test_wizard(:step_a, {}, {}) }
-
-    it 'executes callback before next_step' do
-      callback_called = false
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_edge from: :step_a, to: :step_b
-        g.before_next_step {
-          callback_called = true
-          nil
-        }
-        g.root :step_a
-      end
-
-      graph.next_step(:step_a)
-      expect(callback_called).to be true
+  describe '#find_step' do
+    it 'returns step class for existing node' do
+      expect(graph.find_step(:organization_type)).to eq(Steps::OrganizationType)
     end
 
-    it 'uses callback return value if not nil' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_node :step_c, step_c_class
-        g.add_edge from: :step_a, to: :step_b
-        g.before_next_step { :step_c }
-        g.root :step_a
-      end
-
-      expect(graph.next_step(:step_a)).to eq(:step_c)
-    end
-
-    it 'falls back to normal navigation if callback returns nil' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_edge from: :step_a, to: :step_b
-        g.before_next_step { nil }
-        g.root :step_a
-      end
-
-      expect(graph.next_step(:step_a)).to eq(:step_b)
-    end
-
-    it 'executes multiple callbacks in order' do
-      call_order = []
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_edge from: :step_a, to: :step_b
-        g.before_next_step {
-          call_order << 1
-          nil
-        }
-        g.before_next_step {
-          call_order << 2
-          nil
-        }
-        g.root :step_a
-      end
-
-      graph.next_step(:step_a)
-      expect(call_order).to eq([1, 2])
-    end
-
-    it 'accepts method names as callbacks' do
-      callback_called = false
-      wizard_with_method = build_test_wizard(:step_a, {}, {})
-      wizard_with_method.define_singleton_method(:my_callback) {
-        callback_called = true
-        nil
-      }
-
-      graph = described_class.draw(wizard_with_method) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_edge from: :step_a, to: :step_b
-        g.before_next_step(:my_callback)
-        g.root :step_a
-      end
-
-      graph.next_step(:step_a)
-      expect(callback_called).to be true
+    it 'returns nil for missing node (never raises)' do
+      expect(graph.find_step(:missing)).to be_nil
     end
   end
 
-  describe '#before_previous_step callbacks' do
-    let(:wizard) { build_test_wizard(:step_b, {}, {}) }
-
-    it 'executes callback before previous_step' do
-      callback_called = false
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_edge from: :step_a, to: :step_b
-        g.before_previous_step {
-          callback_called = true
-          nil
-        }
-        g.root :step_a
-      end
-
-      graph.previous_step(:step_b)
-      expect(callback_called).to be true
-    end
-
-    it 'uses callback return value if not nil' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_node :step_c, step_c_class
-        g.add_edge from: :step_a, to: :step_b
-        g.before_previous_step { :step_c }
-        g.root :step_a
-      end
-
-      expect(graph.previous_step(:step_b)).to eq(:step_c)
-    end
-
-    it 'falls back to normal navigation if callback returns nil' do
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.add_edge from: :step_a, to: :step_b
-        g.before_previous_step { nil }
-        g.root :step_a
-      end
-
-      expect(graph.previous_step(:step_b)).to eq(:step_a)
-    end
-  end
-
-  describe 'complex wizard scenarios' do
-    context 'nationality wizard (UK vs non-UK path)' do
-      it 'handles UK national path (short path)' do
-        wizard = build_test_wizard(:nationality, {}, { uk_or_irish?: true })
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :name, step_a_class
-          g.add_node :nationality, step_b_class
-          g.add_node :right_to_work, step_c_class
-          g.add_node :review, step_review_class
-          g.add_edge from: :name, to: :nationality
-          g.add_conditional_edge(
-            from: :nationality,
-            when: :uk_or_irish?,
-            then: :review,
-            else: :right_to_work,
-          )
-          g.add_edge from: :right_to_work, to: :review
-          g.root :name
-        end
-
-        expect(graph.path_traversal(:review)).to eq(%i[name nationality review])
-        expect(graph.previous_step_without_callbacks(:review)).to eq(:nationality)
-      end
-
-      it 'handles non-UK national path (long path)' do
-        wizard = build_test_wizard(:nationality, {}, { uk_or_irish?: false })
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :name, step_a_class
-          g.add_node :nationality, step_b_class
-          g.add_node :right_to_work, step_c_class
-          g.add_node :review, step_review_class
-          g.add_edge from: :name, to: :nationality
-          g.add_conditional_edge(
-            from: :nationality,
-            when: :uk_or_irish?,
-            then: :review,
-            else: :right_to_work,
-          )
-          g.add_edge from: :right_to_work, to: :review
-          g.root :name
-        end
-
-        expect(graph.path_traversal(:review)).to eq(%i[name nationality right_to_work review])
-        expect(graph.previous_step_without_callbacks(:review)).to eq(:right_to_work)
-      end
-    end
-
-    context 'multi-conditional wizard (nested conditions)' do
-      it 'handles nested conditionals' do
-        wizard = build_test_wizard(:step_a, {}, { check_a?: true, check_b?: false })
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_node :step_d, step_d_class
-          g.add_node :review, step_review_class
-          g.add_conditional_edge(from: :step_a, when: :check_a?, then: :step_b, else: :step_c)
-          g.add_conditional_edge(from: :step_b, when: :check_b?, then: :step_d, else: :review)
-          g.add_edge from: :step_c, to: :review
-          g.root :step_a
-        end
-
-        expect(graph.path_traversal(:review)).to eq(%i[step_a step_b review])
-      end
-    end
-
-    context 'diamond-shaped wizard (multiple paths converge)' do
-      it 'handles convergent paths' do
-        wizard = build_test_wizard(:step_a, {}, { path_choice?: true })
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_node :step_d, step_d_class
-          g.add_conditional_edge(from: :step_a, when: :path_choice?, then: :step_b, else: :step_c)
-          g.add_edge from: :step_b, to: :step_d
-          g.add_edge from: :step_c, to: :step_d
-          g.root :step_a
-        end
-
-        expect(graph.path_traversal(:step_d)).to eq(%i[step_a step_b step_d])
-        expect(graph.next_step_without_callbacks(:step_b)).to eq(:step_d)
-        expect(graph.next_step_without_callbacks(:step_c)).to eq(:step_d)
-      end
-    end
-  end
-
-  describe '#add_multiple_conditional_edges' do
-    let(:wizard) { build_test_wizard(:step_a, {}, {}) }
-
-    context 'validation' do
-      it 'raises ArgumentError if from node does not exist' do
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.add_multiple_conditional_edges(
-              from: :nonexistent,
-              branches: [{ when: :check?, then: :step_a }],
-            )
-            g.root :step_a
-          end
-        }.to raise_error(ArgumentError, /Cannot add branches from non-existent node/)
-      end
-
-      it 'raises ArgumentError if branches array is empty' do
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.add_multiple_conditional_edges(from: :step_a, branches: [])
-            g.root :step_a
-          end
-        }.to raise_error(ArgumentError, /branches array cannot be empty/)
-      end
-
-      it 'raises ArgumentError if branches is nil' do
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.add_multiple_conditional_edges(from: :step_a, branches: nil)
-            g.root :step_a
-          end
-        }.to raise_error(ArgumentError, /branches array cannot be empty/)
-      end
-
-      it 'raises ArgumentError if branch is not a Hash' do
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.add_multiple_conditional_edges(
-              from: :step_a,
-              branches: ['not_a_hash'],
-            )
-            g.root :step_a
-          end
-        }.to raise_error(ArgumentError, /Branch at index 0 must be a Hash/)
-      end
-
-      it 'raises ArgumentError if branch missing :when key' do
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.add_node :step_b, step_b_class
-            g.add_multiple_conditional_edges(
-              from: :step_a,
-              branches: [{ then: :step_b }],
-            )
-            g.root :step_a
-          end
-        }.to raise_error(ArgumentError, /Branch at index 0 from :step_a is missing required key :when/)
-      end
-
-      it 'raises ArgumentError if branch missing :then key' do
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.add_multiple_conditional_edges(
-              from: :step_a,
-              branches: [{ when: :check? }],
-            )
-            g.root :step_a
-          end
-        }.to raise_error(ArgumentError, /Branch at index 0 from :step_a is missing required key :then/)
-      end
-
-      it 'raises if target node does not exist' do
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.add_multiple_conditional_edges(
-              from: :step_a,
-              branches: [{ when: :check?, then: :nonexistent }],
-            )
-            g.root :step_a
-          end
-        }.to raise_error(ArgumentError, /points to non-existent node/)
-      end
-    end
-
-    context 'structure' do
-      it 'creates a multiple-side conditional edge' do
-        wizard = build_test_wizard(:step_a, {}, { check_b?: true, check_c?: false })
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_node :step_d, step_d_class
-          g.add_multiple_conditional_edges(
-            from: :step_a,
-            branches: [
-              { when: :check_b?, then: :step_b },
-              { when: :check_c?, then: :step_c },
-            ],
-            default: :step_d,
-            label: 'Multi-way routing',
-          )
-          g.root :step_a
-        end
-
-        expect(graph.multiple_conditional_edges.size).to eq(1)
-        edge = graph.multiple_conditional_edges.first
-        expect(edge.from).to eq(:step_a)
-        expect(edge.branches.size).to eq(2)
-        expect(edge.default).to eq(:step_d)
-        expect(edge.label).to eq('Multi-way routing')
-      end
-
-      it 'stores branch metadata' do
-        wizard = build_test_wizard(:step_a, {}, { check?: true })
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_multiple_conditional_edges(
-            from: :step_a,
-            branches: [
-              { when: :check?, then: :step_b, label: 'Check passed' },
-            ],
-          )
-          g.root :step_a
-        end
-
-        branch = graph.multiple_conditional_edges.first.branches.first
-        expect(branch[:then]).to eq(:step_b)
-        expect(branch[:label]).to eq('Check passed')
-        expect(branch[:when]).to be_a(Proc)
-      end
-    end
-
-    context 'navigation' do
-      it 'follows first matching branch' do
-        wizard = build_test_wizard(:visa_selection, {}, { student_visa?: false, work_visa?: true, family_visa?: false })
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :visa_selection, step_a_class
-          g.add_node :student, step_b_class
-          g.add_node :work, step_c_class
-          g.add_node :family, step_d_class
-          g.add_node :other, step_review_class
-          g.add_multiple_conditional_edges(
-            from: :visa_selection,
-            branches: [
-              { when: :student_visa?, then: :student },
-              { when: :work_visa?, then: :work },
-              { when: :family_visa?, then: :family },
-            ],
-            default: :other,
-          )
-          g.root :visa_selection
-        end
-
-        expect(graph.next_step_without_callbacks(:visa_selection)).to eq(:work)
-      end
-
-      it 'uses default when no branches match' do
-        wizard = build_test_wizard(:visa_selection, {},
-                                   { student_visa?: false, work_visa?: false, family_visa?: false })
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :visa_selection, step_a_class
-          g.add_node :student, step_b_class
-          g.add_node :work, step_c_class
-          g.add_node :other, step_d_class
-          g.add_multiple_conditional_edges(
-            from: :visa_selection,
-            branches: [
-              { when: :student_visa?, then: :student },
-              { when: :work_visa?, then: :work },
-            ],
-            default: :other,
-          )
-          g.root :visa_selection
-        end
-
-        expect(graph.next_step_without_callbacks(:visa_selection)).to eq(:other)
-      end
-
-      it 'returns nil when no match and no default' do
-        wizard = build_test_wizard(:step_a, {}, { check?: false })
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_multiple_conditional_edges(
-            from: :step_a,
-            branches: [{ when: :check?, then: :step_b }],
-          )
-          g.root :step_a
-        end
-
-        expect(graph.next_step_without_callbacks(:step_a)).to be_nil
-      end
-
-      it 'evaluates branches in order (first match wins)' do
-        wizard = build_test_wizard(:step_a, {}, { always_true?: true, also_true?: true })
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_multiple_conditional_edges(
-            from: :step_a,
-            branches: [
-              { when: :always_true?, then: :step_b },
-              { when: :also_true?, then: :step_c }, # Never reached
-            ],
-          )
-          g.root :step_a
-        end
-
-        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_b)
-      end
-
-      it 'handles proc predicates' do
-        wizard = build_test_wizard(:step_a, {}, {})
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_multiple_conditional_edges(
-            from: :step_a,
-            branches: [
-              { when: ->(_step) { false }, then: :step_b },
-              { when: ->(_step) { true }, then: :step_c },
-            ],
-          )
-          g.root :step_a
-        end
-
-        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_c)
-      end
-    end
-
-    context 'priority in next_step_without_callbacks' do
-      it 'prioritizes multiple-side over conditional edges' do
-        wizard = build_test_wizard(:step_a, {}, { check?: true })
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_node :step_d, step_d_class
-          # Add both types from same node
-          g.add_conditional_edge(from: :step_a, when: :check?, then: :step_b, else: :step_c)
-          g.add_multiple_conditional_edges(
-            from: :step_a,
-            branches: [{ when: :check?, then: :step_d }],
-          )
-          g.root :step_a
-        end
-
-        # Many-side takes precedence
-        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_d)
-      end
-
-      it 'prioritizes multiple-side over simple edges' do
-        wizard = build_test_wizard(:step_a, {}, { check?: true })
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-          g.add_edge from: :step_a, to: :step_b
-          g.add_multiple_conditional_edges(
-            from: :step_a,
-            branches: [{ when: :check?, then: :step_c }],
-          )
-          g.root :step_a
-        end
-
-        expect(graph.next_step_without_callbacks(:step_a)).to eq(:step_c)
-      end
-    end
-
-    context 'real-world scenarios' do
-      it 'handles visa type selection (4-way)' do
-        wizard = build_test_wizard(:visa_type, {}, { student?: false, work?: false, family?: true, tourist?: false })
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :visa_type, step_a_class
-          g.add_node :student_path, step_b_class
-          g.add_node :work_path, step_c_class
-          g.add_node :family_path, step_d_class
-          g.add_node :tourist_path, step_review_class
-          g.add_multiple_conditional_edges(
-            from: :visa_type,
-            branches: [
-              { when: :student?, then: :student_path },
-              { when: :work?, then: :work_path },
-              { when: :family?, then: :family_path },
-              { when: :tourist?, then: :tourist_path },
-            ],
-          )
-          g.root :visa_type
-        end
-
-        expect(graph.next_step_without_callbacks(:visa_type)).to eq(:family_path)
-      end
-
-      it 'handles age-based routing with ranges' do
-        wizard = build_test_wizard(:age_check, {}, {})
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :age_check, step_a_class
-          g.add_node :child, step_b_class
-          g.add_node :adult, step_c_class
-          g.add_node :senior, step_d_class
-          g.add_multiple_conditional_edges(
-            from: :age_check,
-            branches: [
-              { when: ->(step) { step.respond_to?(:age) && step.age < 18 }, then: :child },
-              { when: ->(step) { step.respond_to?(:age) && step.age >= 65 }, then: :senior },
-              { when: ->(step) { step.respond_to?(:age) && step.age >= 18 }, then: :adult },
-            ],
-          )
-          g.root :age_check
-        end
-
-        expect(graph.multiple_conditional_edges.first.branches.size).to eq(3)
-      end
-    end
-  end
-
-  describe 'undefined predicate method' do
-    let(:wizard) { build_test_wizard(:start, {}, {}) }
-
-    it 'raises ArgumentError when method does not exist' do
-      wizard = build_test_wizard(:start, {}, {})
-      expect {
-        DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |graph|
-          graph.add_node :start, double
-          graph.add_node :next, double
-          graph.root :start
-          graph.add_conditional_edge(
-            from: :start,
-            when: :undefined_method?,
-            then: :next,
-            else: :start,
-          )
-        end
-      }.to raise_error(ArgumentError, /Predicate method :undefined_method\? not found/)
-    end
-
-    it 'raises ArgumentError with helpful message about delegation' do
-      expect {
-        DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |graph|
-          graph.add_node :start, double
-          graph.add_node :next, double
-          graph.root :start
-          graph.add_conditional_edge(
-            from: :start,
-            when: :missing_predicate?,
-            then: :next,
-            else: :start,
-          )
-        end
-      }.to raise_error(ArgumentError,
-                       /Did you forget to create the method\? Alternatively, you can delegate it to state_store/)
-    end
-
-    it 'raises ArgumentError for invalid predicate types (String)' do
-      expect {
-        DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |graph|
-          graph.add_node :start, double
-          graph.add_node :next, double
-          graph.root :start
-          graph.add_conditional_edge(
-            from: :start,
-            when: 'invalid_string',
-            then: :next,
-            else: :start,
-          )
-        end
-      }.to raise_error(ArgumentError, /Predicate must be a Symbol \(method name\) or callable/)
-    end
-  end
-
-  describe 'predicate logging' do
-    let(:logger) { double('Logger', info: nil) }
-    let(:wizard) do
-      build_test_wizard(:start, {}, { true_predicate?: true, false_predicate?: false, british?: false })
-    end
-
-    before { allow(wizard).to receive(:log).and_return(logger) }
-
-    it 'logs predicate evaluation and branch taken (true)' do
-      graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
-        g.add_node :start, double
-        g.add_node :yes, double
-        g.add_node :no, double
-        g.root :start
-        g.add_conditional_edge(from: :start, when: :true_predicate?, then: :yes, else: :no)
-      end
-      graph.next_step(:start)
-
-      expect(logger).to have_received(:info).with(
-        '[Graph] Conditional edge evaluated from step :start: true_predicate?=true → :yes',
-        category: :step_processor,
+  describe '#step_definitions' do
+    it 'returns all node IDs mapped to step classes' do
+      definitions = graph.step_definitions
+      expect(definitions).to include(
+        organization_type: Steps::OrganizationType,
+        waste_category: Steps::WasteCategory,
+        activity_type: Steps::ActivityType,
+        office_address: Steps::OfficeAddress,
+        review: Steps::Review,
+        issue_certificate: Steps::IssueCertificate,
       )
     end
 
-    it 'logs predicate evaluation and branch taken (false)' do
-      graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
-        g.add_node :start, double
-        g.add_node :nationality, double
-        g.add_node :right_to_work, double
-        g.add_node :review, double
-        g.root :start
-        g.add_conditional_edge(from: :nationality, when: :british?, then: :review, else: :right_to_work)
-      end
-      graph.next_step(:nationality)
+    it 'includes all 9 steps' do
+      expect(graph.step_definitions.size).to eq(9)
+    end
+  end
 
-      expect(logger).to have_received(:info).with(
-        '[Graph] Conditional edge evaluated from step :nationality: british?=false → :right_to_work',
-        category: :step_processor,
-      )
+  describe '#metadata' do
+    subject(:metadata) { graph.metadata }
+
+    it 'has correct structure_type' do
+      expect(metadata[:structure_type]).to eq(:graph)
     end
 
-    it 'logs multiple branch match' do
-      graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
-        g.add_node :start, double
-        g.add_node :path_a, double
-        g.add_node :path_b, double
-        g.add_node :default_path, double
-        g.root :start
-        g.add_multiple_conditional_edges(
-          from: :start,
-          branches: [
-            { when: :false_predicate?, then: :path_a },
-            { when: :true_predicate?, then: :path_b },
-          ],
-          default: :default_path,
+    it 'includes root_step' do
+      wizard.state_store.is_returning_user = false
+      expect(metadata[:root_step]).to eq(:organization_type)
+    end
+
+    describe 'steps metadata' do
+      it 'includes all steps with labels' do
+        steps_meta = metadata[:steps]
+        expect(steps_meta).to eq(
+          {
+            account_login: {
+              class: 'Steps::AccountLogin',
+              label: 'Account Login',
+            },
+            activity_type: {
+              class: 'Steps::ActivityType',
+              label: 'Activity Type',
+            },
+            waste_category: {
+              class: 'Steps::WasteCategory',
+              label: 'Waste Category',
+            },
+            issue_certificate: {
+              class: 'Steps::IssueCertificate',
+              label: 'Issue Certificate',
+            },
+            office_address: {
+              class: 'Steps::OfficeAddress',
+              label: 'Office Address',
+            },
+            organization_type: {
+              class: 'Steps::OrganizationType',
+              label: 'Organization Type',
+            },
+            pending_info: {
+              class: 'Steps::PendingInfo',
+              label: 'Pending Information',
+            },
+            rejection_notice: {
+              class: 'Steps::RejectionNotice',
+              label: 'Rejection Notice',
+            },
+            review: {
+              class: 'Steps::Review',
+              label: 'Review Application',
+            },
+          },
         )
       end
-      graph.next_step(:start)
-
-      expect(logger).to have_received(:info).with(
-        '[Graph] Branch evaluated from step :start: true_predicate?=true → :path_b',
-        category: :step_processor,
-      )
     end
 
-    it 'logs multiple branch default when no match' do
-      graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
-        g.add_node :start, double
-        g.add_node :other, double
-        g.add_node :default_path, double
-        g.root :start
-        g.add_multiple_conditional_edges(
-          from: :start,
-          branches: [{ when: :false_predicate?, then: :other }],
-          default: :default_path,
-        )
-      end
-      graph.next_step(:start)
-
-      expect(logger).to have_received(:info).with(
-        '[Graph] No branch matched from step :start, using default option → :default_path',
-        category: :step_processor,
-      )
-    end
-
-    it 'logs predicate evaluation and branch taken (true)' do
-      graph = DfE::Wizard::StepsProcessor::Graph.draw(wizard) do |g|
-        g.add_node :start, double
-        g.add_node :nationality, double
-        g.add_node :right_to_work, double
-        g.add_node :immigration_status, double
-        g.add_node :review, double
-        g.root :start
-        g.add_custom_branching_edge(
-          from: :nationality,
-          conditional: proc { |_step| :right_to_work },
-          potential_transitions: [
-            { label: 'right_to_work', nodes: [:right_to_work] },
-            { label: 'Path 2', nodes: [:step_c] },
+    describe 'transitions metadata' do
+      it 'includes all transitions' do
+        expect(metadata[:transitions]).to eq(
+          [
+            { from: :organization_type, to: :waste_category, type: :simple, label: nil },
+            { from: :account_login, to: :waste_category, type: :simple, label: nil },
+            { from: :office_address, to: :review, type: :simple, label: nil },
+            {
+              from: :waste_category,
+              then: :activity_type,
+              else: :office_address,
+              type: :conditional,
+              label: 'Upper tier waste?',
+            },
+            {
+              from: :activity_type,
+              branches: [
+                { then: :office_address, label: 'Listed Activity' },
+                { then: :office_address, label: 'Non-listed Activity' },
+                { then: :review, label: 'Exempt Activity' },
+              ],
+              default: :office_address,
+              type: :multiple_conditional,
+              label: 'Activity Classification',
+            },
+            {
+              from: :review,
+              type: :custom_branching,
+              potential_transitions: [
+                { label: 'Submitted', nodes: [:review] },
+                { label: 'Approved', nodes: [:issue_certificate] },
+                { label: 'Rejected', nodes: [:rejection_notice] },
+                { label: 'Pending', nodes: [:pending_info] },
+              ],
+            },
           ],
         )
       end
-      graph.next_step(:nationality)
-
-      expect(logger).to have_received(:info).with(
-        '[Graph] Custom edge evaluated from step :nationality → :right_to_work',
-        category: :step_processor,
-      )
-    end
-  end
-
-  describe '#conditional_root' do
-    let(:step_a_class) { Class.new }
-    let(:step_b_class) { Class.new }
-    let(:step_c_class) { Class.new }
-
-    context 'when conditional_root is used with a block' do
-      it 'accepts a block for conditional root determination' do
-        wizard = build_test_wizard(:step_a, {}, {})
-
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.add_node :step_b, step_b_class
-            g.conditional_root { |_state_store| :step_a }
-          end
-        }.not_to raise_error
-      end
-
-      it 'stores conditional root block' do
-        wizard = build_test_wizard(:step_a, {}, {})
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.conditional_root { |_state_store| :step_a }
-        end
-
-        expect(graph.instance_variable_get(:@conditional_root_block)).to be_a(Proc)
-      end
-
-      it 'raises if both root and conditional_root are set' do
-        wizard = build_test_wizard(:step_a, {}, {})
-
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.add_node :step_b, step_b_class
-            g.root :step_a
-            g.conditional_root { |_state_store| :step_a }
-          end
-        }.to raise_error(ArgumentError, /Cannot set both.*root.*and.*conditional_root/)
-      end
     end
 
-    context 'when conditional_root is used with a symbol (method reference)' do
-      it 'accepts a symbol referring to wizard method' do
-        wizard_class = Class.new do
-          attr_accessor :current_step_name, :log
-
-          def initialize
-            @current_step_name = :step_a
-            @log = OpenStruct.new(info: nil)
-          end
-
-          def step(step_name)
-            OpenStruct.new(id: step_name)
-          end
-
-          def determine_root_step
-            :step_a
-          end
-        end
-
-        wizard = wizard_class.new
-
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.add_node :step_b, step_b_class
-            g.conditional_root :determine_root_step
-          end
-        }.not_to raise_error
+    describe 'counts metadata' do
+      it 'includes correct step count' do
+        expect(metadata[:counts][:steps]).to eq(9)
       end
 
-      it 'stores symbol for conditional root' do
-        wizard_class = Class.new do
-          attr_accessor :current_step_name, :log
-
-          def initialize
-            @current_step_name = :step_a
-            @log = OpenStruct.new(info: nil)
-          end
-
-          def step(step_name)
-            OpenStruct.new(id: step_name)
-          end
-
-          def determine_root_step
-            :step_a
-          end
-        end
-
-        wizard = wizard_class.new
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.conditional_root :determine_root_step
-        end
-
-        expect(graph.instance_variable_get(:@conditional_root_method)).to eq(:determine_root_step)
-      end
-
-      it 'raises if method does not exist on wizard' do
-        wizard = build_test_wizard(:step_a, {}, {})
-
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.conditional_root :nonexistent_method
-          end
-        }.to raise_error(ArgumentError, /method.*not found on wizard/)
-      end
-    end
-
-    context 'conditional root with state_store parameter' do
-      it 'passes state_store to block' do
-        state_store = instance_double('StateStore')
-        wizard = build_test_wizard(:step_a, {}, {})
-        allow(wizard).to receive(:current_step_name).and_return(:step_a)
-        allow(wizard).to receive(:log).and_return(double(info: nil))
-        allow(wizard).to receive(:step).and_return(OpenStruct.new(id: :step_a))
-        wizard.state_store = state_store
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.conditional_root { |_store| :step_b }
-        end
-
-        # Verify block receives state_store parameter
-        block = graph.instance_variable_get(:@conditional_root_block)
-        result = block.call(state_store)
-        expect(result).to eq(:step_b)
-      end
-
-      it 'resolves to :step_a when create mode (no existing A-levels)' do
-        wizard = build_test_wizard(:step_a, {}, {})
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-
-          g.conditional_root do |_state_store|
-            # Simulate: no existing a_levels → start fresh
-            :step_a
-          end
-        end
-
-        block = graph.instance_variable_get(:@conditional_root_block)
-        expect(block.call(nil)).to eq(:step_a)
-      end
-
-      it 'resolves to :step_b when edit mode (existing A-levels)' do
-        wizard = build_test_wizard(:step_a, {}, {})
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-
-          g.conditional_root do |_state_store|
-            # Simulate: existing data exists → go to edit
-            :step_b
-          end
-        end
-
-        block = graph.instance_variable_get(:@conditional_root_block)
-        expect(block.call(nil)).to eq(:step_b)
-      end
-    end
-
-    context 'real-world A-levels scenarios with conditional_root' do
-      let(:state_store) { instance_double('StateStore') }
-
-      it 'returns what_a_level_is_required for create mode' do
-        allow(state_store).to receive(:repository).and_return(
-          instance_double('Repository', record: instance_double('Course', a_level_subject_requirements: [])),
+      it 'includes correct edge counts' do
+        expect(metadata[:counts]).to include(
+          simple_edges: 3,
+          conditional_edges: 1,
+          multiple_conditional_edges: 1,
+          custom_branching_edges: 1,
         )
-
-        wizard = build_test_wizard(:step_a, {}, {})
-        wizard.state_store = state_store
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :what_a_level_is_required, step_a_class
-          g.add_node :a_level_equivalencies, step_b_class
-
-          g.conditional_root do |store|
-            if store.repository.record.a_level_subject_requirements.any?
-              :a_level_equivalencies
-            else
-              :what_a_level_is_required
-            end
-          end
-        end
-
-        block = graph.instance_variable_get(:@conditional_root_block)
-        result = block.call(state_store)
-        expect(result).to eq(:what_a_level_is_required)
-      end
-
-      it 'returns a_level_equivalencies for edit mode' do
-        course_record = instance_double('Course',
-                                        a_level_subject_requirements: [
-                                          { uuid: '123', subject: 'maths', minimum_grade_required: 'A' },
-                                        ])
-        allow(state_store).to receive(:repository).and_return(
-          instance_double('Repository', record: course_record),
-        )
-
-        wizard = build_test_wizard(:step_a, {}, {})
-        wizard.state_store = state_store
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :what_a_level_is_required, step_a_class
-          g.add_node :a_level_equivalencies, step_b_class
-
-          g.conditional_root do |store|
-            if store.repository.record.a_level_subject_requirements.any?
-              :a_level_equivalencies
-            else
-              :what_a_level_is_required
-            end
-          end
-        end
-
-        block = graph.instance_variable_get(:@conditional_root_block)
-        result = block.call(state_store)
-        expect(result).to eq(:a_level_equivalencies)
-      end
-
-      it 'calls wizard method when conditional_root given as symbol' do
-        wizard_class = Class.new do
-          attr_accessor :current_step_name, :log
-
-          def initialize
-            @current_step_name = :step_a
-            @log = OpenStruct.new(info: nil)
-          end
-
-          def step(step_name)
-            OpenStruct.new(id: step_name)
-          end
-
-          def determine_root_step
-            # Determine root based on state_store
-            if @ccurrent_step_name == :step_a
-              :a_level_equivalencies
-            else
-              :what_a_level_is_required
-            end
-          end
-        end
-
-        wizard = wizard_class.new
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :what_a_level_is_required, step_a_class
-          g.add_node :a_level_equivalencies, step_b_class
-          g.conditional_root :determine_root_step
-        end
-
-        # Verify method is stored
-        expect(graph.instance_variable_get(:@conditional_root_method)).to eq(:determine_root_step)
       end
     end
 
-    context 'multiple conditional branches' do
-      it 'handles create/edit/resume modes with block' do
-        wizard = build_test_wizard(:step_a, {}, {})
-        wizard.state_store = instance_double('StateStore', mode: :create)
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-
-          g.conditional_root do |store|
-            case store&.mode
-            when :create
-              :step_a
-            when :edit
-              :step_b
-            when :resume
-              :step_c
-            else
-              :step_d
-            end
-          end
-        end
-
-        block = graph.instance_variable_get(:@conditional_root_block)
-
-        mock_store_create = instance_double('StateStore', mode: :create)
-        mock_store_edit = instance_double('StateStore', mode: :edit)
-        mock_store_resume = instance_double('StateStore', mode: :resume)
-
-        expect(block.call(mock_store_create)).to eq(:step_a)
-        expect(block.call(mock_store_edit)).to eq(:step_b)
-        expect(block.call(mock_store_resume)).to eq(:step_c)
-      end
-    end
-
-    context 'validation of conditional_root' do
-      it 'raises if neither root nor conditional_root is set' do
-        wizard = build_test_wizard(:step_a, {}, {})
-
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            # No root or conditional_root set
-          end
-        }.to raise_error(ArgumentError, /Graph must have a root node set/)
-      end
-
-      it 'does not raise when conditional_root is set with block' do
-        wizard = build_test_wizard(:step_a, {}, {})
-
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.add_node :step_b, step_b_class
-            g.conditional_root { |_store| :step_a }
-          end
-        }.not_to raise_error
-      end
-
-      it 'does not raise when conditional_root is set with symbol' do
-        wizard_class = Class.new do
-          attr_accessor :current_step_name, :log
-
-          def initialize
-            @current_step_name = :step_a
-            @log = OpenStruct.new(info: nil)
-          end
-
-          def step(step_name)
-            OpenStruct.new(id: step_name)
-          end
-
-          def determine_root
-            :step_a
-          end
-        end
-
-        wizard = wizard_class.new
-
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.add_node :step_b, step_b_class
-            g.conditional_root :determine_root
-          end
-        }.not_to raise_error
-      end
-
-      it 'requires argument for conditional_root' do
-        wizard = build_test_wizard(:step_a, {}, {})
-
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.conditional_root # Missing block or symbol
-          end
-        }.to raise_error(ArgumentError, /conditional_root requires a block or method name/)
-      end
-    end
-
-    context 'conditional_root with path traversal' do
-      it 'uses conditional_root as starting point' do
-        wizard = build_test_wizard(:step_a, {}, {})
-
-        graph = described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.add_node :step_c, step_c_class
-
-          g.conditional_root { |_store| :step_b } # Entry at step_b
-          g.add_edge from: :step_a, to: :step_b
-          g.add_edge from: :step_b, to: :step_c
-        end
-
-        # Block can determine root
-        block = graph.instance_variable_get(:@conditional_root_block)
-        expect(block.call(nil)).to eq(:step_b)
-      end
-    end
-
-    context 'error handling for conditional_root' do
-      it 'raises if method name does not exist on wizard' do
-        wizard = build_test_wizard(:step_a, {}, {})
-
-        expect {
-          described_class.draw(wizard) do |g|
-            g.add_node :step_a, step_a_class
-            g.conditional_root :missing_method
-          end
-        }.to raise_error(ArgumentError, /method :missing_method not found on wizard/)
-      end
-
-      it 'validates predicate has correct arity' do
-        # This test depends on implementation details
-        # If method takes 0 args, should be wrapped to accept state_store
-        # If method takes 1 arg (state_store), use directly
-        expect(true).to be true # Placeholder for arity validation
-      end
+    it 'is serializable to JSON' do
+      expect { JSON.generate(metadata) }.not_to raise_error
     end
   end
 
-  describe 'static vs conditional_root interaction' do
-    let(:step_a_class) { Class.new }
-    let(:step_b_class) { Class.new }
+  describe 'Full wizard flow' do
+    context 'new user - upper tier - exempt activity' do
+      before do
+        wizard.state_store.is_returning_user = false
+        wizard.state_store.waste_category = :upper_tier
+        wizard.state_store.activity_type = :exempt
+        wizard.state_store.application_status = :approved
+      end
 
-    it 'raises if both root and conditional_root are set' do
-      wizard = build_test_wizard(:step_a, {}, {})
+      it 'navigates complete path' do
+        current = graph.root_step
+        path = [current]
 
-      expect {
-        described_class.draw(wizard) do |g|
-          g.add_node :step_a, step_a_class
-          g.add_node :step_b, step_b_class
-          g.root :step_a
-          g.conditional_root { |_store| :step_b }
+        until current == :issue_certificate
+          next_step = graph.next_step(current)
+          break if next_step.nil?
+
+          path << next_step
+          current = next_step
         end
-      }.to raise_error(ArgumentError, /Cannot set both/)
+
+        expect(path).to eq(%i[
+                             organization_type
+                             waste_category
+                             activity_type
+                             review
+                             issue_certificate
+                           ])
+      end
     end
 
-    it 'allows static root when conditional_root not used' do
-      wizard = build_test_wizard(:step_a, {}, {})
-
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.root :step_a
+    context 'returning user - lower tier' do
+      before do
+        wizard.state_store.is_returning_user = true
+        wizard.state_store.waste_category = :lower_tier
+        wizard.state_store.application_status = :rejected
       end
 
-      expect(graph.root_node).to eq(:step_a)
-      expect(graph.instance_variable_get(:@conditional_root_block)).to be_nil
-      expect(graph.instance_variable_get(:@conditional_root_method)).to be_nil
-    end
-  end
+      it 'navigates correct path to rejection' do
+        current = graph.root_step
+        path = [current]
 
-  describe 'documentation and inspection' do
-    let(:step_a_class) { Class.new }
-    let(:step_b_class) { Class.new }
+        until current == :rejection_notice
+          next_step = graph.next_step(current)
+          break if next_step.nil?
 
-    it 'marks conditional_root in documentation' do
-      wizard = build_test_wizard(:step_a, {}, {})
-
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.conditional_root { |_store| :step_a }
-      end
-
-      # When generating documentation, should show [CONDITIONAL] marker
-      # This depends on to_doc implementation
-      expect(graph.instance_variable_get(:@conditional_root_block)).to be_a(Proc)
-    end
-
-    it 'includes conditional_root method in inspection' do
-      wizard_class = Class.new do
-        attr_accessor :current_step_name, :log
-
-        def initialize
-          @current_step_name = :step_a
-          @log = OpenStruct.new(info: nil)
+          path << next_step
+          current = next_step
         end
 
-        def step(step_name)
-          OpenStruct.new(id: step_name)
-        end
-
-        def my_root_resolver
-          :step_a
-        end
+        expect(path).to eq(%i[
+                             account_login
+                             waste_category
+                             office_address
+                             review
+                             rejection_notice
+                           ])
       end
-
-      wizard = wizard_class.new
-
-      graph = described_class.draw(wizard) do |g|
-        g.add_node :step_a, step_a_class
-        g.add_node :step_b, step_b_class
-        g.conditional_root :my_root_resolver
-      end
-
-      method_name = graph.instance_variable_get(:@conditional_root_method)
-      expect(method_name).to eq(:my_root_resolver)
     end
   end
 end

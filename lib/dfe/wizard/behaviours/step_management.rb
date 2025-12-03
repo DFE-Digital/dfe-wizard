@@ -1,6 +1,6 @@
 module DfE
   module Wizard
-    module Core
+    module Behaviours
       # Step lifecycle management
       #
       # Handles step lookup, instantiation, and attribute extraction.
@@ -13,6 +13,33 @@ module DfE
       #
       # @api public
       module StepManagement
+        def current_step_name
+          @current_step_name || root_step
+        end
+
+        def root_step
+          steps_processor.root_step
+        end
+
+        # Get the current step instance
+        #
+        # Instantiates the step class with current state and parameters.
+        # Caches the instance.
+        #
+        # @return [DfE::Wizard::Step]
+        #
+        # @example
+        #   step = wizard.current_step
+        #   step.valid?  # => true/false
+        def current_step
+          @current_step ||= begin
+            klass = find_step(current_step_name)
+            params = fetch_step_attributes
+
+            klass.new(**params.symbolize_keys.merge(wizard: self, step_id: current_step_name))
+          end
+        end
+
         # Get a hydrated step object
         #
         # @param step_id [Symbol]
@@ -56,25 +83,6 @@ module DfE
         #   wizard.find_step(:email)  # => EmailStep
         def find_step(step_name)
           steps_processor.find_step(step_name)
-        end
-
-        # Get the current step instance
-        #
-        # Instantiates the step class with current state and parameters.
-        # Caches the instance.
-        #
-        # @return [DfE::Wizard::Step]
-        #
-        # @example
-        #   step = wizard.current_step
-        #   step.valid?  # => true/false
-        def current_step
-          @current_step ||= begin
-            klass = find_step(current_step_name)
-            params = fetch_step_attributes
-
-            klass.new(**params.symbolize_keys.merge(wizard: self, step_id: current_step_name))
-          end
         end
 
         # Extracts permitted parameters for the current step.
@@ -310,8 +318,8 @@ module DfE
         # @see StateStore#method_missing Which uses this list to route method calls
         # @api public
         def attribute_names
-          step_definitions.flat_map do |node|
-            node.klass.respond_to?(:attribute_names) ? node.klass.attribute_names : []
+          step_definitions.flat_map do |_step_id, step_class|
+            step_class.respond_to?(:attribute_names) ? step_class.attribute_names : []
           end
         end
       end

@@ -1,0 +1,81 @@
+{
+  "structure_type": "linear",
+  "root_step": "step_1",
+  "steps": {
+    "step_1": {
+      "label": "Step 1",
+      "class": "Steps::StepOne",
+      "attributes": [
+        {
+          "name": "name",
+          "type": "String",
+          "required": true,
+          "description": "User full name"
+        }
+      ],
+      "validators": [
+        {
+          "name": "name",
+          "type": "presence",
+          "message": "cannot be blank",
+          "code": "validates :name, presence: true, length: { minimum: 2 }"
+        }
+      ],
+      "operations": []
+    },
+    "step_2": {
+      "label": "Step 2",
+      "class": "Steps::StepTwo",
+      "attributes": [
+        {
+          "name": "email",
+          "type": "String",
+          "required": true,
+          "description": "Contact email"
+        }
+      ],
+      "validators": [
+        {
+          "name": "email",
+          "type": "format",
+          "message": "must be valid",
+          "code": "validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }"
+        }
+      ],
+      "operations": []
+    },
+    "step_3": {
+      "label": "Step 3",
+      "class": "Steps::StepThree",
+      "attributes": [],
+      "validators": [],
+      "operations": [
+        {
+          "name": "confirm_submission",
+          "hook": "after_save",
+          "description": "Record submission timestamp",
+          "code": "after_save :confirm_submission"
+        }
+      ]
+    }
+  },
+  "transitions": [
+    {
+      "type": "simple",
+      "from": "step_1",
+      "to": "step_2"
+    },
+    {
+      "type": "simple",
+      "from": "step_2",
+      "to": "step_3"
+    }
+  ],
+  "counts": {
+    "steps": 3,
+    "simple_transitions": 2,
+    "conditional_transitions": 0,
+    "multiple_conditional_transitions": 0,
+    "custom_branching_transitions": 0
+  }
+}

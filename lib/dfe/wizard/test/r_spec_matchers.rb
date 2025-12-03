@@ -137,7 +137,7 @@ module DfE
           match do |wizard|
             wizard.state_store.write(@state_data) if @state_data.present?
 
-            actual_root = wizard.steps_processor.root_node
+            actual_root = wizard.steps_processor.root_step
 
             actual_root == expected_root
           end
@@ -147,12 +147,12 @@ module DfE
           end
 
           failure_message do |wizard|
-            actual_root = wizard.steps_processor.root_node
+            actual_root = wizard.steps_processor.root_step
             "expected wizard to have root node #{expected_root.inspect}, but got #{actual_root.inspect}"
           end
 
           failure_message_when_negated do |wizard|
-            wizard.steps_processor.root_node
+            wizard.steps_processor.root_step
             "expected wizard not to have root node #{expected_root.inspect}, but it does"
           end
 
@@ -595,7 +595,7 @@ module DfE
         # @param wizard [Wizard] The wizard instance to inspect
         # @return [String] Formatted inspection output
         def wizard_inspect(wizard)
-          DfE::Wizard::Core::Inspect.new(wizard:).inspect
+          DfE::Wizard::Inspect.new(wizard:).inspect
         end
 
         # Helper to render state store data

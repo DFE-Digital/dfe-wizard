@@ -1,6 +1,6 @@
 module DfE
   module Wizard
-    module Core
+    module Behaviours
       # State management and data persistence
       #
       # Provides high-level API for reading/writing wizard state with automatic
@@ -679,12 +679,13 @@ module DfE
         #
         # @api private
         def find_step_for_attribute(attribute_name)
-          steps_processor.step_definitions.find do |node|
-            step_class = node.klass
+          result = steps_processor.step_definitions.find do |_, step_class|
             next unless step_class.respond_to?(:attribute_names)
 
             step_class.attribute_names.map(&:to_sym).include?(attribute_name.to_sym)
-          end&.id
+          end
+
+          result[0] if result
         end
       end
     end

@@ -259,7 +259,37 @@ RSpec.feature 'Personal information wizard', type: :feature do
     end
   end
 
-  # === Step Definitions
+  scenario 'documentation generation' do
+    when_i_generate_documentation_for_personal_information_wizard
+    and_the_generated_files_match_expected_fixture
+  end
+
+  def when_i_generate_documentation_for_personal_information_wizard
+    @generated_directory = Rails.root.join('tmp')
+
+    PersonalInformationWizard.new(
+      state_store: StateStores::PersonalInformation.new
+    )
+      .documentation
+      .generate_markdown(@generated_directory)
+  end
+
+  def and_the_generated_files_match_expected_fixture
+    generated_markdown = File.read(File.join(@generated_directory, 'personal_information_wizard.md'))
+
+    fixture_markdown = File.read(
+      Rails.root.join('spec/fixtures/dummy-app-wizard-docs/personal_information.md')
+    )
+
+    expect(normalize_whitespace(generated_readme)).to eq(normalize_whitespace(fixture_readme))
+  end
+
+  def normalize_whitespace(content)
+    content
+    .strip
+    .gsub(/\s+/, ' ')
+    .gsub(/\n\s*\n+/, "\n\n")
+  end
 
   def given_i_start_the_personal_information_wizard
     visit root_path
