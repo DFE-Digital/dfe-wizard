@@ -52,7 +52,7 @@ module DfE
           #
           # @example With block
           #   g.conditional_root { |state| state.user_type == :student ? :student_path : :general_path }
-          def conditional_root(method_name = nil, &block)
+          def conditional_root(method_name = nil, potential_root: nil, &block)
             if @registry.root_node || @registry.conditional_root_method || @registry.conditional_root_block
               raise ArgumentError, 'Cannot set both root and conditional_root'
             end
@@ -73,6 +73,20 @@ module DfE
               @registry.conditional_root_method = method_name
             end
 
+            unless potential_root.is_a?(Array) && potential_root.any?
+              raise ArgumentError, <<~MESSAGE
+                conditional_root requires :potential_root list of possible entry points for documentation.
+
+                Example:
+
+                  conditional_root(potential_root: [:login, :signup]) do |state|
+                    state.new_user? ? :signup : :login
+                  end
+
+              MESSAGE
+            end
+
+            @registry.potential_root_nodes = potential_root
             @registry.conditional_root_block = block if block_given?
           end
 

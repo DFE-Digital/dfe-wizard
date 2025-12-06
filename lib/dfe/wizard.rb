@@ -106,7 +106,6 @@ module DfE
       # Define a step with attributes and validation
       # @api public
       autoload :Step, 'dfe/wizard/core/step'
-
     end
     # @!endgroup
 
@@ -148,6 +147,10 @@ module DfE
     # @!endgroup
 
     module Tooling
+      # Documentation capabilities
+      # @api public
+      autoload :DocManagement, 'dfe/wizard/tooling/doc_management'
+
       # Inspect class to understand the whole wizard management in development
       # @api public
       autoload :Inspect, 'dfe/wizard/tooling/inspect'
@@ -223,6 +226,7 @@ module DfE
     include Core
     include Tooling
     include Tooling::LogManagement
+    include Tooling::DocManagement
     include Logging
 
     include Behaviours::Navigation

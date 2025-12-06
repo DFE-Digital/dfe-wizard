@@ -1,27 +1,29 @@
 RSpec.describe DfE::Wizard::Documentation::Generator do
-  describe 'Initialization' do
-    let(:wizard) { build_stub_wizard }
-    let(:options) { {} }
+  subject(:generator) { described_class.new(metadata, options) }
 
-    context 'with valid wizard' do
+  let(:wizard) { WorkExperienceWizard.new(state_store: WorkExperienceStateStore.new) }
+  let(:metadata) { DfE::Wizard::Core::Metadata.new(wizard) }
+  let(:options) { {} }
+  let(:temp_dir) { Dir.mktmpdir }
+
+  after { FileUtils.rm_rf(temp_dir) }
+
+  describe 'initialization' do
+    context 'with valid metadata' do
       it 'initializes successfully' do
-        builder = described_class.new(wizard, options)
-        expect(builder).to be_a(described_class)
+        expect(generator).to be_a(described_class)
       end
 
-      it 'stores wizard reference' do
-        builder = described_class.new(wizard, options)
-        expect(builder.wizard).to eq(wizard)
+      it 'sets metadata' do
+        expect(generator.metadata).to eq(metadata)
       end
 
-      it 'extracts metadata from wizard' do
-        builder = described_class.new(wizard, options)
-        expect(builder.metadata).to be_a(Hash)
+      it 'derives wizard_name from class' do
+        expect(generator.wizard_name).to eq('Work experience wizard')
       end
 
       it 'normalizes options with defaults' do
-        builder = described_class.new(wizard, {})
-        expect(builder.options).to include(
+        expect(generator.options).to include(
           step_attributes: true,
           step_validations: true,
           step_operations: true,
@@ -30,515 +32,344 @@ RSpec.describe DfE::Wizard::Documentation::Generator do
       end
     end
 
-    context 'without steps_processor' do
-      it 'raises ArgumentError' do
-        bad_wizard = Object.new
-        expect do
-          described_class.new(bad_wizard, options)
-        end.to raise_error(ArgumentError, /steps_processor/)
+    context 'with custom title' do
+      let(:options) { { title: 'Custom Wizard' } }
+
+      it 'derives wizard_name from title' do
+        expect(generator.wizard_name).to eq('Custom Wizard')
       end
     end
 
-    context 'with steps_processor but no metadata' do
-      it 'raises ArgumentError' do
-        bad_wizard = build_stub_wizard
-        allow(bad_wizard.steps_processor).to receive(:respond_to?).and_return(false)
-        expect do
-          described_class.new(bad_wizard, options)
-        end.to raise_error(ArgumentError, /metadata/)
-      end
-    end
-  end
-
-  describe 'Options Normalization' do
-    let(:wizard) { build_stub_wizard }
-
-    context 'with no options' do
-      it 'defaults all to true' do
-        builder = described_class.new(wizard, {})
-        expect(builder.options[:step_attributes]).to be true
-        expect(builder.options[:step_validations]).to be true
-        expect(builder.options[:step_operations]).to be true
-        expect(builder.options[:include_raw_metadata]).to be true
-      end
-    end
-
-    context 'with partial options' do
-      it 'preserves provided values' do
-        builder = described_class.new(wizard, step_attributes: false)
-        expect(builder.options[:step_attributes]).to be false
-        expect(builder.options[:step_validations]).to be true
-      end
-
-      it 'fills missing options with defaults' do
-        builder = described_class.new(wizard, include_raw_metadata: false)
-        expect(builder.options[:step_operations]).to be true
-        expect(builder.options[:include_raw_metadata]).to be false
-      end
-    end
-
-    context 'with all options disabled' do
-      it 'honors all false values' do
-        opts = {
+    context 'with custom options' do
+      let(:options) do
+        {
           step_attributes: false,
-          step_validations: false,
+          step_validations: true,
           step_operations: false,
           include_raw_metadata: false,
         }
-        builder = described_class.new(wizard, opts)
-        expect(builder.options).to eq(opts)
+      end
+
+      it 'sets custom options' do
+        expect(generator.options).to eq(options)
+      end
+    end
+
+    context 'with invalid metadata' do
+      let(:metadata) { 'not metadata' }
+
+      it 'raises ArgumentError' do
+        expect { described_class.new(metadata) }
+          .to raise_error(ArgumentError, /must respond to #to_h/)
       end
     end
   end
 
-  describe '#generate_markdown' do
-    let(:wizard) { build_stub_wizard }
-    let(:builder) { described_class.new(wizard) }
-    let(:temp_dir) { Pathname.new(Dir.mktmpdir) }
+  describe '#generate' do
+    context 'with built-in :markdown format' do
+      it 'writes markdown file' do
+        output_path = File.join(temp_dir, 'wizard.md')
+        result = generator.generate(:markdown, output_path)
 
-    after do
-      FileUtils.rm_rf(temp_dir) if temp_dir.exist?
-    end
-
-    it 'generates markdown file' do
-      filepath = temp_dir.join('test.md')
-      result = builder.generate_markdown(filepath)
-      expect(File.exist?(result)).to be true
-    end
-
-    it 'returns absolute file path' do
-      filepath = temp_dir.join('test.md')
-      result = builder.generate_markdown(filepath)
-      expect(Pathname.new(result).absolute?).to be true
-    end
-
-    it 'creates readable markdown file' do
-      filepath = temp_dir.join('test.md')
-      builder.generate_markdown(filepath)
-      content = File.read(filepath)
-      expect(content).to include('# Wizard Documentation')
-    end
-
-    it 'respects formatter options' do
-      filepath = temp_dir.join('test.md')
-      builder_no_attrs = described_class.new(wizard, step_attributes: false)
-      content_no_attrs = File.read(builder_no_attrs.generate_markdown(filepath))
-
-      filepath2 = temp_dir.join('test2.md')
-      builder_with_attrs = described_class.new(wizard, step_attributes: true)
-      content_with_attrs = File.read(builder_with_attrs.generate_markdown(filepath2))
-
-      # With attributes should generally be longer (more content)
-      expect(content_with_attrs.length).to be > content_no_attrs.length
-    end
-
-    context 'with invalid path' do
-      it 'raises error for non-writable directory' do
-        expect do
-          builder.generate_markdown('/root/forbidden/path.md')
-        end.to raise_error(Errno::EACCES)
+        expect(result).to eq(File.realpath(output_path))
+        expect(File.exist?(output_path)).to be true
+        expect(File.read(output_path)).to include('# Wizard Documentation')
       end
-    end
-  end
 
-  describe '#generate_mermaid' do
-    let(:wizard) { build_stub_wizard }
-    let(:builder) { described_class.new(wizard) }
-    let(:temp_dir) { Pathname.new(Dir.mktmpdir) }
+      it 'returns absolute path' do
+        output_path = File.join(temp_dir, 'wizard.md')
+        result = generator.generate(:markdown, output_path)
 
-    after do
-      FileUtils.rm_rf(temp_dir) if temp_dir.exist?
-    end
-
-    it 'generates mermaid diagram file' do
-      filepath = temp_dir.join('test.mmd')
-      result = builder.generate_mermaid(filepath)
-      expect(File.exist?(result)).to be true
-    end
-
-    it 'creates valid mermaid syntax' do
-      filepath = temp_dir.join('test.mmd')
-      builder.generate_mermaid(filepath)
-      content = File.read(filepath)
-      expect(content).to match(/^graph (TD|LR|BT|RL)/)
-    end
-
-    it 'includes step nodes' do
-      filepath = temp_dir.join('test.mmd')
-      builder.generate_mermaid(filepath)
-      content = File.read(filepath)
-      expect(content).to include('[')
-      expect(content).to include(']')
-    end
-
-    it 'includes arrows for transitions' do
-      filepath = temp_dir.join('test.mmd')
-      builder.generate_mermaid(filepath)
-      content = File.read(filepath)
-      expect(content).to match(/-->|=>/)
-    end
-  end
-
-  describe '#generate_graphviz' do
-    let(:wizard) { build_stub_wizard }
-    let(:builder) { described_class.new(wizard) }
-    let(:temp_dir) { Pathname.new(Dir.mktmpdir) }
-
-    after do
-      FileUtils.rm_rf(temp_dir) if temp_dir.exist?
-    end
-
-    it 'generates graphviz DOT file' do
-      filepath = temp_dir.join('test.dot')
-      result = builder.generate_graphviz(filepath)
-      expect(File.exist?(result)).to be true
-    end
-
-    it 'creates valid DOT syntax' do
-      filepath = temp_dir.join('test.dot')
-      builder.generate_graphviz(filepath)
-      content = File.read(filepath)
-      expect(content).to match(/^digraph|^graph/)
-    end
-
-    it 'includes graph nodes' do
-      filepath = temp_dir.join('test.dot')
-      builder.generate_graphviz(filepath)
-      content = File.read(filepath)
-      expect(content).to include('"')
-      expect(content).to include(';')
-    end
-
-    it 'includes edges for transitions' do
-      filepath = temp_dir.join('test.dot')
-      builder.generate_graphviz(filepath)
-      content = File.read(filepath)
-      expect(content).to match(/->|--/)
-    end
-  end
-
-  describe '#generate_all' do
-    let(:wizard) { build_stub_wizard }
-    let(:builder) { described_class.new(wizard) }
-    let(:output_dir) { Pathname.new(Dir.mktmpdir) }
-    let(:wizard_name) { 'stub_wizard' }
-
-    after do
-      FileUtils.rm_rf(output_dir) if output_dir.exist?
-    end
-
-    it 'generates all three formats' do
-      result = builder.generate_all(output_dir)
-      expect(result).to have_key(:markdown)
-      expect(result).to have_key(:mermaid)
-      expect(result).to have_key(:graphviz)
-    end
-
-    it 'creates markdown file' do
-      builder.generate_all(output_dir)
-      expect(File.exist?(output_dir.join("#{wizard_name}.md"))).to be true
-    end
-
-    it 'creates mermaid file' do
-      builder.generate_all(output_dir)
-      expect(File.exist?(output_dir.join("#{wizard_name}.mmd"))).to be true
-    end
-
-    it 'creates graphviz file' do
-      builder.generate_all(output_dir)
-      expect(File.exist?(output_dir.join("#{wizard_name}.dot"))).to be true
-    end
-
-    it 'returns absolute paths' do
-      result = builder.generate_all(output_dir)
-      expect(Pathname.new(result[:markdown]).absolute?).to be true
-      expect(Pathname.new(result[:mermaid]).absolute?).to be true
-      expect(Pathname.new(result[:graphviz]).absolute?).to be true
-    end
-
-    it 'creates output directory if missing' do
-      new_dir = output_dir.join('nested/deep/path')
-      builder.generate_all(new_dir)
-      expect(new_dir.exist?).to be true
-    end
-
-    context 'with string path' do
-      it 'accepts string paths' do
-        result = builder.generate_all(output_dir.to_s)
-        expect(result[:markdown]).to include(wizard_name)
+        expect(Pathname.new(result).absolute?).to be true
       end
     end
 
-    context 'with Pathname' do
-      it 'accepts Pathname objects' do
-        result = builder.generate_all(output_dir)
-        expect(result[:markdown]).to include(wizard_name)
-      end
-    end
-  end
+    context 'with built-in :mermaid format' do
+      it 'writes mermaid file' do
+        output_path = File.join(temp_dir, 'wizard.mmd')
+        result = generator.generate(:mermaid, output_path)
 
-  describe 'Metadata Access' do
-    let(:wizard) { build_stub_wizard }
-    let(:builder) { described_class.new(wizard) }
-
-    it 'exposes metadata as attr_reader' do
-      expect(builder.metadata).to be_a(Hash)
-    end
-
-    it 'includes structure_type' do
-      expect(builder.metadata).to have_key(:structure_type)
-    end
-
-    it 'includes steps' do
-      expect(builder.metadata).to have_key(:steps)
-    end
-
-    it 'includes transitions' do
-      expect(builder.metadata).to have_key(:transitions)
-    end
-
-    it 'includes counts' do
-      expect(builder.metadata).to have_key(:counts)
-    end
-
-    it 'exposes wizard reference' do
-      expect(builder.wizard).to eq(wizard)
-    end
-
-    it 'exposes normalized options' do
-      expect(builder.options).to be_a(Hash)
-    end
-  end
-
-  describe 'File Operations' do
-    let(:wizard) { build_stub_wizard }
-    let(:builder) { described_class.new(wizard) }
-    let(:temp_dir) { Pathname.new(Dir.mktmpdir) }
-
-    after do
-      FileUtils.rm_rf(temp_dir) if temp_dir.exist?
-    end
-
-    context 'with writable directory' do
-      it 'successfully writes files' do
-        filepath = temp_dir.join('test.md')
-        result = builder.generate_markdown(filepath)
-        expect(File.exist?(result)).to be true
+        expect(result).to eq(File.realpath(output_path))
+        expect(File.exist?(output_path)).to be true
+        expect(File.read(output_path)).to include('flowchart')
       end
     end
 
-    context 'with restricted permissions' do
-      it 'raises error when directory not writable' do
-        restricted_dir = temp_dir.join('restricted')
-        Dir.mkdir(restricted_dir)
-        File.chmod(0o444, restricted_dir)
+    context 'with built-in :graphviz format' do
+      it 'writes graphviz file' do
+        output_path = File.join(temp_dir, 'wizard.dot')
+        result = generator.generate(:graphviz, output_path)
 
-        expect do
-          builder.generate_markdown(restricted_dir.join('test.md'))
-        end.to raise_error(Errno::EACCES)
-
-        File.chmod(0o755, restricted_dir)
+        expect(result).to eq(File.realpath(output_path))
+        expect(File.exist?(output_path)).to be true
+        expect(File.read(output_path)).to include('digraph')
       end
     end
-  end
 
-  describe 'Wizard Name Derivation' do
-    it 'derives wizard name from class' do
-      wizard = build_stub_wizard
-      builder = described_class.new(wizard)
+    context 'with custom formatter' do
+      before do
+        class TestFormatter
+          def initialize(metadata, options)
+            @metadata = metadata
+            @options = options
+          end
 
-      expect(builder.send(:wizard_name)).to include('stub_wizard')
-    end
-
-    it 'converts CamelCase to underscore' do
-      # Using a real wizard class would be better, but for testing:
-      allow_any_instance_of(described_class).to receive(:wizard_name).and_return('my_awesome_wizard')
-      wizard = build_stub_wizard
-      builder = described_class.new(wizard)
-
-      # Verify method exists and works
-      expect(builder.send(:wizard_name)).to be_a(String)
-    end
-  end
-
-  describe 'Format Delegation' do
-    let(:wizard) { build_stub_wizard }
-    let(:builder) { described_class.new(wizard) }
-    let(:temp_file) { Pathname.new(Dir.mktmpdir).join('test') }
-
-    after do
-      FileUtils.rm_f(temp_file.to_s)
-    end
-
-    it 'delegates markdown to MarkdownFormatter' do
-      expect_any_instance_of(
-        DfE::Wizard::Documentation::Formatters::MarkdownFormatter,
-      ).to receive(:render).and_return('# Test')
-      builder.generate_markdown("#{temp_file}.md")
-    end
-
-    it 'delegates mermaid to MermaidFormatter' do
-      expect_any_instance_of(
-        DfE::Wizard::Documentation::Formatters::MermaidFormatter,
-      ).to receive(:render).and_return('graph TD')
-      builder.generate_mermaid("#{temp_file}.mmd")
-    end
-
-    it 'delegates graphviz to GraphvizFormatter' do
-      expect_any_instance_of(
-        DfE::Wizard::Documentation::Formatters::GraphvizFormatter,
-      ).to receive(:render).and_return('digraph {}')
-      builder.generate_graphviz("#{temp_file}.dot")
-    end
-
-    it 'passes metadata to formatters' do
-      expect(
-        DfE::Wizard::Documentation::Formatters::MarkdownFormatter,
-      ).to receive(:new).with(
-        builder.metadata,
-        anything,
-      )
-      temp_path = Pathname.new(Dir.mktmpdir).join('test.md')
-      builder.generate_markdown(temp_path)
-    end
-
-    it 'passes options to formatters' do
-      opts = { step_attributes: false }
-      builder_with_opts = described_class.new(wizard, opts)
-      expect(
-        DfE::Wizard::Documentation::Formatters::MarkdownFormatter,
-      ).to receive(:new).with(
-        anything,
-        include(step_attributes: false),
-      )
-      temp_path = Pathname.new(Dir.mktmpdir).join('test.md')
-      builder_with_opts.generate_markdown(temp_path)
-    end
-  end
-
-  describe 'Integration' do
-    let(:wizard) { build_stub_wizard }
-    let(:output_dir) { Pathname.new(Dir.mktmpdir) }
-
-    after do
-      FileUtils.rm_rf(output_dir) if output_dir.exist?
-    end
-
-    context 'complete workflow' do
-      it 'generates all formats in one call' do
-        builder = described_class.new(wizard)
-        result = builder.generate_all(output_dir)
-
-        # Verify all files exist
-        expect(File.exist?(result[:markdown])).to be true
-        expect(File.exist?(result[:mermaid])).to be true
-        expect(File.exist?(result[:graphviz])).to be true
-
-        # Verify content is not empty
-        expect(File.size(result[:markdown])).to be > 0
-        expect(File.size(result[:mermaid])).to be > 0
-        expect(File.size(result[:graphviz])).to be > 0
+          def render
+            'TEST_FORMAT_OUTPUT'
+          end
+        end
       end
 
-      it 'handles conditional root entries' do
-        # Create wizard with multiple entry points
-        wizard = build_stub_wizard(root_type: :multiple)
-        builder = described_class.new(wizard)
-        result = builder.generate_all(output_dir)
+      it 'uses custom formatter' do
+        output_path = File.join(temp_dir, 'wizard.txt')
+        result = generator.generate(:test, output_path)
 
-        # Should generate without error
-        expect(result[:markdown]).to be_present
-        expect(result[:mermaid]).to be_present
-        expect(result[:graphviz]).to be_present
+        expect(result).to eq(File.realpath(output_path))
+        expect(File.read(output_path)).to eq('TEST_FORMAT_OUTPUT')
+      end
+    end
+
+    context 'with invalid format' do
+      it 'raises ArgumentError' do
+        output_path = File.join(temp_dir, 'wizard.xyz')
+
+        expect { generator.generate(:unknown_format, output_path) }
+          .to raise_error(ArgumentError, /Formatter not found for :unknown_format/)
       end
 
-      it 'respects all option combinations' do
-        options_combos = [
-          { step_attributes: true, step_validations: true, step_operations: true },
-          { step_attributes: false, step_validations: false, step_operations: false },
-          { step_attributes: true, step_validations: false, step_operations: true },
-          { include_raw_metadata: false },
-        ]
+      it 'provides helpful error message' do
+        output_path = File.join(temp_dir, 'wizard.xyz')
 
-        options_combos.each do |opts|
-          builder = described_class.new(wizard, opts)
-          result = builder.generate_all(output_dir.join(opts.values.join('_')))
-          expect(result).to have_key(:markdown)
-          expect(result).to have_key(:mermaid)
-          expect(result).to have_key(:graphviz)
+        expect { generator.generate(:invalid, output_path) }
+          .to raise_error(ArgumentError) do |error|
+            expect(error.message).to include('Expected format:')
+            expect(error.message).to include(':markdown, :mermaid, :graphviz')
+            expect(error.message).to include('To create a custom formatter:')
+          end
+      end
+    end
+
+    context 'with nested directory path' do
+      it 'creates directories if needed' do
+        nested_path = File.join(temp_dir, 'docs', 'sub', 'dir', 'wizard.md')
+        result = generator.generate(:markdown, nested_path)
+
+        expect(File.exist?(nested_path)).to be true
+        expect(result).to eq(File.realpath(nested_path))
+      end
+    end
+
+    context 'when directory not writable' do
+      it 'raises error' do
+        readonly_dir = File.join(temp_dir, 'readonly')
+        FileUtils.mkdir(readonly_dir)
+        FileUtils.chmod(0o444, readonly_dir)
+
+        output_path = File.join(readonly_dir, 'wizard.md')
+
+        begin
+          expect { generator.generate(:markdown, output_path) }
+            .to raise_error(Errno::EACCES)
+        ensure
+          FileUtils.chmod(0o755, readonly_dir)
         end
       end
     end
   end
 
-  describe 'Error Handling' do
-    let(:wizard) { build_stub_wizard }
-    let(:builder) { described_class.new(wizard) }
+  describe '#generate_all' do
+    it 'generates all three formats' do
+      result = generator.generate_all(temp_dir)
 
-    it 'handles non-existent parent directories' do
-      temp_dir = Pathname.new(Dir.mktmpdir)
-      nested_path = temp_dir.join('a/b/c/d/e')
-      FileUtils.rm_rf(temp_dir)
-
-      expect do
-        builder.generate_markdown(nested_path.join('test.md'))
-      end.to raise_error(Errno::ENOENT)
+      expect(result).to be_a(Hash)
+      expect(result.keys).to contain_exactly(:markdown, :mermaid, :graphviz)
     end
 
-    it 'handles file write failures gracefully' do
-      # Create a file and try to write to it as a directory
-      temp_dir = Pathname.new(Dir.mktmpdir)
-      file_path = temp_dir.join('is_a_file')
-      File.write(file_path, 'test')
+    it 'creates markdown file with correct name' do
+      generator.generate_all(temp_dir)
+      markdown_path = File.join(temp_dir, 'work_experience_wizard.md')
 
-      expect do
-        builder.generate_markdown(file_path.join('subfile.md'))
-      end.to raise_error(Errno::ENOTDIR)
-
-      FileUtils.rm_rf(temp_dir)
+      expect(File.exist?(markdown_path)).to be true
     end
-  end
 
-  # Helper Methods
-  def build_stub_wizard(root_type: :single)
-    wizard = double('Wizard')
-    processor = double('StepsProcessor')
+    it 'creates mermaid file with correct name' do
+      generator.generate_all(temp_dir)
+      mermaid_path = File.join(temp_dir, 'work_experience_wizard.mmd')
 
-    metadata = {
-      structure_type: :graph,
-      root_step: root_type == :single ? :start : %i[entry_one entry_two],
-      steps: {
-        start: { label: 'Start', class: 'Steps::Start' },
-        end: { label: 'End', class: 'Steps::End' },
-      },
-      transitions: [
-        { type: :simple, from: :start, to: :end },
-      ],
-      counts: {
-        steps: 2,
-        simple_transitions: 1,
-        conditional_transitions: 0,
-        multiple_conditional_transitions: 0,
-        custom_branching_transitions: 0,
-      },
-    }
+      expect(File.exist?(mermaid_path)).to be true
+    end
 
-    allow(processor).to receive(:respond_to?).and_return(true)
-    allow(processor).to receive(:metadata).and_return(metadata)
-    allow(wizard).to receive(:steps_processor).and_return(processor)
-    allow(wizard).to receive(:class).and_return(StubWizard)
+    it 'creates graphviz file with correct name' do
+      generator.generate_all(temp_dir)
+      graphviz_path = File.join(temp_dir, 'work_experience_wizard.dot')
 
-    wizard
-  end
+      expect(File.exist?(graphviz_path)).to be true
+    end
 
-  class StubWizard
-    include DfE::Wizard
+    it 'returns hash with absolute paths' do
+      result = generator.generate_all(temp_dir)
 
-    def steps_processor
-      DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
-        graph.add_node :name
-        graph.root :name
+      result.each_value do |path|
+        expect(Pathname.new(path).absolute?).to be true
+        expect(File.exist?(path)).to be true
       end
+    end
+
+    it 'returns paths matching generated files' do
+      result = generator.generate_all(temp_dir)
+
+      expect(result[:markdown]).to include('work_experience_wizard.md')
+      expect(result[:mermaid]).to include('work_experience_wizard.mmd')
+      expect(result[:graphviz]).to include('work_experience_wizard.dot')
+    end
+
+    context 'with custom title' do
+      let(:options) { { title: 'My Custom Wizard' } }
+
+      it 'uses custom title for filenames' do
+        result = generator.generate_all(temp_dir)
+
+        expect(result[:markdown]).to include('my_custom_wizard.md')
+        expect(result[:mermaid]).to include('my_custom_wizard.mmd')
+        expect(result[:graphviz]).to include('my_custom_wizard.dot')
+      end
+    end
+
+    context 'when directory does not exist' do
+      it 'creates the directory' do
+        new_dir = File.join(temp_dir, 'new_docs')
+        generator.generate_all(new_dir)
+
+        expect(Dir.exist?(new_dir)).to be true
+      end
+    end
+
+    context 'with custom options' do
+      let(:options) do
+        {
+          step_attributes: false,
+          step_validations: false,
+          include_raw_metadata: false,
+        }
+      end
+
+      it 'passes options to formatters' do
+        result = generator.generate_all(temp_dir)
+        markdown_content = File.read(result[:markdown])
+
+        expect(markdown_content).not_to include('#### Attributes')
+        expect(markdown_content).not_to include('#### Validations')
+      end
+    end
+  end
+
+  describe '#validate_metadata!' do
+    context 'with object responding to #to_h' do
+      it 'does not raise error' do
+        expect { generator }.not_to raise_error
+      end
+    end
+
+    context 'with object not responding to #to_h' do
+      it 'raises ArgumentError' do
+        expect { described_class.new('string') }
+          .to raise_error(ArgumentError, /must respond to #to_h/)
+      end
+    end
+  end
+
+  describe '#formatter_for' do
+    it 'returns MarkdownFormatter for :markdown' do
+      formatter_class = generator.formatter_for(:markdown)
+      expect(formatter_class).to eq(DfE::Wizard::Documentation::Formatters::MarkdownFormatter)
+    end
+
+    it 'returns MermaidFormatter for :mermaid' do
+      formatter_class = generator.formatter_for(:mermaid)
+      expect(formatter_class).to eq(DfE::Wizard::Documentation::Formatters::MermaidFormatter)
+    end
+
+    it 'returns GraphvizFormatter for :graphviz' do
+      formatter_class = generator.formatter_for(:graphviz)
+      expect(formatter_class).to eq(DfE::Wizard::Documentation::Formatters::GraphvizFormatter)
+    end
+
+    it 'constantizes custom formatter' do
+      class CustomFormatter
+        def render = 'custom'
+      end
+
+      formatter_class = generator.formatter_for(:custom)
+      expect(formatter_class).to eq(CustomFormatter)
+    end
+
+    it 'raises error for unknown formatter' do
+      expect { generator.formatter_for(:unknown) }
+        .to raise_error(ArgumentError, /Formatter not found for :unknown/)
+    end
+  end
+
+  describe '#filename' do
+    it 'converts wizard name into filename' do
+      expect(generator.filename).to eq('work_experience_wizard')
+    end
+  end
+
+  describe '#write_file' do
+    it 'writes content to file' do
+      output_path = File.join(temp_dir, 'test.txt')
+      generator.send(:write_file, output_path, 'Test content')
+
+      expect(File.read(output_path)).to eq('Test content')
+    end
+
+    it 'returns absolute path' do
+      output_path = File.join(temp_dir, 'test.txt')
+      result = generator.send(:write_file, output_path, 'content')
+
+      expect(Pathname.new(result).absolute?).to be true
+    end
+
+    it 'creates parent directories if needed' do
+      output_path = File.join(temp_dir, 'a', 'b', 'c', 'test.txt')
+      generator.send(:write_file, output_path, 'content')
+
+      expect(File.exist?(output_path)).to be true
+    end
+  end
+
+  describe 'integration' do
+    it 'generates complete documentation package' do
+      result = generator.generate_all(temp_dir)
+
+      result.each_value { |path|
+        expect(File.exist?(path)).to be true
+        content = File.read(path)
+        expect(content.length).to be > 100
+      }
+
+      markdown = File.read(result[:markdown])
+      mermaid = File.read(result[:mermaid])
+      graphviz = File.read(result[:graphviz])
+
+      expect(markdown).to include('#')
+      expect(mermaid).to include('flowchart')
+      expect(graphviz).to include('digraph')
+    end
+
+    it 'respects custom options throughout' do
+      custom_gen = described_class.new(
+        metadata,
+        step_attributes: true,
+        step_validations: false,
+        include_raw_metadata: false,
+      )
+
+      result = custom_gen.generate_all(temp_dir)
+      markdown = File.read(result[:markdown])
+
+      expect(markdown).to include('#### Attributes')
+      expect(markdown).not_to include('#### Validations')
     end
   end
 end

@@ -35,7 +35,9 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
         g.add_node :pending_info, Steps::PendingInfo, label: 'Pending Information'
 
         # Dynamic root: returning users go to login, new users to organization type
-        g.conditional_root { |state| state.is_returning_user? ? :account_login : :organization_type }
+        g.conditional_root(potential_root: %i[account_login organization_type]) do |state|
+          state.is_returning_user? ? :account_login : :organization_type
+        end
 
         # Simple edges (linear progression)
         g.add_edge from: :organization_type, to: :waste_category
@@ -171,6 +173,29 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
       it 'returns login for returning users' do
         wizard.state_store.is_returning_user = true
         expect(graph.root_step).to eq(:account_login)
+      end
+    end
+
+    context 'when not passing potential root' do
+      before do
+        class GraphWithoutPotentialRoot
+          def steps_processor
+            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+              graph.add_node :first_page, Object
+              graph.add_node :second_page, Object
+
+              graph.conditional_root { %i[first_page second_page].rand }
+            end
+          end
+        end
+      end
+
+      it 'raises error without potential root steps' do
+        expect {
+          GraphWithoutPotentialRoot.new.steps_processor
+        }.to raise_error(
+          /conditional_root requires :potential_root list of possible entry points for documentation/,
+        )
       end
     end
   end
@@ -326,9 +351,17 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
       expect(metadata[:structure_type]).to eq(:graph)
     end
 
-    it 'includes root_step' do
-      wizard.state_store.is_returning_user = false
-      expect(metadata[:root_step]).to eq(:organization_type)
+    it 'identifies multiple possible entry points' do
+      possible_roots = metadata[:root_step]
+      expect(possible_roots).to eq(%i[account_login organization_type])
+    end
+
+    it 'returns root when is only one' do
+      root_step = PersonalInformationWizard.new(
+        state_store: StateStores::PersonalInformation.new,
+      ).steps_processor.metadata[:root_step]
+
+      expect(root_step).to eq(:name_and_date_of_birth)
     end
 
     describe 'steps metadata' do

@@ -21,7 +21,7 @@ module DfE
       #   #          class: '...',
       #   #          attributes: [{name:, type:,}],
       #   #          validators: [{name:, type:, message:}],
-      #   #          operations: [{name:, hook:, description:}]
+      #   #          operations: [{name:, description:}]
       #   #        }
       #   #      }
       #   #    }
@@ -44,6 +44,7 @@ module DfE
           @enriched_metadata ||= begin
             metadata = @wizard.steps_processor.metadata.deep_dup
             enrich_with_step_details(metadata)
+            metadata[:wizard_name] = @wizard.class.to_s.underscore.humanize
             metadata
           end
         end
@@ -90,9 +91,10 @@ module DfE
           raise ArgumentError, 'Wizard must have steps_processor method' unless @wizard.respond_to?(:steps_processor)
 
           processor = @wizard.steps_processor
+
           unless processor.respond_to?(:metadata)
             raise ArgumentError,
-                  'Wizard.steps_processor must have metadata method'
+                  'Wizard.steps_processor must have #metadata method for documentation'
           end
         end
 
@@ -202,15 +204,15 @@ module DfE
 
           return [] unless operation_classes
 
-          operation_classes.map do |op_class|
-            description = if op_class.respond_to?(:description)
-                            op_class.description
+          operation_classes.map do |operation_class|
+            description = if operation_class.respond_to?(:description)
+                            operation_class.description
                           else
-                            "#{op_class.name.demodulize} operation"
+                            "#{operation_class.name.demodulize} operation"
                           end
 
             {
-              name: op_class.name.demodulize.underscore.to_sym,
+              name: operation_class.name.demodulize.underscore.to_sym,
               description:,
             }
           end

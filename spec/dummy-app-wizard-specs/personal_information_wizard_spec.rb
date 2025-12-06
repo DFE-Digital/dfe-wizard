@@ -778,13 +778,4 @@ RSpec.describe PersonalInformationWizard do
       expect(step.nationalities).to eq(['british'])
     end
   end
-
-  describe '#to_doc' do
-    let(:current_step) { :name_and_date_of_birth }
-
-    it 'returns a valid documentation' do
-      expected = File.read('spec/fixtures/personal_information_wizard.dot')
-      expect(wizard.to_doc.to_s).to eq(expected)
-    end
-  end
 end

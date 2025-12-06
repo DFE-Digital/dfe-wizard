@@ -42,6 +42,44 @@ RSpec.feature 'Assign mentor wizard', type: :feature do
     then_i_see_a_404
   end
 
+  scenario 'documentation generation' do
+    when_i_generate_documentation_for_assign_mentor_wizard
+    and_the_generated_files_match_expected_fixture
+  end
+
+  def when_i_generate_documentation_for_assign_mentor_wizard
+    @generated_directory = Rails.root.join('tmp')
+
+    AssignMentorWizard.new(
+      state_store: StateStores::AssignMentor.new,
+    )
+                      .documentation
+                      .generate_all(@generated_directory)
+  end
+
+  def and_the_generated_files_match_expected_fixture
+    generated_markdown = File.read(File.join(@generated_directory, 'assign_mentor_wizard.md'))
+    generated_mermaid = File.read(File.join(@generated_directory, 'assign_mentor_wizard.mmd'))
+    generated_graphviz = File.read(File.join(@generated_directory, 'assign_mentor_wizard.dot'))
+
+    fixture_markdown = File.read('spec/fixtures/documentation/markdown/assign_mentor_wizard.md')
+    fixture_mermaid = File.read('spec/fixtures/documentation/mermaid/assign_mentor_wizard.mmd')
+    fixture_graphviz = File.read('spec/fixtures/documentation/graphviz/assign_mentor_wizard.dot')
+
+    expect(normalize_whitespace(generated_markdown)).to eq(normalize_whitespace(fixture_markdown))
+    expect(normalize_whitespace(generated_mermaid)).to eq(normalize_whitespace(fixture_mermaid))
+    expect(normalize_whitespace(generated_graphviz)).to eq(normalize_whitespace(fixture_graphviz))
+  end
+
+  def normalize_whitespace(content)
+    content
+      .strip
+      # Remove/normalize timestamps
+      .gsub(/\*\*Generated:\*\*.*?Z/, '**Generated:** NORMALIZED')
+      .gsub(/\s+/, ' ')
+      .gsub(/\n\s*\n+/, "\n\n")
+  end
+
   def given_i_start_the_assign_mentor_wizard
     visit root_path
     click_link_or_button 'Wizards'
