@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_11_27_144308) do
+ActiveRecord::Schema[7.2].define(version: 2025_12_06_173343) do
   # These are extensions that must be enabled in order to support this database
   enable_extension 'plpgsql'
 
@@ -57,5 +57,17 @@ ActiveRecord::Schema[7.2].define(version: 2025_11_27_144308) do
     t.datetime 'created_at', null: false
     t.datetime 'updated_at', null: false
     t.index ['email'], name: 'index_users_on_email', unique: true
+  end
+
+  create_table 'wizard_states', force: :cascade do |t|
+    t.string 'key'
+    t.string 'state_key'
+    t.jsonb 'state'
+    t.boolean 'encrypted'
+    t.datetime 'created_at', null: false
+    t.datetime 'updated_at', null: false
+    t.index %w[key state_key], name: 'index_wizard_states_on_key_and_state_key'
+    t.index ['key'], name: 'index_wizard_states_on_key'
+    t.index ['state'], name: 'index_wizard_states_on_state'
   end
 end
