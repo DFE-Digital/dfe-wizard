@@ -143,6 +143,7 @@ module DfE
       autoload :Session, 'dfe/wizard/repository/session'
       autoload :Redis, 'dfe/wizard/repository/redis'
       autoload :Cache, 'dfe/wizard/repository/cache'
+      autoload :WizardState, 'dfe/wizard/repository/wizard_state'
     end
     # @!endgroup
 
