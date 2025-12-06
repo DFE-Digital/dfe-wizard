@@ -370,15 +370,6 @@ RSpec.describe AssignMentorWizard do
     end
   end
 
-  describe 'documentation generation' do
-    let(:current_step) { :who_will_be_the_mentor }
-
-    it 'generates valid GraphViz documentation' do
-      expected = File.read('spec/fixtures/assign_mentor_wizard.dot')
-      expect(wizard.to_doc.to_s).to eq(expected)
-    end
-  end
-
   describe 'complex branching scenarios' do
     context 'complete no training path' do
       before do

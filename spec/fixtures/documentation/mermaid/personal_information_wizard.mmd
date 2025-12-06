@@ -1,0 +1,12 @@
+flowchart TD
+  name_and_date_of_birth["Name And Date Of Birth"]
+  nationality["Nationality"]
+  right_to_work_or_study["Right To Work Or Study"]
+  immigration_status["Immigration Status"]
+  review["Review"]
+  name_and_date_of_birth --> nationality
+  immigration_status --> review
+  nationality -->|Non-UK/Non-Irish: ✓| right_to_work_or_study
+  nationality -->|Non-UK/Non-Irish: ✗| review
+  right_to_work_or_study -->|Right to work or study?: ✓| immigration_status
+  right_to_work_or_study -->|Right to work or study?: ✗| review

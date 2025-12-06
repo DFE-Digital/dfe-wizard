@@ -249,11 +249,15 @@ module DfE
         def metadata
           {
             structure_type: :graph,
-            root_step:,
+            root_step: build_root_step,
             steps: build_steps_metadata,
             transitions: build_all_transitions_metadata,
             counts: build_counts_metadata,
           }
+        end
+
+        def build_root_step
+          @registry.potential_root_nodes.presence || @registry.root_node
         end
 
         def build_steps_metadata

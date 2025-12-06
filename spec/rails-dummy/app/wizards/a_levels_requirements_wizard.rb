@@ -8,12 +8,6 @@ class ALevelsRequirementsWizard
            :has_remaining_a_levels?,
            to: :state_store
 
-  def initialize(state_store:, current_step:, current_step_params: {})
-    @course = state_store.repository.record
-
-    super
-  end
-
   def steps_processor
     DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
       graph.add_node :what_a_level_is_required, Steps::WhatALevelIsRequired
@@ -23,7 +17,7 @@ class ALevelsRequirementsWizard
       graph.add_node :a_level_equivalencies, Steps::ALevelEquivalencies
       graph.add_node :course_edit, DfE::Wizard::Redirect
 
-      graph.conditional_root do |state_store|
+      graph.conditional_root(potential_root: %i[add_a_level_to_a_list what_a_level_is_required]) do |state_store|
         if state_store.any_a_levels?
           :add_a_level_to_a_list
         else

@@ -435,7 +435,7 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
             @steps_processor ||= DfE::Wizard::StepsProcessor::Graph.draw(self) do |g|
               g.add_node :step_a, Class.new
               g.add_node :step_b, Class.new
-              g.conditional_root { :step_b }
+              g.conditional_root(potential_root: [:step_b]) { :step_b }
             end
           end
         end.new(state_store: conditional_root_state_store)
@@ -475,7 +475,7 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
             g.add_node :entry, Class.new
             g.add_node :form, Class.new
             g.add_node :review, Class.new
-            g.conditional_root :determine_entry
+            g.conditional_root :determine_entry, potential_root: %i[entry form]
           end
         end
 

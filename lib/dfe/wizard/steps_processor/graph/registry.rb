@@ -26,7 +26,7 @@ module DfE
 
           attr_reader :nodes, :edges, :conditional_edges, :multiple_conditional_edges, :custom_branching_edges,
                       :step_labels
-          attr_accessor :root_node, :conditional_root_method, :conditional_root_block
+          attr_accessor :root_node, :conditional_root_method, :conditional_root_block, :potential_root_nodes
 
           def initialize
             @nodes = {}
@@ -40,6 +40,7 @@ module DfE
             @next_step_before_callbacks = []
             @previous_step_before_callbacks = []
             @step_labels = {}
+            @potential_root_nodes = []
           end
 
           def add_node(node_id, klass, label: nil)
