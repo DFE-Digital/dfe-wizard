@@ -336,7 +336,7 @@ module DfE
           failure_message do |wizard|
             <<~MSG
               Expected flow_path: #{expected_steps.inspect}
-              Got: #{wizard.flow_path.inspect}
+              Got:                #{wizard.flow_path.inspect}
 
               #{state_store_data(wizard)}
               #{wizard_inspect(wizard)}
