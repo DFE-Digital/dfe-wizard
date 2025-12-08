@@ -266,6 +266,13 @@ module DfE
               class: node.klass.name,
               label: @registry.step_labels[id],
             }
+
+            next unless node.skippable?
+
+            hash[id].merge!(
+              skippable?: node.skippable?,
+              skip_when: node.skip_when,
+            )
           end
         end
 

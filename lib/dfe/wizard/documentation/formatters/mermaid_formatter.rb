@@ -54,7 +54,17 @@ module DfE
               render_header,
               render_steps,
               render_transitions,
+              render_styles,
             ].compact.join("\n")
+          end
+
+          def render_styles
+            skippable_steps = @metadata[:steps].select { |_, data| data[:skippable?] }.keys
+            return '' if skippable_steps.empty?
+
+            skippable_steps.map do |skippable_step|
+              "  style #{skippable_step} stroke:#FFA500,stroke-dasharray: 5 5,stroke-width:2px"
+            end.join("\n")
           end
 
           private
@@ -69,8 +79,20 @@ module DfE
 
             steps.map do |step_id, step_data|
               label = step_data[:label] || step_id.to_s.titleize
+
+              if step_data[:skippable?] && step_data[:skip_when]
+                condition_name = step_data[:skip_when].to_s.sub('?', '').titleize
+
+                skippable_text = %(⊘ Skippable when: #{condition_name})
+              end
+
               sanitized_label = sanitize_label(label)
-              "  #{step_id}[\"#{sanitized_label}\"]"
+
+              if skippable_text.present?
+                "  #{step_id}[\"#{sanitized_label}\n#{skippable_text}\"]"
+              else
+                "  #{step_id}[\"#{sanitized_label}\"]"
+              end
             end.join("\n")
           end
 
