@@ -257,6 +257,92 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
     it 'returns nil when no outgoing edge' do
       expect(graph.next_step(:issue_certificate)).to be_nil
     end
+
+    context 'when skipping steps' do
+      before do
+        class GraphWithSkippedSteps
+          include DfE::Wizard
+
+          delegate :user_not_permitted?, :single_provider?, to: :state_store
+
+          def steps_processor
+            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+              graph.add_node :first_page, Object
+              graph.add_node :second_page, Object, skip_when: :user_not_permitted?
+              graph.add_node :third_page, Object, skip_when: :single_provider?
+              graph.add_node :fourth_page, Object
+
+              graph.add_edge from: :first_page, to: :second_page
+              graph.add_edge from: :second_page, to: :third_page
+              graph.add_edge from: :third_page, to: :fourth_page
+
+              graph.root :first_page
+            end
+          end
+        end
+
+        class GraphWithSkippedStateStore
+          include DfE::Wizard::StateStore
+
+          attr_reader :user, :providers
+
+          def initialize(
+            user:, providers:, repository: DfE::Wizard::Repository::InMemory.new,
+            attribute_names: [],
+            step_definitions: []
+          )
+            @user = user
+            @providers = providers
+
+            super(repository:, attribute_names:, step_definitions:)
+          end
+
+          def user_not_permitted?
+            !user.permitted?
+          end
+
+          def single_provider?
+            providers.size == 1
+          end
+        end
+      end
+
+      it 'skip second step when user not permitted but has multiple providers' do
+        current_step = :first_page
+        state_store = GraphWithSkippedStateStore.new(user: double(permitted?: false), providers: [1, 2])
+        graph = GraphWithSkippedSteps.new(state_store:, current_step:).steps_processor
+
+        expect(graph.next_step).to eq(:third_page)
+        expect(graph.path_traversal(:fourth_page)).to eq(%i[first_page third_page fourth_page])
+      end
+
+      it 'does not skip second step when user is permitted' do
+        current_step = :first_page
+        state_store =  GraphWithSkippedStateStore.new(user: double(permitted?: true), providers: [1, 2])
+        graph = GraphWithSkippedSteps.new(state_store:, current_step:).steps_processor
+
+        expect(graph.next_step).to eq(:second_page)
+        expect(graph.path_traversal(:fourth_page)).to eq(%i[first_page second_page third_page fourth_page])
+      end
+
+      it 'skip second step when user does not have permissions' do
+        current_step = :second_page
+        state_store =  GraphWithSkippedStateStore.new(user: double(permitted?: false), providers: [1, 2])
+        graph = GraphWithSkippedSteps.new(state_store:, current_step:).steps_processor
+
+        expect(graph.next_step).to eq(:third_page)
+        expect(graph.path_traversal(:fourth_page)).to eq(%i[first_page third_page fourth_page])
+      end
+
+      it 'skip second and third step when user not permitted and has single provider' do
+        current_step = :first_page
+        state_store =  GraphWithSkippedStateStore.new(user: double(permitted?: false), providers: [1])
+        graph = GraphWithSkippedSteps.new(state_store:, current_step:).steps_processor
+
+        expect(graph.next_step).to eq(:fourth_page)
+        expect(graph.path_traversal(:fourth_page)).to eq(%i[first_page fourth_page])
+      end
+    end
   end
 
   describe '#previous_step' do
@@ -419,6 +505,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
             { from: :office_address, to: :review, type: :simple, label: nil },
             {
               from: :waste_category,
+              when: :is_upper_tier_waste?,
               then: :activity_type,
               else: :office_address,
               type: :conditional,
@@ -427,9 +514,9 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
             {
               from: :activity_type,
               branches: [
-                { then: :office_address, label: 'Listed Activity' },
-                { then: :office_address, label: 'Non-listed Activity' },
-                { then: :review, label: 'Exempt Activity' },
+                { then: :office_address, label: 'Listed Activity', when: :is_listed_activity? },
+                { then: :office_address, label: 'Non-listed Activity', when: :is_non_listed_activity? },
+                { then: :review, label: 'Exempt Activity', when: :is_exempt_activity? },
               ],
               default: :office_address,
               type: :multiple_conditional,

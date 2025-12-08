@@ -356,6 +356,7 @@ Evaluates the predicate `LP provides?`:
     },
     {
       :from: "can_receive_mentor_training",
+      :when: "lead_provider_will_not_provide?",
       :then: "which_lead_provider",
       :else: "confirmation",
       :type: "conditional",

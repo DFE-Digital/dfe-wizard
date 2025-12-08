@@ -23,11 +23,11 @@ module DfE
           # @example
           #   g.add_node :personal_info, PersonalInfoStep
           #   g.add_node :confirmation, ConfirmationStep, label: "Review & Confirm"
-          def add_node(node_id, klass, label: nil)
+          def add_node(node_id, klass, label: nil, skip_when: nil)
             raise ArgumentError, "node_id must be a symbol, got #{node_id.class}" unless node_id.is_a?(Symbol)
             raise ArgumentError, "klass must be a Class, got #{klass.class}" unless klass.is_a?(Class)
 
-            @registry.add_node(node_id, klass, label:)
+            @registry.add_node(node_id, klass, label:, skip_when:)
           end
 
           # Set static root node.
@@ -125,6 +125,7 @@ module DfE
 
             @registry.add_conditional_edge(
               from:,
+              when_original: kwargs[:when],
               when_predicate: predicate,
               then_step:,
               else_step:,
@@ -180,6 +181,7 @@ module DfE
 
               {
                 when: build_predicate(branch[:when]),
+                when_original: branch[:when],
                 then: branch[:then],
                 label: branch[:label],
               }

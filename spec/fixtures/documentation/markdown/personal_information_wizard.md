@@ -477,6 +477,7 @@ Evaluates the predicate `Right to work or study?`:
     },
     {
       :from: "nationality",
+      :when: "needs_permission_to_work_or_study?",
       :then: "right_to_work_or_study",
       :else: "review",
       :type: "conditional",
@@ -484,6 +485,7 @@ Evaluates the predicate `Right to work or study?`:
     },
     {
       :from: "right_to_work_or_study",
+      :when: "right_to_work_or_study?",
       :then: "immigration_status",
       :else: "review",
       :type: "conditional",

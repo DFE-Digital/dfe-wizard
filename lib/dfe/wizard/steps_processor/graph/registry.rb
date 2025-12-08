@@ -10,13 +10,13 @@ module DfE
         # @api private
         class Registry
           # Node definition
-          Node = Struct.new(:id, :klass, keyword_init: true)
+          Node = Struct.new(:id, :klass, :skippable?, :skip_when, keyword_init: true)
 
           # Simple unconditional edge
           Edge = Struct.new(:from, :to, keyword_init: true)
 
           # Binary conditional edge (if/else)
-          ConditionalEdge = Struct.new(:from, :when, :then, :else, :label, keyword_init: true)
+          ConditionalEdge = Struct.new(:from, :when, :when_original, :then, :else, :label, keyword_init: true)
 
           # N-way conditional edge (multiple branches)
           MultipleConditionalEdge = Struct.new(:from, :branches, :default, :label, keyword_init: true)
@@ -43,8 +43,8 @@ module DfE
             @potential_root_nodes = []
           end
 
-          def add_node(node_id, klass, label: nil)
-            @nodes[node_id] = Node.new(id: node_id, klass: klass)
+          def add_node(node_id, klass, label: nil, skip_when: nil)
+            @nodes[node_id] = Node.new(id: node_id, klass: klass, skip_when:, skippable?: skip_when.present?)
             @step_labels[node_id] = label || humanize(node_id)
           end
 
@@ -52,9 +52,10 @@ module DfE
             @edges << Edge.new(from: from, to: to)
           end
 
-          def add_conditional_edge(from:, when_predicate:, then_step:, else_step:, label: nil)
+          def add_conditional_edge(from:, when_predicate:, when_original:, then_step:, else_step:, label: nil)
             @conditional_edges << ConditionalEdge.new(
               from: from,
+              when_original:,
               when: when_predicate,
               then: then_step,
               else: else_step,
