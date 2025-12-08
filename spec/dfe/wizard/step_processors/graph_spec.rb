@@ -14,6 +14,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
              :is_listed_activity?,
              :is_non_listed_activity?,
              :is_exempt_activity?,
+             :account_feature_flag_enabled?,
              to: :state_store
 
     def initialize
@@ -33,6 +34,8 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
         g.add_node :issue_certificate, Steps::IssueCertificate, label: 'Issue Certificate'
         g.add_node :rejection_notice, Steps::RejectionNotice, label: 'Rejection Notice'
         g.add_node :pending_info, Steps::PendingInfo, label: 'Pending Information'
+
+        g.add_node :account_show, DfE::Wizard::Redirect, skip_when: :account_feature_flag_enabled?
 
         # Dynamic root: returning users go to login, new users to organization type
         g.conditional_root(potential_root: %i[account_login organization_type]) do |state|
@@ -112,6 +115,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
         @activity_type = :listed
         @application_status = :submitted
         @is_returning_user = false
+        @account_feature_flag_enabled = false
 
         super
       end
@@ -138,6 +142,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
 
       def is_exempt_activity?
         @activity_type == :exempt
+      end
+
+      def account_feature_flag_enabled?
+        @account_feature_flag_enabled.present?
       end
     end
   end
@@ -426,7 +434,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
     end
 
     it 'includes all 9 steps' do
-      expect(graph.step_definitions.size).to eq(9)
+      expect(graph.step_definitions.size).to eq(10)
     end
   end
 
@@ -487,6 +495,12 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
               class: 'Steps::RejectionNotice',
               label: 'Rejection Notice',
             },
+            account_show: {
+              class: 'DfE::Wizard::Core::Redirect',
+              label: 'Account Show',
+              skippable?: true,
+              skip_when: :account_feature_flag_enabled?,
+            },
             review: {
               class: 'Steps::Review',
               label: 'Review Application',
@@ -539,7 +553,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
 
     describe 'counts metadata' do
       it 'includes correct step count' do
-        expect(metadata[:counts][:steps]).to eq(9)
+        expect(metadata[:counts][:steps]).to eq(10)
       end
 
       it 'includes correct edge counts' do
