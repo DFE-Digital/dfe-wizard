@@ -182,9 +182,12 @@ module DfE
             actual = wizard.next_step
 
             <<~MSG
-              Expected next step: #{expected_step.inspect}
-              Got: #{actual.inspect}
-              From step: #{start_step.inspect}
+              Expected transition: #{start_step} -> #{expected_step}
+              Got:                 #{start_step} -> #{actual}
+
+              From step:          #{start_step}
+              Expected next step: #{expected_step}
+              Got next step:      #{actual}
 
               #{wizard_inspect(wizard)}
             MSG

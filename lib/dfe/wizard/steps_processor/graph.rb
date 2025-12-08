@@ -277,6 +277,7 @@ module DfE
           @registry.conditional_edges.each do |edge|
             transitions << {
               from: edge.from,
+              when: edge.when_original,
               then: edge.then,
               else: edge.else,
               type: :conditional,
@@ -287,7 +288,7 @@ module DfE
           @registry.multiple_conditional_edges.each do |edge|
             transitions << {
               from: edge.from,
-              branches: edge.branches.map { |b| { then: b[:then], label: b[:label] } },
+              branches: edge.branches.map { |b| { when: b[:when_original], then: b[:then], label: b[:label] } },
               default: edge.default,
               type: :multiple_conditional,
               label: edge.label,

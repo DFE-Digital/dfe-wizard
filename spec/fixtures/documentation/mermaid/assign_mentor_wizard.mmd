@@ -5,5 +5,5 @@ flowchart TD
   confirmation["Confirmation"]
   who_will_be_the_mentor --> can_receive_mentor_training
   which_lead_provider --> confirmation
-  can_receive_mentor_training -->|LP provides?: ✓| which_lead_provider
-  can_receive_mentor_training -->|LP provides?: ✗| confirmation
+  can_receive_mentor_training -->|LP provides?: ✓ yes| which_lead_provider
+  can_receive_mentor_training -->|LP provides?: ✗ no| confirmation

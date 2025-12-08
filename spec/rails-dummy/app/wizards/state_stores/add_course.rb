@@ -22,18 +22,68 @@ module StateStores
       !(uni_or_scitt? || further_education?)
     end
 
-    def design_technology?; end
+    def design_technology?
+      main_subject == 'Design and technology'
+    end
 
-    def modern_languages?; end
+    def modern_languages?
+      main_subject == 'Modern languages'
+    end
 
-    def physics?; end
+    def physics?
+      main_subject == 'Physics'
+    end
 
-    def further_education_and_skip_applications_open?
-      further_education? && !FeatureFlag.active?(:applications_open)
+    def applications_open_feature_flag_inactive?
+      !FeatureFlag.active?(:applications_open)
     end
 
     def fee_based?
       funding_type == 'fee'
+    end
+
+    def single_accredited_provider_or_self_accredited?
+      single_accredited_provider? || self_accredited?
+    end
+
+    def single_accredited_provider?
+      provider.accredited_partners.size == 1
+    end
+
+    def self_accredited?
+      uni_or_scitt?
+    end
+
+    def teacher_degree_apprenticeship?
+      qualification == 'undergraduate_degree_with_qts'
+    end
+
+    def no_visa_sponsorship?
+      !can_sponsor_visa?
+    end
+
+    def can_sponsor_visa?
+      (fee_based? && can_sponsor_student_visa?) || ((salary? || apprenticeship?) && can_sponsor_skilled_worker_visa?)
+    end
+
+    def can_sponsor_student_visa?
+      can_sponsor_student_visa.present?
+    end
+
+    def can_sponsor_skilled_worker_visa?
+      can_sponsor_skilled_worker_visa.present?
+    end
+
+    def salary?
+      funding_type == 'salary'
+    end
+
+    def apprenticeship?
+      funding_type == 'apprenticeship'
+    end
+
+    def visa_deadline_required?
+      visa_deadline_required.present?
     end
 
     # fixme

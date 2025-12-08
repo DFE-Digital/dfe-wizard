@@ -102,23 +102,30 @@ module DfE
             from = transition[:from]
             then_step = transition[:then]
             else_step = transition[:else]
-            label = transition[:label] || 'condition'
+            label = transition[:label] || transition[:when] || 'condition'
 
             [
-              "  #{from} -->|#{label}: ✓| #{then_step}",
-              "  #{from} -->|#{label}: ✗| #{else_step}",
+              "  #{from} -->|#{label}: ✓ yes| #{then_step}",
+              "  #{from} -->|#{label}: ✗ no| #{else_step}",
             ].join("\n")
           end
 
           def render_multiple_conditional_transition(transition)
             from = transition[:from]
             branches = transition[:branches] || []
+            default_step = transition[:default]
 
-            branches.map do |branch|
-              label = branch[:label] || 'branch'
+            lines = branches.map do |branch|
+              label = branch[:label] || branch[:when] || 'branch'
               to = branch[:then]
-              "  #{from} -->|#{label}| #{to}"
-            end.join("\n")
+              "  #{from} -->|#{label}: ✓ yes| #{to}"
+            end
+
+            if default_step
+              lines << "  #{from} -->|else| #{default_step}"
+            end
+
+            lines.join("\n")
           end
 
           def render_custom_branching_transition(transition)
