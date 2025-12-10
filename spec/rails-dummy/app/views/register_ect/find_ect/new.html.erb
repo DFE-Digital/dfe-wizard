@@ -1,0 +1,30 @@
+<%= govuk_back_link href: @wizard.previous_step_path || wizards_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">Find an ECT</h1>
+
+    <p class="govuk-body">Enter the ECT's teacher reference number and date of birth to find their teaching record.</p>
+
+    <%= form_with(model: @wizard.current_step,
+                  url: @wizard.current_step_path,
+                  scope: @wizard.current_step_name) do |f| %>
+      <%= f.govuk_error_summary %>
+
+      <%= f.govuk_text_field(
+            :trn,
+            label: { text: "Teacher reference number (TRN)", size: "m" },
+            hint: { text: "This unique ID is usually 7 digits long, for example 4567814. It can be found on their payslip, teaching contract or registration document from the GTCE.", size: "s" },
+            extra_letter_spacing: true,
+          )
+      %>
+
+      <%= f.govuk_date_field :date_of_birth,
+                             width: "two-thirds",
+                             legend: { text: "Date of birth", size: "m", tag: "h3" },
+                             hint: { text: "For example, 31 3 1980" } %>
+
+      <%= f.govuk_submit "Continue" %>
+    <% end %>
+  </div>
+</div>
