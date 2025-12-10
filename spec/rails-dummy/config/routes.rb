@@ -50,6 +50,8 @@ Rails.application.routes.draw do
 
     get  '/induction-exempt', to: 'induction_exempt#new', as: :induction_exempt
     post '/induction-exempt', to: 'induction_exempt#create'
+    get  '/induction-failed', to: 'induction_failed#new', as: :induction_failed
+    post '/induction-failed', to: 'induction_failed#create'
 
     get  '/cannot-register-ect', to: 'cannot_register_ect#new', as: :cannot_register_ect
     post '/cannot-register-ect', to: 'cannot_register_ect#create'

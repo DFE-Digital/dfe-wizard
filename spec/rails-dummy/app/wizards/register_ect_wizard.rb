@@ -14,6 +14,7 @@ class RegisterECTWizard
            :matches_trs_dob?,
            :active_at_school?,
            :induction_exempt?,
+           :induction_failed?,
            :prohibited_from_teaching?,
            :induction_completed?,
            :cant_use_email?,
@@ -34,6 +35,7 @@ class RegisterECTWizard
       graph.add_node :independent_school_appropriate_body,  Steps::RegisterECT::IndependentSchoolAppropriateBodyStep
       graph.add_node :induction_completed,  Steps::RegisterECT::InductionCompletedStep
       graph.add_node :induction_exempt,  Steps::RegisterECT::InductionExemptStep
+      graph.add_node :induction_failed,  Steps::RegisterECT::InductionFailedStep
       graph.add_node :lead_provider,  Steps::RegisterECT::LeadProviderStep
       graph.add_node :national_insurance_number,  Steps::RegisterECT::NationalInsuranceNumberStep
       graph.add_node :not_found, Steps::RegisterECT::NotFoundStep
@@ -211,6 +213,7 @@ class RegisterECTWizard
     return :already_active_at_school if active_at_school?
     return :induction_completed if induction_completed?
     return :induction_exempt if induction_exempt?
+    return :induction_failed if induction_failed?
     return :cannot_register_ect if prohibited_from_teaching?
 
     :review_ect_details

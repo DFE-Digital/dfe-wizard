@@ -22,6 +22,10 @@ module StateStores
       trn == '4444444'
     end
 
+    def induction_failed?
+      trn == '6666666'
+    end
+
     def prohibited_from_teaching?
       trn == '5555555'
     end
