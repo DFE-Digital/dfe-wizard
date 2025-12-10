@@ -1,0 +1,55 @@
+<%= govuk_back_link href: @wizard.previous_step_path || wizards_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">Review ECT details</h1>
+
+    <%= govuk_summary_list do |summary_list| %>
+      <%= summary_list.with_row do |row| %>
+        <%= row.with_key { "Name" } %>
+        <%= row.with_value do %>
+          <% stored_name = @wizard.state_store.read[:correct_full_name] %>
+          <%= stored_name.presence || "Example ECT" %>
+        <% end %>
+      <% end %>
+
+      <%= summary_list.with_row do |row| %>
+        <%= row.with_key { "Teacher reference number (TRN)" } %>
+        <%= row.with_value { @wizard.state_store.read[:trn].presence || "Not provided" } %>
+      <% end %>
+
+      <%= summary_list.with_row do |row| %>
+        <%= row.with_key { "Date of birth" } %>
+        <%= row.with_value do %>
+          <% raw_dob = @wizard.state_store.read[:date_of_birth] %>
+          <% formatted_dob = begin
+                               raw_dob.respond_to?(:strftime) ? raw_dob.strftime("%-d %B %Y") : Date.parse(raw_dob).strftime("%-d %B %Y")
+                             rescue StandardError
+                               raw_dob.presence
+                             end %>
+          <%= formatted_dob || "Not provided" %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <%= form_with(model: @wizard.current_step,
+                  url: @wizard.current_step_path,
+                  scope: @wizard.current_step_name) do |f| %>
+      <%= f.govuk_error_summary %>
+
+      <%= f.govuk_radio_buttons_fieldset :details_correct,
+                                         legend: { text: "Are these details correct for the ECT?", size: "m" } do %>
+        <%= f.govuk_radio_button :details_correct, "yes", label: { text: "Yes" }, link_errors: true %>
+        <%= f.govuk_radio_button :details_correct, "no",
+                                 label: { text: "No, they changed their name or it's spelt wrong" },
+                                 link_errors: false do %>
+          <%= f.govuk_text_field :correct_full_name,
+                                 label: { text: "Enter the correct full name" },
+                                 hint: { text: "This is the name that will be used in this service and communications with the ECT. The ECT can update their name in their teacher record later using the Access your teaching qualifications service." } %>
+        <% end %>
+      <% end %>
+
+      <%= f.govuk_submit "Confirm and continue" %>
+    <% end %>
+  </div>
+</div>
