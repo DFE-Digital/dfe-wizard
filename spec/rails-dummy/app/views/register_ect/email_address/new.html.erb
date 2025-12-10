@@ -1,0 +1,28 @@
+<%= govuk_back_link href: @wizard.previous_step_path || wizards_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <% name = @wizard.state_store.read[:correct_full_name].presence || "the ECT" %>
+    <h1 class="govuk-heading-l">What is <%= name %>’s email address?</h1>
+
+    <p class="govuk-body">We ask for an email so we can share their details if needed for training.</p>
+
+    <p class="govuk-body">Make sure you use an email <%= name %> can access. You can update it later if they haven’t got a school email set up yet.</p>
+
+    <p class="govuk-body">Do not use a generic email like headteacher@school.com.</p>
+
+    <%= form_with(model: @wizard.current_step,
+                  url: @wizard.current_step_path,
+                  scope: @wizard.current_step_name) do |f| %>
+      <%= f.govuk_error_summary %>
+
+      <%= f.govuk_email_field(
+            :email,
+            label: { text: "Email address" },
+            autocomplete: "email",
+          ) %>
+
+      <%= f.govuk_submit "Continue" %>
+    <% end %>
+  </div>
+</div>
