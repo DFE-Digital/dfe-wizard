@@ -171,7 +171,7 @@ class RegisterECTWizard
   #     path_traversal(A -> CYA) => [:A, :B, :E, :F, :G, :CYA]
   #
   def next_step_override
-    target = step_params[:return_to_review]
+    target = current_step_params[:return_to_review]
 
     target if user_up_to_check_answers? && target.present?
   end
@@ -192,7 +192,7 @@ class RegisterECTWizard
   #  ?return_to_review=B so previous step will be B
   #
   def previous_step_overrride
-    target = step_params[:return_to_review]
+    target = current_step_params[:return_to_review]
 
     target if user_up_to_check_answers? && full_traversal.include?(target)
   end
@@ -202,7 +202,7 @@ class RegisterECTWizard
   end
 
   def full_traversal
-    path_traversal(:check_answers)
+    steps_processor.path_traversal(:check_answers)
   end
 
   def find_ect_transitions
