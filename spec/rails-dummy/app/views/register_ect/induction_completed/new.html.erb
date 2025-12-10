@@ -1,0 +1,11 @@
+<%= govuk_back_link href: @wizard.previous_step_path || register_ect_find_ect_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">This ECT has already completed induction</h1>
+
+    <p class="govuk-body">Our records show this ECT has already completed their induction and cannot be registered again.</p>
+
+    <p class="govuk-body"><%= govuk_link_to("Register another ECT", register_ect_find_ect_path) %></p>
+  </div>
+</div>
