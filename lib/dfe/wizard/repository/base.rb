@@ -47,7 +47,8 @@ module DfE
         #   repository.read # => { name: 'John', email: 'john@example.com' }
         def read
           data = read_data
-          encrypted? ? decrypt_hash(data) : data
+          final_data = transform_for_read(data)
+          encrypted? ? decrypt_hash(final_data) : final_data
         end
 
         # Write state by merging with existing data

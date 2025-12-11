@@ -44,7 +44,7 @@ module DfE
         #
         # @return [Hash] Always returns { success: true }
         def execute
-          @repository.write(@step.serializable_data)
+          @repository.write(@step.serializable_data.deep_symbolize_keys)
 
           { success: true }
         end

@@ -12,6 +12,10 @@ module StateStores
       a_level_subject_requirements.present?
     end
 
+    def add_another_a_level?
+      add_another_a_level == 'yes' && !maximum_number_of_a_level_subjects_reached?
+    end
+
     def deletion_confirmed?
       confirmation == 'yes'
     end
@@ -22,6 +26,22 @@ module StateStores
 
     def a_level_subject_requirements
       Array(read[:a_level_subject_requirements])
+    end
+
+    def provider_code
+      course.provider_code
+    end
+
+    def course_code
+      course.course_code
+    end
+
+    def recruitment_cycle_year
+      course.recruitment_cycle_year
+    end
+
+    def course
+      repository.record
     end
   end
 end

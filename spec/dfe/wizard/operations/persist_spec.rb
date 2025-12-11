@@ -265,4 +265,20 @@ RSpec.describe DfE::Wizard::Operations::Persist do
       expect(repository.read[:last_name]).to eq('Smith')
     end
   end
+
+  class AnotherStep
+    def serializable_data
+      {
+        'string_key' => 'value',
+      }
+    end
+  end
+
+  context 'sybmolize keys' do
+    it 'persist even string keys' do
+      expect(described_class.new(repository:, step: AnotherStep.new).execute)
+
+      expect(repository.read[:string_key]).to eq('value')
+    end
+  end
 end
