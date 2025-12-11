@@ -166,13 +166,19 @@ module DfE
         # @example
         #   expect(wizard).to have_next_step(:nationality)
         #   expect(wizard).to have_next_step(:review).from(:nationality)
+        #   expect(wizard).to have_next_step(:review).from(:nationality).when(nationality: 'British')
         matcher :have_next_step do |expected_step|
           chain :from do |from_step|
             @from_step = from_step
           end
 
+          chain :when do |params|
+            @params = params
+          end
+
           match do |wizard|
             wizard.current_step_name = @from_step if @from_step
+            wizard.state_store.write(@params) if @params
             wizard.next_step == expected_step
           end
 
@@ -222,13 +228,20 @@ module DfE
         # @example
         #   expect(wizard).to have_previous_step(:name_and_date_of_birth)
         #   expect(wizard).to have_previous_step(:nationality).from(:right_to_work_or_study)
+        #   expect(wizard).to have_previous_step(:nationality)
+        #                     .from(:right_to_work_or_study).when(nationality: 'non-uk')
         matcher :have_previous_step do |expected_step|
           chain :from do |from_step|
             @from_step = from_step
           end
 
+          chain :when do |params|
+            @params = params
+          end
+
           match do |wizard|
             wizard.current_step_name = @from_step if @from_step
+            wizard.state_store.write(@params) if @params
             wizard.previous_step == expected_step
           end
 

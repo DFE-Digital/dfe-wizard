@@ -24,26 +24,26 @@ class RegisterECTWizard
 
   def steps_processor
     DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
-      graph.add_node :cannot_register_ect,  Steps::RegisterECT::CannotRegisterECTStep
-      graph.add_node :cant_use_email,  Steps::RegisterECT::CantUseEmailStep
-      graph.add_node :check_answers,  Steps::RegisterECT::CheckAnswersStep
-      graph.add_node :confirmation,  Steps::RegisterECT::ConfirmationStep
-      graph.add_node :email_address,  Steps::RegisterECT::EmailAddressStep
+      graph.add_node :cannot_register_ect, Steps::RegisterECT::CannotRegisterECTStep
+      graph.add_node :cant_use_email, Steps::RegisterECT::CantUseEmailStep
+      graph.add_node :check_answers, Steps::RegisterECT::CheckAnswersStep
+      graph.add_node :confirmation, Steps::RegisterECT::ConfirmationStep
+      graph.add_node :email_address, Steps::RegisterECT::EmailAddressStep
       graph.add_node :find_ect, Steps::RegisterECT::FindECTStep
-      graph.add_node :trn_not_found,  Steps::RegisterECT::TRNNotFoundStep
-      graph.add_node :already_active_at_school,  Steps::RegisterECT::AlreadyActiveAtSchoolStep
-      graph.add_node :independent_school_appropriate_body,  Steps::RegisterECT::IndependentSchoolAppropriateBodyStep
-      graph.add_node :induction_completed,  Steps::RegisterECT::InductionCompletedStep
+      graph.add_node :trn_not_found, Steps::RegisterECT::TRNNotFoundStep
+      graph.add_node :already_active_at_school, Steps::RegisterECT::AlreadyActiveAtSchoolStep
+      graph.add_node :independent_school_appropriate_body, Steps::RegisterECT::IndependentSchoolAppropriateBodyStep
+      graph.add_node :induction_completed, Steps::RegisterECT::InductionCompletedStep
       graph.add_node :induction_exempt,  Steps::RegisterECT::InductionExemptStep
       graph.add_node :induction_failed,  Steps::RegisterECT::InductionFailedStep
-      graph.add_node :lead_provider,  Steps::RegisterECT::LeadProviderStep
-      graph.add_node :national_insurance_number,  Steps::RegisterECT::NationalInsuranceNumberStep
+      graph.add_node :lead_provider, Steps::RegisterECT::LeadProviderStep
+      graph.add_node :national_insurance_number, Steps::RegisterECT::NationalInsuranceNumberStep
       graph.add_node :not_found, Steps::RegisterECT::NotFoundStep
-      graph.add_node :programme_type,  Steps::RegisterECT::ProgrammeTypeStep
-      graph.add_node :review_ect_details,  Steps::RegisterECT::ReviewECTDetailsStep
+      graph.add_node :programme_type, Steps::RegisterECT::ProgrammeTypeStep
+      graph.add_node :review_ect_details, Steps::RegisterECT::ReviewECTDetailsStep
       graph.add_node :start_date, Steps::RegisterECT::StartDateStep
       graph.add_node :state_school_appropriate_body, Steps::RegisterECT::StateSchoolAppropriateBodyStep
-      graph.add_node :working_pattern,  Steps::RegisterECT::WorkingPatternStep
+      graph.add_node :working_pattern, Steps::RegisterECT::WorkingPatternStep
 
       graph.root :find_ect
 

@@ -4,6 +4,7 @@ class ALevelsRequirementsWizard
   attr_reader :course
 
   delegate :any_a_levels?,
+           :add_another_a_level?,
            :has_remaining_a_levels?,
            to: :state_store
 
@@ -60,21 +61,15 @@ class ALevelsRequirementsWizard
       namespace: 'a_levels_requirements',
     ) do |config|
       config.default_path_arguments = {
-        provider_code: course.provider_code,
-        recruitment_cycle_year: course.recruitment_cycle_year,
-        course_code: course.course_code,
+        recruitment_cycle_year: state_store.recruitment_cycle_year,
+        provider_code: state_store.provider_code,
+        code: state_store.course_code,
       }
 
       config.map_step :course_edit, to: lambda { |_wizard, options, helpers|
-        helpers.publish_provider_recruitment_cycle_course_path(**options)
+        helpers.recruitment_cycle_provider_course_path(**options)
       }
     end
-  end
-
-  def add_another_a_level?
-    current_step.respond_to?(:add_another_a_level) &&
-      current_step.add_another_a_level == 'yes' &&
-      !state_store.maximum_number_of_a_level_subjects_reached?
   end
 
   def logger
