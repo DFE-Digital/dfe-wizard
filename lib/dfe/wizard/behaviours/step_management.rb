@@ -191,7 +191,7 @@ module DfE
         #
         # @api public
         def fetch_step_attributes
-          step_data(current_step_name).deep_merge(current_step_params)
+          raw_step_data(current_step_name).deep_merge(current_step_params)
         end
 
         # Get step objects for all steps in current flow

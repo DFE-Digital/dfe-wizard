@@ -591,6 +591,36 @@ module DfE
           end
         end
 
+        matcher :have_step_operations do |expected_operations|
+          match do |wizard|
+            @failures = []
+
+            expected_operations.each do |step_name, expected_ops|
+              # Normalize to array even if single operation provided
+              expected_ops = Array(expected_ops)
+
+              # Get actual operations from wizard's operator
+              actual_ops = wizard.steps_operator.operations_for(step_name)
+
+              # Compare class names or classes themselves
+              unless ops_match?(actual_ops, expected_ops)
+                @failures << "Step :#{step_name} expected operations #{expected_ops}, but got #{actual_ops}"
+              end
+            end
+
+            @failures.empty?
+          end
+
+          failure_message do
+            @failures.join("\n")
+          end
+
+          def ops_match?(actual, expected)
+            # Convert everything to strings for easier comparison (handles class vs string input)
+            actual.map(&:to_s) == expected.map(&:to_s)
+          end
+        end
+
         # HELPER METHODS
 
         # Helper to render wizard inspection output

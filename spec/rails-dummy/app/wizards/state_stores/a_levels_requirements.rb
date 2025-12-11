@@ -6,12 +6,6 @@ module StateStores
       a_level_subject_requirements.size.positive?
     end
 
-    def add_another_a_level?
-      return false if maximum_number_of_a_level_subjects_reached?
-
-      add_another_a_level == 'yes'
-    end
-
     def has_remaining_a_levels?
       return true unless deletion_confirmed?
 
