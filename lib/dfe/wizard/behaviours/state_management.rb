@@ -231,7 +231,7 @@ module DfE
           operations.each do |operation_class|
             result = execute_operation(operation_class:, step: current_step)
 
-            return false unless result[:success]
+            return false unless result && result[:success]
           end
 
           true

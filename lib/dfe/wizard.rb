@@ -297,6 +297,9 @@ module DfE
     # @return [Symbol, nil]
     attr_accessor :current_step_name
 
+    # The current step params - user answers
+    attr_writer :current_step_params
+
     # The state store instance
     # @return [DfE::Wizard::StateStore::Base]
     attr_accessor :state_store

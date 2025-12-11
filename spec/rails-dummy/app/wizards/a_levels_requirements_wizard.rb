@@ -4,7 +4,6 @@ class ALevelsRequirementsWizard
   attr_reader :course
 
   delegate :any_a_levels?,
-           :add_another_a_level?,
            :has_remaining_a_levels?,
            to: :state_store
 
@@ -35,8 +34,6 @@ class ALevelsRequirementsWizard
         label: 'Add another A-level?',
       )
 
-      graph.add_edge from: :consider_pending_a_level, to: :a_level_equivalencies
-
       graph.add_conditional_edge(
         from: :remove_a_level_subject_confirmation,
         when: :has_remaining_a_levels?,
@@ -44,6 +41,16 @@ class ALevelsRequirementsWizard
         else: :course_edit,
         label: 'Has remaining A-levels?',
       )
+
+      graph.add_edge from: :consider_pending_a_level, to: :a_level_equivalencies
+      graph.add_edge from: :a_level_equivalencies, to: :course_edit
+    end
+  end
+
+  def steps_operator
+    DfE::Wizard::StepsOperator::Builder.draw(wizard: self, callable: state_store) do |builder|
+      builder.on_step(:what_a_level_is_required, use: [StepOperations::CreateALevel])
+      builder.on_step(:remove_a_level_subject_confirmation, use: [StepOperations::RemoveALevelSubjectConfirmation])
     end
   end
 
@@ -62,6 +69,12 @@ class ALevelsRequirementsWizard
         helpers.publish_provider_recruitment_cycle_course_path(**options)
       }
     end
+  end
+
+  def add_another_a_level?
+    current_step.respond_to?(:add_another_a_level) &&
+      current_step.add_another_a_level == 'yes' &&
+      !state_store.maximum_number_of_a_level_subjects_reached?
   end
 
   def logger

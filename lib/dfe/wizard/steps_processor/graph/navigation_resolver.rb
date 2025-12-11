@@ -60,21 +60,23 @@ module DfE
           #
           # @param target_step [Symbol, nil]
           # @return [Array<Symbol>]
-          def path_traversal(target_step = nil)
-            target_step ||= @wizard.current_step_name
-            current = compute_root_node
-            steps = [current]
-            depth_limit = @registry.nodes.size
+          def path_traversal(target_step = @wizard.current_step_name, max_depth: 20)
+            root = compute_root_node
 
-            while current && current != target_step && steps.size < depth_limit
-              next_node = next_step_without_callbacks(current)
-              break if next_node.nil? || steps.include?(next_node)
+            path = dfs_path(root, target_step, Set.new, max_depth:)
+            path || []
+          end
 
-              steps << next_node
-              current = next_node
-            end
+          def dfs_path(current, target, visited, max_depth:)
+            return [current] if current == target
+            return nil if visited.include?(current) || max_depth <= 0
 
-            steps.include?(target_step) ? steps : []
+            visited.add(current)
+            next_node = next_step_without_callbacks(current)
+            return nil unless next_node
+
+            remaining_path = dfs_path(next_node, target, visited, max_depth: max_depth - 1)
+            remaining_path ? [current] + remaining_path : nil
           end
 
           private
