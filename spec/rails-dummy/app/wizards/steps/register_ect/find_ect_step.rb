@@ -18,7 +18,7 @@ module Steps
 
         super
 
-        if date_parts.values.all?(&:present?)
+        if date_parts.present? && date_parts.values.all?(&:present?)
           self.date_of_birth = Date.new(
             date_parts[:'date_of_birth(1i)'].to_i,
             date_parts[:'date_of_birth(2i)'].to_i,
