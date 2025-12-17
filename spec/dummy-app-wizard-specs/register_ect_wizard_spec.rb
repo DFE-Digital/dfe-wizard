@@ -207,6 +207,38 @@ RSpec.describe RegisterECTWizard do
     end
   end
 
+  describe '#valid_path_to?' do
+    let(:current_step) { :confirmation }
+
+    before do
+      wizard.state_store.write(
+        trn: '9999999',
+        date_of_birth: Date.new(2000, 1, 1),
+        details_correct: 'yes',
+        email: 'free@example.com',
+        school_type: 'state',
+        training_programme: 'school_led',
+      )
+    end
+
+    it 'is valid through to confirmation on the happy path' do
+      expect(wizard).to be_valid_to(:confirmation)
+      expect(wizard.flow_path).to eq(
+        %i[
+          find_ect
+          review_ect_details
+          email_address
+          start_date
+          working_pattern
+          state_school_appropriate_body
+          programme_type
+          check_answers
+          confirmation
+        ],
+      )
+    end
+  end
+
   describe '#previous_step' do
     context 'from confirmation' do
       let(:current_step) { :confirmation }
