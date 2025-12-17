@@ -131,9 +131,7 @@ class RegisterECTWizard
       graph.add_edge from: :check_answers, to: :confirmation
 
       graph.before_next_step(:next_step_override)
-
-      # stil implementing the override
-      #      graph.before_previous_step(:previous_step_override)
+      graph.before_previous_step(:previous_step_override)
     end
   end
 
@@ -193,8 +191,8 @@ class RegisterECTWizard
   #
   #  ?return_to_review=B so previous step will be B
   #
-  def previous_step_overrride
-    target = current_step_params[:return_to_review]
+  def previous_step_override
+    target = current_step_params[:return_to_review]&.to_sym
 
     target if user_up_to_check_answers? && full_traversal.include?(target)
   end

@@ -7,6 +7,7 @@ RSpec.describe RegisterECTWizard do
     described_class.new(
       current_step:,
       state_store:,
+      current_step_params: step_params,
     )
   end
 
@@ -226,6 +227,18 @@ RSpec.describe RegisterECTWizard do
       it 'returns lead_provider when provider led' do
         state_store.write(training_programme: 'provider_led')
         expect(wizard).to have_previous_step(:lead_provider)
+      end
+
+      context 'when returning to review' do
+        let(:step_params) { { check_answers: { return_to_review: 'review_ect_details' } } }
+
+        before do
+          stub_eligible_path(wizard)
+        end
+
+        it 'short-circuits back to the requested review step' do
+          expect(wizard).to have_previous_step(:review_ect_details)
+        end
       end
     end
 
