@@ -30,11 +30,20 @@ module StateStores
       trn == '5555555'
     end
 
-    def cant_use_email?; end
+    def cant_use_email?
+      email_taken = read[:cant_use_email]
+      email_value = read[:email].to_s.downcase
 
-    def school_independent?; end
+      email_taken.present? || email_value == 'taken@example.com'
+    end
 
-    def provider_led?; end
+    def school_independent?
+      read[:school_type] == 'independent'
+    end
+
+    def provider_led?
+      read[:training_programme] == 'provider_led'
+    end
 
     private
 
