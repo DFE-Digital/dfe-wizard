@@ -55,7 +55,7 @@ module DfE
         #   end
         #
         # @return [Builder] The configured builder
-        def self.draw(wizard:, callable:)
+        def self.draw(wizard:, callable: nil)
           builder = new(wizard: wizard, callable: callable)
           yield(builder)
           builder
