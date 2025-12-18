@@ -295,7 +295,7 @@ module DfE
 
     # The current step being displayed
     # @return [Symbol, nil]
-    attr_accessor :current_step_name
+    attr_writer :current_step_name
 
     # The current step params - user answers
     attr_writer :current_step_params

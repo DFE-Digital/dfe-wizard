@@ -69,7 +69,7 @@ module DfE
         #   strategy.resolve(step_id: :email, options: {})
         #   # => "/wizards/abc-123-def/email"
         def resolve(step_id:, options: {})
-          @path_builder.call(step_id, state_store, options)
+          @path_builder.call(step_id, @state_store, url_helpers, options)
         end
 
         # Get state key from state store
@@ -78,6 +78,18 @@ module DfE
         # @api public
         def state_key
           @state_store.state_key
+        end
+
+        # Access Rails URL helpers
+        #
+        # @return [Module]
+        # @raise [RuntimeError] If Rails is not loaded
+        #
+        # @api private
+        def url_helpers
+          raise 'Rails is required for NamedRoutes strategy' unless defined?(Rails)
+
+          Rails.application.routes.url_helpers
         end
       end
     end
