@@ -2,6 +2,7 @@ RSpec.describe RegisterECTWizard do
   let(:repository) { DfE::Wizard::Repository::InMemory.new }
   let(:state_store) { StateStores::RegisterECTStore.new(repository:) }
   let(:step_params) { {} }
+  let(:current_step) { nil }
 
   subject(:wizard) do
     described_class.new(
@@ -32,7 +33,9 @@ RSpec.describe RegisterECTWizard do
       let(:current_step) { :national_insurance_number }
 
       it { expect(wizard).to have_next_step(:not_found).from(:national_insurance_number).when(trn: '0000000') }
-      it { expect(wizard).to have_next_step(:induction_completed).from(:national_insurance_number).when(trn: '3333333') }
+      it {
+        expect(wizard).to have_next_step(:induction_completed).from(:national_insurance_number).when(trn: '3333333')
+      }
       it { expect(wizard).to have_next_step(:induction_exempt).from(:national_insurance_number).when(trn: '4444444') }
 
       it 'returns review_ect_details for eligible users' do
@@ -41,16 +44,12 @@ RSpec.describe RegisterECTWizard do
     end
 
     context 'from email_address' do
-      let(:current_step) { :email_address }
-
       it 'branches to cant_use_email' do
-        state_store.write(email: 'taken@example.com')
-        expect(wizard).to have_next_step(:cant_use_email)
+        expect(wizard).to have_next_step(:cant_use_email).from(:email_address).when(email: 'taken@example.com')
       end
 
       it 'moves to start_date when email allowed' do
-        state_store.write(email: 'free@example.com')
-        expect(wizard).to have_next_step(:start_date)
+        expect(wizard).to have_next_step(:start_date).from(:email_address).when(email: 'free@example.com')
       end
     end
 
@@ -100,13 +99,56 @@ RSpec.describe RegisterECTWizard do
 
       it 'short-circuits to check_answers when the path reaches CYA' do
         stub_eligible_path(wizard)
-        allow(wizard).to receive(:next_step_override).and_return(:check_answers)
+
+        wizard.current_step_params = { return_to_review: 'find_ect' }
+
         expect(wizard).to have_next_step(:check_answers)
+      end
+
+      it 'follow next if return to review changed branching' do
+        wizard.state_store.write(
+          trn: '9999999',
+          date_of_birth: Date.new(2000, 1, 1),
+          email: 'free@example.com',
+          school_type: 'independent',
+          training_programme: 'provider_led',
+          details_correct: 'no',
+          correct_full_name: 'Some full name',
+        )
+
+        wizard.current_step_params = { return_to_review: 'find_ect' }
+
+        expect(wizard).to have_next_step(:check_answers)
+
+        expect(wizard.valid_path(:check_answers)).to eq(%i[find_ect
+                                                           review_ect_details
+                                                           email_address
+                                                           start_date
+                                                           working_pattern
+                                                           independent_school_appropriate_body
+                                                           programme_type
+                                                           lead_provider
+                                                           check_answers])
+
+        wizard.current_step_name = :working_pattern
+        wizard.current_step_params = { return_to_review: 'working_pattern' }
+        wizard.state_store.write(
+          school_type: 'non-independent',
+        )
+        expect(wizard).to have_next_step(:state_school_appropriate_body)
+        expect(wizard).not_to be_valid_to(:check_answers)
       end
 
       it 'follows normal flow when CYA is unreachable' do
         allow(wizard).to receive_messages(in_trs?: true, prohibited_from_teaching?: true)
         expect(wizard).to have_next_step(:cannot_register_ect)
+      end
+
+      it 'returns to review from preview step when is the step user click change' do
+        stub_eligible_path(wizard)
+        wizard.current_step_name = :working_pattern
+        wizard.current_step_params = { return_to_review: 'working_pattern' }
+        expect(wizard).to have_previous_step(:check_answers)
       end
     end
   end
@@ -135,7 +177,9 @@ RSpec.describe RegisterECTWizard do
         )
       end
 
-      it { expect(wizard.flow_path(:cant_use_email)).to eq(%i[find_ect review_ect_details email_address cant_use_email]) }
+      it {
+        expect(wizard.flow_path(:cant_use_email)).to eq(%i[find_ect review_ect_details email_address cant_use_email])
+      }
     end
 
     context 'independent school with lead provider' do
@@ -218,6 +262,7 @@ RSpec.describe RegisterECTWizard do
         email: 'free@example.com',
         school_type: 'state',
         training_programme: 'school_led',
+        appropriate_body_name: 'Some school',
       )
     end
 
@@ -262,14 +307,14 @@ RSpec.describe RegisterECTWizard do
       end
 
       context 'when returning to review' do
-        let(:step_params) { { check_answers: { return_to_review: 'review_ect_details' } } }
+        let(:step_params) { { return_to_review: 'review_ect_details' } }
 
         before do
           stub_eligible_path(wizard)
         end
 
-        it 'short-circuits back to the requested review step' do
-          expect(wizard).to have_previous_step(:review_ect_details)
+        it 'short-circuits back to the previous check_answers' do
+          expect(wizard).to have_previous_step(:programme_type)
         end
       end
     end
@@ -311,6 +356,8 @@ RSpec.describe RegisterECTWizard do
       email: 'free@example.com',
       school_type: 'state',
       training_programme: 'school_led',
+      details_correct: 'yes',
+      school_type: 'independent',
     )
   end
 end
