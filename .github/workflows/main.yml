@@ -10,18 +10,34 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Ruby ${{ matrix.ruby }}
-    strategy:
-      matrix:
-        ruby:
-          - '3.2.4'
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dfe_wizard_test
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/dfe_wizard_test
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: ${{ matrix.ruby }}
-        bundler-cache: true
-    - name: Run the specs
-      run: bundle exec rspec -f doc
+      - uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - name: Prepare DB
+        run: |
+          cd spec/rails-dummy && bundle exec rake db:create db:schema:load RAILS_ENV=test
+      - name: Run the specs
+        run: bundle exec rspec -f doc
+
