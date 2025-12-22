@@ -12,4 +12,3 @@ RuboCop::RakeTask.new
 task default: %i[spec rubocop]
 
 require 'dfe/wizard'
-load Gem.find_files('dfe/wizard/tasks/docs.rake').first
