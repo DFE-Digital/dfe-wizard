@@ -354,7 +354,6 @@ RSpec.describe RegisterECTWizard do
       trn: '9999999',
       date_of_birth: Date.new(2000, 1, 1),
       email: 'free@example.com',
-      school_type: 'state',
       training_programme: 'school_led',
       details_correct: 'yes',
       school_type: 'independent',
