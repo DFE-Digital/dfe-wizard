@@ -30,10 +30,11 @@ feedback so the final version can be more stable and developer-friendly.
 5. [Usage Guide](#usage-guide)
 5. [Testing](#testing)
 7. [Auto generated documentation](#auto-generated-documentation)
-8. [API Reference](#api-reference)
-9. [Troubleshooting](#troubleshooting)
-10. [Support](#support)
-11. [Contact](#contact)
+8. [Wizard Examples](#wizard-examples)
+9. [API Reference](#api-reference)
+10. [Troubleshooting](#troubleshooting)
+11. [Support](#support)
+12. [Contact](#contact)
 
 ---
 
@@ -183,7 +184,7 @@ class PersonalInformationWizard
            to: :state_store
 
   def steps_processor
-    DfE::Wizard::StepsProcessor::Graph.new(self) do |graph|
+    DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
       graph.add_node :name_and_date_of_birth, Steps::NameAndDateOfBirth
       graph.add_node :nationality, Steps::Nationality
       graph.add_node :right_to_work_or_study, Steps::RightToWorkOrStudy
@@ -338,7 +339,7 @@ graph.add_conditional_edge(
   when: :right_to_work_or_study?,
   then: :immigration_status,
   else: :review,
-  label: 'Right to work or study?'
+  label: 'Right to work or study?' # for auto-generated documentation
 )
 ```
 
@@ -1263,7 +1264,7 @@ class ApplicationWizard
   include DfE::Wizard::Base
 
   def steps_processor
-    DfE::Wizard::StepsProcessor::Graph.new(self) do |graph|
+    DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
       graph.add_node :name, Steps::Name
       graph.add_node :email, Steps::Email
       graph.add_node :review, Steps::Review
@@ -1405,7 +1406,7 @@ class ApplicationWizard
   include DfE::Wizard
 
   def steps_processor
-    DfE::Wizard::StepsProcessor::Graph.new(wizard: self) do |graph|
+    DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
       graph.add_node(:name, Steps::Name)
       graph.add_node(:email, Steps::Email)
       graph.add_node(:review, Steps::Review)
@@ -1769,6 +1770,15 @@ In this example:
 
 - Each wizard is instantiated (here with a trivial `OpenStruct` state store) and asked to generate documentation into `docs/wizards`.
 - `generate_all` will emit the different formats (Mermaid, GraphViz, Markdown) using the internal metadata of the steps processor (steps, edges, branching, counts).
+
+---
+
+## Wizard examples
+
+* [Personal Information wizard](spec/rails-dummy/app/wizards/personal_information_wizard.rb) - (from Apply teacher training)
+* [Assign mentor](spec/rails-dummy/app/wizards/assign_mentor_wizard.rb) - (from Register early carreers teachers)
+* [A level wizard](spec/rails-dummy/app/wizards/a_levels_requirements_wizard.rb) - (from Publish teacher training)
+* [Register ECT wizard](spec/rails-dummy/app/wizards/register_ect_wizard.rb) - (from Register early carreers teachers)
 
 ---
 

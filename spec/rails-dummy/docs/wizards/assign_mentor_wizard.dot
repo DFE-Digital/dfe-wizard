@@ -1,0 +1,14 @@
+digraph Assign mentor wizard {
+  rankdir=LR;
+  bgcolor="#ffffff";
+  node [shape=box, style="rounded,filled", fillcolor="#e8f4f8", fontname="Helvetica"];
+  edge [fontname="Helvetica", fontsize=10];
+  who_will_be_the_mentor [label="Who Will Be The Mentor"];
+  can_receive_mentor_training [label="Can Receive Mentor Training"];
+  which_lead_provider [label="Which Lead Provider"];
+  confirmation [label="Confirmation"];
+  who_will_be_the_mentor -> can_receive_mentor_training [style=solid];
+  which_lead_provider -> confirmation [style=solid];
+  can_receive_mentor_training -> which_lead_provider [label="LP provides?\nyes", style=dashed, color=blue];
+  can_receive_mentor_training -> confirmation [label="LP provides?\nno", style=dashed, color=blue];
+}

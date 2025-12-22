@@ -1,0 +1,44 @@
+flowchart TD
+  cannot_register_ect["Cannot Register Ect"]
+  cant_use_email["Cant Use Email"]
+  check_answers["Check Answers"]
+  confirmation["Confirmation"]
+  email_address["Email Address"]
+  find_ect["Find Ect"]
+  trn_not_found["Trn Not Found"]
+  already_active_at_school["Already Active At School"]
+  independent_school_appropriate_body["Independent School Appropriate Body"]
+  induction_completed["Induction Completed"]
+  induction_exempt["Induction Exempt"]
+  induction_failed["Induction Failed"]
+  lead_provider["Lead Provider"]
+  national_insurance_number["National Insurance Number"]
+  not_found["Not Found"]
+  programme_type["Programme Type"]
+  review_ect_details["Review Ect Details"]
+  start_date["Start Date"]
+  state_school_appropriate_body["State School Appropriate Body"]
+  working_pattern["Working Pattern"]
+  review_ect_details --> email_address
+  start_date --> working_pattern
+  independent_school_appropriate_body --> programme_type
+  state_school_appropriate_body --> programme_type
+  lead_provider --> check_answers
+  check_answers --> confirmation
+  email_address -->|cant_use_email?: ✓ yes| cant_use_email
+  email_address -->|cant_use_email?: ✗ no| start_date
+  working_pattern -->|school_independent?: ✓ yes| independent_school_appropriate_body
+  working_pattern -->|school_independent?: ✗ no| state_school_appropriate_body
+  programme_type -->|provider_led?: ✓ yes| lead_provider
+  programme_type -->|provider_led?: ✗ no| check_answers
+  find_ect -->|TRN not found| trn_not_found
+  find_ect -->|National Insurance number| national_insurance_number
+  find_ect -->|Already active at school| already_active_at_school
+  find_ect -->|Induction completed| induction_completed
+  find_ect -->|Induction exempt| induction_exempt
+  find_ect -->|Can not register ECT| cannot_register_ect
+  find_ect -->|Review ECT details| review_ect_details
+  national_insurance_number -->|In TRS?| not_found
+  national_insurance_number -->|Induction completed?| induction_completed
+  national_insurance_number -->|Induction exempt| induction_exempt
+  national_insurance_number -->|Review ECT details| review_ect_details

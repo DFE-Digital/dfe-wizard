@@ -1,0 +1,34 @@
+digraph Apply teacher training wizard {
+  rankdir=LR;
+  bgcolor="#ffffff";
+  node [shape=box, style="rounded,filled", fillcolor="#e8f4f8", fontname="Helvetica"];
+  edge [fontname="Helvetica", fontsize=10];
+  do_you_know_the_course [label="Do You Know The Course"];
+  go_to_find_explanation [label="Go To Find Explanation"];
+  provider_selection [label="Provider Selection"];
+  course_selection [label="Course Selection"];
+  reached_reapplication_limit [label="Reached Reapplication Limit"];
+  duplicate_course_selection [label="Duplicate Course Selection"];
+  closed_course_selection [label="Closed Course Selection"];
+  full_course_selection [label="Full Course Selection"];
+  study_mode_selection [label="Study Mode Selection"];
+  school_selection [label="School Selection"];
+  review [label="Review"];
+  confirm_apply [label="Confirm Apply"];
+  application_choices_list [label="Application Choices List"];
+  provider_selection -> course_selection [style=solid];
+  school_selection -> review [style=solid];
+  review -> confirm_apply [style=solid];
+  confirm_apply -> application_choices_list [style=solid];
+  do_you_know_the_course -> provider_selection [label="condition\nyes", style=dashed, color=blue];
+  do_you_know_the_course -> go_to_find_explanation [label="condition\nno", style=dashed, color=blue];
+  study_mode_selection -> review [label="condition\nyes", style=dashed, color=blue];
+  study_mode_selection -> school_selection [label="condition\nno", style=dashed, color=blue];
+  course_selection -> reached_reapplication_limit [label="branch", style=dotted, color=green];
+  course_selection -> duplicate_course_selection [label="branch", style=dotted, color=green];
+  course_selection -> closed_course_selection [label="branch", style=dotted, color=green];
+  course_selection -> full_course_selection [label="branch", style=dotted, color=green];
+  course_selection -> review [label="branch", style=dotted, color=green];
+  course_selection -> study_mode_selection [label="branch", style=dotted, color=green];
+  course_selection -> school_selection [label="branch", style=dotted, color=green];
+}
