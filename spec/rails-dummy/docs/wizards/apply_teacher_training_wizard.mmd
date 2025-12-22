@@ -1,0 +1,30 @@
+flowchart TD
+  do_you_know_the_course["Do You Know The Course"]
+  go_to_find_explanation["Go To Find Explanation"]
+  provider_selection["Provider Selection"]
+  course_selection["Course Selection"]
+  reached_reapplication_limit["Reached Reapplication Limit"]
+  duplicate_course_selection["Duplicate Course Selection"]
+  closed_course_selection["Closed Course Selection"]
+  full_course_selection["Full Course Selection"]
+  study_mode_selection["Study Mode Selection"]
+  school_selection["School Selection"]
+  review["Review"]
+  confirm_apply["Confirm Apply"]
+  application_choices_list["Application Choices List"]
+  provider_selection --> course_selection
+  school_selection --> review
+  review --> confirm_apply
+  confirm_apply --> application_choices_list
+  do_you_know_the_course -->|know_the_course_to_apply?: ✓ yes| provider_selection
+  do_you_know_the_course -->|know_the_course_to_apply?: ✗ no| go_to_find_explanation
+  study_mode_selection -->|completed?: ✓ yes| review
+  study_mode_selection -->|completed?: ✗ no| school_selection
+  course_selection -->|reapplication_limit_reached?: ✓ yes| reached_reapplication_limit
+  course_selection -->|duplicate_course?: ✓ yes| duplicate_course_selection
+  course_selection -->|course_closed?: ✓ yes| closed_course_selection
+  course_selection -->|course_unavailable?: ✓ yes| full_course_selection
+  course_selection -->|completed?: ✓ yes| review
+  course_selection -->|multiple_study_modes?: ✓ yes| study_mode_selection
+  course_selection -->|multiple_schools?: ✓ yes| school_selection
+  course_selection -->|else| study_mode_selection
