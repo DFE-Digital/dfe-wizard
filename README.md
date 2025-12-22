@@ -157,7 +157,22 @@ wizard.valid?(:phone)       # => false
 
 Linear is too basic. Usually many wizard has conditional and more complicated scenarios.
 
-For this we will use a graph data structure:
+For this we will use a graph data structure.
+
+**As an example**, let's implement a simple wizard like a Personal Information Wizard.
+
+A wizard that collects personal information with conditional flows
+
+**Steps:**
+1. Name & Date of Birth
+2. Nationality
+3. Right to Work/Study *(conditional)*
+4. Immigration Status *(conditional)*
+5. Review
+
+**Conditionals:**
+- UK/Irish nationals skip visa questions
+- Non-UK nationals may need immigration status info if they have right to work
 
 ```ruby
 class PersonalInformationWizard
@@ -793,18 +808,49 @@ The **State Store** bridges the wizard and repository. It:
 
 #### State Store Features
 
+Assuming we have a step:
+
 ```ruby
-state_store = DfE::Wizard::Core::StateStore.new(
+module Steps
+  class NameAndDateOfBirth
+    include DfE::Wizard::Step
+
+    attribute :first_name, :string
+    attribute :last_name, :string
+    attribute :date_of_birth, :date
+  end
+end
+```
+
+And a simple state store:
+```ruby
+class PersonalInformation
+  include DfE::Wizard::StateStore
+
+  def full_name
+    "#{first_name} #{last_name}" # first_name and last_name is available from the steps
+  end
+
+  def date_of_birth?
+    date_of_birth.present? # date_of_birth too
+  end
+end
+```
+
+The attributes `:first_name, :last_name, :date_of_birth` are available in state store:
+
+```ruby
+state_store = PersonalInformation.new(
   # memory is default but not recommended in production environment.
   # See repositories section below.
   repository: DfE::Wizard::Repository::InMemory.new,
 )
 
 # Dynamic attribute access (uses method_missing)
-state_store.first_name = "John"
+state_store.write(first_name: "John")
 state_store.first_name # => "John"
 
-# Read all state
+# Read all state from previous answers
 state_store.read
 # => { first_name: "John", email: "john@example.com", confirmed: true }
 
