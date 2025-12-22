@@ -37,7 +37,7 @@ jobs:
           bundler-cache: true
       - name: Prepare DB
         run: |
-          cd spec/rails-dummy && bundle exec rake db:create db:schema:load RAILS_ENV=test
+          cd spec/rails-dummy && bundle && bundle exec rails db:create db:schema:load RAILS_ENV=test
       - name: Run the specs
         run: bundle exec rspec -f doc
 
