@@ -182,6 +182,10 @@ module DfE
       # Graph-based step processor
       # @api public
       autoload :Graph, 'dfe/wizard/steps_processor/graph'
+
+      # Linear-based step processor
+      # @api public
+      autoload :Linear, 'dfe/wizard/steps_processor/linear'
     end
 
     # @!endgroup
