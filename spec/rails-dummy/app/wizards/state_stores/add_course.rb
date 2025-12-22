@@ -4,14 +4,26 @@ module StateStores
 
     attr_reader :provider
 
+    delegate :recruitment_cycle_year, to: :provider
+
+    delegate :code, to: :provider, prefix: true
+
     def initialize(repository:, provider:, attribute_names: [], step_definitions: [])
       @provider = provider
 
       super(repository:, attribute_names:, step_definitions:)
     end
 
+    def state_key
+      @repository.model.state_key
+    end
+
     def further_education?
       level == 'Further education'
+    end
+
+    def primary?
+      level == 'primary'
     end
 
     def uni_or_scitt?

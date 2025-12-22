@@ -34,14 +34,19 @@ class AddCourseWizard
       graph.add_node(:study_site, Steps::Courses::StudySite)
 
       # Course-type specific steps
-      graph.add_node(:accredited_provider, Steps::Courses::AccreditedProvider,
-                     skip_when: :single_accredited_provider_or_self_accredited?)
+      graph.add_node(
+        :accredited_provider, Steps::Courses::AccreditedProvider,
+        skip_when: :single_accredited_provider_or_self_accredited?
+      )
+
       graph.add_node(:can_sponsor_student_visa, Steps::Courses::CanSponsorStudentVisa)
       graph.add_node(:can_sponsor_skilled_worker_visa, Steps::Courses::CanSponsorSkilledWorkerVisa)
       graph.add_node(:visa_sponsorship_application_deadline_required, Steps::Courses::VisaSponsorshipDeadlineRequired)
       graph.add_node(:visa_sponsorship_application_deadline_at, Steps::Courses::VisaSponsorshipDeadlineAt)
-      graph.add_node(:applications_open, Steps::Courses::ApplicationsOpen,
-                     skip_when: :applications_open_feature_flag_inactive?)
+      graph.add_node(
+        :applications_open, Steps::Courses::ApplicationsOpen,
+        skip_when: :applications_open_feature_flag_inactive?
+      )
 
       # Final steps
       graph.add_node(:start_date, Steps::Courses::StartDate)
@@ -138,6 +143,21 @@ class AddCourseWizard
       graph.add_edge(from: :start_date,       to: :review)
       graph.add_edge(from: :review,           to: :courses_list)
     end
+  end
+
+  def route_strategy
+    RouteStrategy::DynamicRoutes.new(
+      state_store:,
+      path_builder: lambda { |step_id, state_store, url_helpers, opts|
+        url_helpers.step_recruitment_cycle_provider_add_course_courses_path(
+          recruitment_cycle_year: state_store.recruitment_cycle_year,
+          provider_code: state_store.provider_code,
+          state_key: state_store.state_key,
+          step: step_id,
+          **opts,
+        )
+      },
+    )
   end
 
   def logger

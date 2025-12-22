@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_12_06_173343) do
+ActiveRecord::Schema[7.2].define(version: 2025_12_18_145939) do
   # These are extensions that must be enabled in order to support this database
   enable_extension 'plpgsql'
 
@@ -28,6 +28,14 @@ ActiveRecord::Schema[7.2].define(version: 2025_12_06_173343) do
                                                                   unique: true
   end
 
+  create_table 'providers', force: :cascade do |t|
+    t.string 'name'
+    t.string 'code'
+    t.integer 'recruitment_cycle_year'
+    t.datetime 'created_at', null: false
+    t.datetime 'updated_at', null: false
+  end
+
   create_table 'register_ect_wizard_records', force: :cascade do |t|
     t.string 'trn'
     t.string 'trs_first_name'
@@ -42,6 +50,22 @@ ActiveRecord::Schema[7.2].define(version: 2025_12_06_173343) do
     t.date 'started_on'
     t.datetime 'created_at', null: false
     t.datetime 'updated_at', null: false
+  end
+
+  create_table 'schools', force: :cascade do |t|
+    t.string 'name'
+    t.bigint 'provider_id'
+    t.datetime 'created_at', null: false
+    t.datetime 'updated_at', null: false
+    t.index ['provider_id'], name: 'index_schools_on_provider_id'
+  end
+
+  create_table 'study_sites', force: :cascade do |t|
+    t.string 'name'
+    t.bigint 'provider_id'
+    t.datetime 'created_at', null: false
+    t.datetime 'updated_at', null: false
+    t.index ['provider_id'], name: 'index_study_sites_on_provider_id'
   end
 
   create_table 'users', force: :cascade do |t|

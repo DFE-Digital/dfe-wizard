@@ -1,0 +1,29 @@
+<% content_for :page_title, 'Subject' %>
+
+<% if @wizard.state_store.primary? %>
+  <%= form.govuk_collection_radio_buttons(
+    :main_subject,
+    form.object.primary_subjects,
+    :id,
+    :name,
+    legend: { text: 'Subject' }
+  ) %>
+<% else %>
+  <%= form.govuk_fieldset legend: { text: 'Subject' } do %>
+    <div class="govuk-form-group">
+      <%= form.govuk_collection_select :main_subject,
+          form.object.secondary_subjects,
+          :id,
+          :name,
+          label: { text: "First subject" }, options: { include_blank: true } %>
+    </div>
+
+    <div class="govuk-form-group">
+      <%= form.govuk_collection_select :second_subject,
+          form.object.secondary_subjects,
+          :id,
+          :name,
+          label: { text: "Second subject (optional)" }, options: { include_blank: true } %>
+    </div>
+  <% end %>
+<% end %>

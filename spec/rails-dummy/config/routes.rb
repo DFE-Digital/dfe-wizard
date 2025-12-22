@@ -97,6 +97,19 @@ Rails.application.routes.draw do
   resources :recruitment_cycles, param: :year do
     resources :providers, param: :code, only: %i[index] do
       resources :courses, param: :code, only: %i[show] do
+        collection do
+          namespace :add_course, path: 'add-course' do
+            get  '/:state_key/:step',
+                 to: 'wizard#new',
+                 as: :step,
+                 constraints: { step: /[a-z_]+/ }
+
+            post '/:state_key/:step',
+                 to: 'wizard#create',
+                 constraints: { step: /[a-z_]+/ }
+          end
+        end
+
         get '/a-levels-or-equivalency-tests/what-a-level-is-required(/:uuid)',
             to: 'courses/a_level_requirements/what_a_level_is_required#new',
             as: :a_levels_what_a_level_is_required

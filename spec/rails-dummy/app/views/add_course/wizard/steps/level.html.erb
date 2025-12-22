@@ -1,0 +1,18 @@
+<% content_for :page_title, 'What type of course?' %>
+
+<%= form.govuk_collection_radio_buttons(
+      :level,
+      form.object.level_options,
+      :id,
+      :name,
+      legend: { text: 'Which department do you work for?', tag: :h2 }) %>
+
+<%= form.govuk_collection_radio_buttons(
+    :send,
+    form.object.send_options,
+    :id,
+    :name,
+    legend: {
+      text: 'Does this course have a special educational needs and disability (SEND) specialism?',
+      tag: :h2 }
+) %>
