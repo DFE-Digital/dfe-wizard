@@ -11,6 +11,9 @@ patterns, and behaviours before the official 1.0 release.
 Please use it in non-critical projects or in development environment first, report bugs, and share
 feedback so the final version can be more stable and developer-friendly.
 
+For history purposes 0.1.x version will be maintained in a separate branch but will be only to fix
+bugs (see 0-stable).
+
 ---
 
 ## Table of Contents
