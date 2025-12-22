@@ -130,7 +130,7 @@ the interface:
 #### Example: Linear Processor
 
 ```ruby
-class PersonalInfoWizard
+class SimpleWizard
   include DfE::Wizard
 
   def steps_processor
@@ -144,7 +144,7 @@ class PersonalInfoWizard
 end
 
 # Usage
-wizard = PersonalInfoWizard.new
+wizard = SimpleWizard.new
 wizard.current_step_name    # => :name
 wizard.next_step            # => :email
 wizard.previous_step        # => nil
@@ -174,6 +174,23 @@ A wizard that collects personal information with conditional flows
 **Conditionals:**
 - UK/Irish nationals skip visa questions
 - Non-UK nationals may need immigration status info if they have right to work
+
+Here a diagram of the wizard that we will implement below:
+
+```mermaid
+flowchart TD
+  name_and_date_of_birth["Name And Date Of Birth"]
+  nationality["Nationality"]
+  right_to_work_or_study["Right To Work Or Study"]
+  immigration_status["Immigration Status"]
+  review["Review"]
+  name_and_date_of_birth --> nationality
+  immigration_status --> review
+  nationality -->|Non-UK/Non-Irish: ✓ yes| right_to_work_or_study
+  nationality -->|Non-UK/Non-Irish: ✗ no| review
+  right_to_work_or_study -->|Right to work or study?: ✓ yes| immigration_status
+  right_to_work_or_study -->|Right to work or study?: ✗ no| review
+```
 
 ```ruby
 class PersonalInformationWizard
@@ -258,6 +275,7 @@ Now we can define a controller to handle everything now:
 
     def current_step
       # define current step here. Could be via params (but needs validation!) or hard coded, etc
+      :name_and_date_of_birth # or params[:step]
     end
   end
 ```
@@ -1779,6 +1797,9 @@ In this example:
 * [Assign mentor](spec/rails-dummy/app/wizards/assign_mentor_wizard.rb) - (from Register early carreers teachers)
 * [A level wizard](spec/rails-dummy/app/wizards/a_levels_requirements_wizard.rb) - (from Publish teacher training)
 * [Register ECT wizard](spec/rails-dummy/app/wizards/register_ect_wizard.rb) - (from Register early carreers teachers)
+
+
+Auto generated documentation examples of these wizard can be seem [here](spec/rails-dummy/docs/wizards)
 
 ---
 
