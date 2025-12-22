@@ -192,6 +192,9 @@ flowchart TD
   right_to_work_or_study -->|Right to work or study?: ✗ no| review
 ```
 
+So now we need to define a method called #steps_processor which will contain only the definitions
+of the flow and will be evaluated when calling #next_step, #previous_step, etc.
+
 ```ruby
 class PersonalInformationWizard
   include DfE::Wizard
@@ -378,14 +381,12 @@ module StateStores
 end
 ```
 
-Any Ruby logic - Database queries, API calls, complex conditions
+### Important gotcha when building predicates
 
 **Observation**: The wizard calls the flow path at least 1 or 2 times on next step/previous step,
 so **if you are calling an API** you need to cache that somehow!!!!!!!
 
-#### Advanced Branching
-
-Multiple Conditional Edges. **Use case**: N-Way Branching.
+### Multiple Conditional Edges. **Use case**: N-Way Branching.
 
 Problem: Need to route to 3+ different steps based on state
 Use when: More than 2 possible next steps from one step
@@ -445,7 +446,7 @@ graph.add_multiple_conditional_edges(
 - **More general last** - Catches remaining cases
 - **Order = priority**
 
-#### Custom branching
+### Custom branching
 
 Custom Branching Edge. **Use case:** If you wanna custom and not use DSL:
 
@@ -510,7 +511,7 @@ end
 
 **External service determines routing** - Full flexibility
 
-##### When to Use Each Type
+### When to Use Each Type
 
 **Binary Conditional** (`add_conditional_edge`)
 - ✅ Yes/No decisions
@@ -557,7 +558,7 @@ graph.add_custom_branching_edge(
 )
 ```
 
-#### Dynamic root
+### Dynamic root
 
 A dynamic root is configured via graph.conditional_root, which receives a block and a list of potential roots, for example:
 
@@ -581,7 +582,7 @@ Why potential_root is required:
 * `potential_root:` declares the set of valid root candidates and is mandatory for conditional
 * roots so the graph can still be fully documented, visualised, and validated at design time.
 
-#### Skip steps
+### Skip steps
 
 **Skip steps**. Sometimes you need to skip a step because of a feature flag, existing data, etc.
 
@@ -631,15 +632,15 @@ Be careful with this feature, use this feature wisely!
 
 The gem provide methods for flow control:
 
-`flow_path` shows the theoretical route a user would take through the wizard given their answers.
-`saved_path` shows the steps that already have data stored
-`valid_path` shows the subset of those steps whose data passes validation.
+* `flow_path` shows the theoretical route a user would take through the wizard given their answers.
+* `saved_path` shows the steps that already have data stored.
+* `valid_path` shows the subset of those steps whose data passes validation.
 
 So using all three together tells you:
 
-1. where the user could go
-2. where they have been
-3. which parts of their journey are currently valid
+1. `flow_path` where the user could go
+2. `saved_path` where they have been
+3. `valid_path` which parts of their journey are currently valid
 
 Use cases:
 
@@ -1023,7 +1024,12 @@ persistence, deletions, API calls, email, in service notifications, etc.).
 
 #### Default Pipeline
 
-**By default, the wizard runs two operations per step**:
+**By default, the wizard runs two operations per step**: Validate and Persist.
+
+You can see each implementation on the gem:
+
+* [Validate](lib/dfe/wizard/operations/validate.rb) operation
+* [Persist](lib/dfe/wizard/operations/persist.rb) operation
 
 ```
 Step Submission
@@ -1070,6 +1076,8 @@ class PaymentWizard
 
   def steps_operator
     DfE::Wizard::StepsOperator::Builder.draw(wizard: self, callable: state_store) do |b|
+      b.on_step(:remove_recipient, use: [RemoveRecipient])
+
       # use: option replace default pipeline for :payment step
       b.on_step(:payment, use: [Validate, ProcessPayment, Persist])
 
@@ -1087,7 +1095,22 @@ end
 
 ```ruby
 # Save current step with configured operations
+wizard.current_step_name = :remove_recipient
+# Run only RemoveRecipient which probably will delete data instead of saving
+wizard.save_current_step
+
+# Save current step with configured operations
+wizard.current_step_name = :payment
+# Run Validate, ProcessPayment, Persist
 wizard.save_current_step  # Runs operations defined on #steps_operator, returns true/false
+
+wizard.current_step_name = :notification
+# Run Validate, Persist, SendEmail
+wizard.save_current_step
+
+wizard.current_step_name = :review
+# Don't do anything
+wizard.save_current_step
 ```
 
 **If you need more customization**, you can also create your own methods on wizard and
