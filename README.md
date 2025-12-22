@@ -297,6 +297,8 @@ state_store.write(first_name: nil) # Assuming Steps::NameAndDateOfBirth has vali
 wizard.valid_path_to?(:review) # => false
 ```
 
+#### Binary conditionals
+
 Simple transition from one step to the other. **Use case:** Always proceed to next step:
 
 ```ruby
@@ -342,22 +344,17 @@ module StateStores
 end
 ```
 
-**Any Ruby logic** - Database queries, API calls, complex conditions
+Any Ruby logic - Database queries, API calls, complex conditions
 
 **Observation**: The wizard calls the flow path at least 1 or 2 times on next step/previous step,
 so **if you are calling an API** you need to cache that somehow!!!!!!!
 
-**Advanced Branching**: Beyond Binary Conditionals:
+#### Advanced Branching
 
 Multiple Conditional Edges. **Use case**: N-Way Branching.
 
-**Problem:** Need to route to 3+ different steps based on state
-
-**Binary conditional:** ✅ Yes/No, True/False decisions
-
-**Multiple conditional:** ✅ Visa type, payment method, age bracket
-
-**Use when:** More than 2 possible next steps from one step
+Problem: Need to route to 3+ different steps based on state
+Use when: More than 2 possible next steps from one step
 
 ```ruby
 graph.add_multiple_conditional_edges(
@@ -414,7 +411,9 @@ graph.add_multiple_conditional_edges(
 - **More general last** - Catches remaining cases
 - **Order = priority**
 
-Custom Branching Edge. **Use case:** If you wanna custom and not DSL:
+#### Custom branching
+
+Custom Branching Edge. **Use case:** If you wanna custom and not use DSL:
 
 **Use when:**
 - Step determines multiple possible destinations
@@ -524,7 +523,7 @@ graph.add_custom_branching_edge(
 )
 ```
 
-##### Dynamic root
+#### Dynamic root
 
 A dynamic root is configured via graph.conditional_root, which receives a block and a list of potential roots, for example:
 
@@ -548,7 +547,7 @@ Why potential_root is required:
 * `potential_root:` declares the set of valid root candidates and is mandatory for conditional
 * roots so the graph can still be fully documented, visualised, and validated at design time.
 
-##### Skip steps
+#### Skip steps
 
 **Skip steps**. Sometimes you need to skip a step because of a feature flag, existing data, etc.
 
@@ -559,6 +558,32 @@ when a skip_when predicate evaluates to true, for example
 Conceptually, the node stays in the model (so visualisations, docs, tests, and future changes can
 still reason about it), but navigation treats it as if it were already completed and jumps over it.
 
+example:
+
+```ruby
+graph.add_node(:name, Name)
+graph.add_node(:age, Age)
+graph.add_node(:visa, Visa)
+graph.add_node(:some_experimental_feature, SomeExperimentalFeature, skip_when: :experimental_feature_inactive?)
+graph.add_node(:schools, Schools, skip_when: :single_school?) # e.g choose single school for user
+graph.add_node(:review, Review)
+
+graph.add_edge(from: :name, to: :age)
+graph.add_edge(from: :age, to: :visa)
+graph.add_edge(from: :visa, to: :some_experimental_feature)
+graph.add_edge(from: :some_experimental_feature, to: :schools)
+graph.add_edge(from: :schools, to: :review)
+
+## on state store
+def single_school?
+ # logic that returns true or false
+end
+
+def experimental_feature_inactive?
+ # logic that returns true or false
+end
+```
+
 Why skipping is important:
 
 * Without explicit skipping, a conditional edge on step A must decide not only whether to go to B,
@@ -568,8 +593,7 @@ but also where to go after B if B is not needed, leading to logic like:
 
 Be careful with this feature, use this feature wisely!
 
-
-##### Flow vs Saved vs Valid
+### Flow vs Saved vs Valid
 
 The gem provide methods for flow control:
 
