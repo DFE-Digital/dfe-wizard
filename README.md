@@ -1488,9 +1488,24 @@ end
 
 ## Testing
 
+This gem also ships with a suite of RSpec matchers for testing wizards at a higher level,
+letting you assert flow (next_step, previous_step, branches),
+paths (flow_path, saved_path, valid_path), operations, and state store attributes
+using expressive, intention‑revealing specs.
+
+You can include the module:
+
+```ruby
+RSpec.configure do |config|
+  config.include DfE::Wizard::Test::RSpecMatchers
+end
+```
+
+Let's explore each matcher.
+
 ### `have_next_step_path`
 
-Asserts that a wizard’s `next_step_path` equals the expected path.[1]
+Asserts that a wizard’s `next_step_path` equals the expected path.
 
 ```ruby
 expect(wizard).to have_next_step_path("/wizard/email")
@@ -1498,7 +1513,7 @@ expect(wizard).to have_next_step_path("/wizard/email")
 
 ### `have_previous_step_path`
 
-Asserts that a wizard’s `previous_step_path` equals the expected path.[1]
+Asserts that a wizard’s `previous_step_path` equals the expected path.
 
 ```ruby
 expect(wizard).to have_previous_step_path("/wizard/name")
@@ -1506,7 +1521,7 @@ expect(wizard).to have_previous_step_path("/wizard/name")
 
 ### `be_next_step_path`
 
-Asserts that a given path is the `next_step_path` for a specific wizard, using subject-first syntax.[1]
+Asserts that a given path is the `next_step_path` for a specific wizard, using subject-first syntax.
 
 ```ruby
 expect("/wizard/email").to be_next_step_path.in(wizard)
@@ -1514,7 +1529,7 @@ expect("/wizard/email").to be_next_step_path.in(wizard)
 
 ### `be_previous_step_path`
 
-Asserts that a given path is the `previous_step_path` for a specific wizard, using subject-first syntax.[1]
+Asserts that a given path is the `previous_step_path` for a specific wizard, using subject-first syntax.
 
 ```ruby
 expect("/wizard/name").to be_previous_step_path.in(wizard)
@@ -1522,7 +1537,7 @@ expect("/wizard/name").to be_previous_step_path.in(wizard)
 
 ### `resolve_step`
 
-Asserts that a given step ID resolves to a specific URL/path via the wizard’s route strategy.[1]
+Asserts that a given step ID resolves to a specific URL/path via the wizard’s route strategy.
 
 ```ruby
 expect(wizard).to resolve_step(:nationality)
@@ -1536,7 +1551,7 @@ expect(wizard).to resolve_step(:review)
 
 ### `have_root_step`
 
-Asserts that the wizard’s `steps_processor.root_step` equals the expected step, optionally after writing state to the state store.[1]
+Asserts that the wizard’s `steps_processor.root_step` equals the expected step, optionally after writing state to the state store.
 
 ```ruby
 # Simple root
@@ -1552,7 +1567,7 @@ expect(wizard).to have_root_step(:what_a_level_is_required)
 
 ### `have_next_step`
 
-Asserts that `wizard.next_step` equals the expected step, optionally from a specific starting step and/or with specific state.[1]
+Asserts that `wizard.next_step` equals the expected step, optionally from a specific starting step and/or with specific state.
 
 ```ruby
 # From current step
@@ -1569,7 +1584,7 @@ expect(wizard).to have_next_step(:review)
 
 ### `be_next_step`
 
-Asserts that a given step symbol is the wizard’s `next_step`, using subject-first syntax.[1]
+Asserts that a given step symbol is the wizard’s `next_step`, using subject-first syntax.
 
 ```ruby
 expect(:nationality).to be_next_step.in(wizard)
@@ -1577,7 +1592,7 @@ expect(:nationality).to be_next_step.in(wizard)
 
 ### `have_previous_step`
 
-Asserts that `wizard.previous_step` equals the expected step, optionally from a specific starting step and/or with specific state.[1]
+Asserts that `wizard.previous_step` equals the expected step, optionally from a specific starting step and/or with specific state.
 
 ```ruby
 # From current step
@@ -1595,7 +1610,7 @@ expect(wizard).to have_previous_step(:nationality)
 
 ### `be_previous_step`
 
-Asserts that a given step symbol is the wizard’s `previous_step`, using subject-first syntax.[1]
+Asserts that a given step symbol is the wizard’s `previous_step`, using subject-first syntax.
 
 ```ruby
 expect(:nationality).to be_previous_step.in(wizard)
@@ -1603,7 +1618,7 @@ expect(:nationality).to be_previous_step.in(wizard)
 
 ### `branch_from`
 
-Asserts that, from a given step and optional state, `wizard.next_step` is the expected target step (tests conditional branching).[1]
+Asserts that, from a given step and optional state, `wizard.next_step` is the expected target step (tests conditional branching).
 
 ```ruby
 expect(wizard).to branch_from(:nationality)
@@ -1617,7 +1632,7 @@ expect(wizard).to branch_from(:nationality)
 
 ### `be_at_step`
 
-Asserts that `wizard.current_step_name` equals the expected step.[1]
+Asserts that `wizard.current_step_name` equals the expected step.
 
 ```ruby
 expect(wizard).to be_at_step(:nationality)
@@ -1627,7 +1642,7 @@ expect(wizard).to be_at_step(:nationality)
 
 ### `have_flow_path`
 
-Asserts that `wizard.flow_path` equals the expected sequence of steps.[1]
+Asserts that `wizard.flow_path` equals the expected sequence of steps.
 
 ```ruby
 expect(wizard).to have_flow_path(
@@ -1637,7 +1652,7 @@ expect(wizard).to have_flow_path(
 
 ### `have_saved_path`
 
-Asserts that `wizard.saved_path` equals the expected sequence of steps with saved data.[1]
+Asserts that `wizard.saved_path` equals the expected sequence of steps with saved data.
 
 ```ruby
 expect(wizard).to have_saved_path(
@@ -1647,7 +1662,7 @@ expect(wizard).to have_saved_path(
 
 ### `have_valid_path`
 
-Asserts that `wizard.valid_path` equals the expected sequence of valid steps up to the stopping point.[1]
+Asserts that `wizard.valid_path` equals the expected sequence of valid steps up to the stopping point.
 
 ```ruby
 expect(wizard).to have_valid_path(
@@ -1659,7 +1674,7 @@ expect(wizard).to have_valid_path(
 
 ### `have_flow_steps`
 
-Asserts that `wizard.flow_steps` (hydrated step objects) match the expected list of step instances, in order.[1]
+Asserts that `wizard.flow_steps` (hydrated step objects) match the expected list of step instances, in order.
 
 ```ruby
 expect(wizard).to have_flow_steps([
@@ -1671,7 +1686,7 @@ expect(wizard).to have_flow_steps([
 
 ### `have_saved_steps`
 
-Asserts that `wizard.saved_steps` (steps with data) match the expected list of step instances, in order.[1]
+Asserts that `wizard.saved_steps` (steps with data) match the expected list of step instances, in order.
 
 ```ruby
 expect(wizard).to have_saved_steps([
@@ -1682,7 +1697,7 @@ expect(wizard).to have_saved_steps([
 
 ### `have_valid_steps`
 
-Asserts that `wizard.valid_steps` (steps with valid data) match the expected list of step instances, in order.[1]
+Asserts that `wizard.valid_steps` (steps with valid data) match the expected list of step instances, in order.
 
 ```ruby
 expect(wizard).to have_valid_steps([
@@ -1696,7 +1711,7 @@ expect(wizard).to have_valid_steps([
 
 ### `be_valid_to`
 
-Asserts that all steps leading to the target step form a valid path (`wizard.valid_path_to?(target_step)` is true).[1]
+Asserts that all steps leading to the target step form a valid path (`wizard.valid_path_to?(target_step)` is true).
 
 ```ruby
 expect(wizard).to be_valid_to(:review)
@@ -1704,7 +1719,7 @@ expect(wizard).to be_valid_to(:review)
 
 ### `be_valid_step`
 
-Asserts that a given step ID is valid in the context of a wizard (`wizard.valid?(step_id)`), using subject-first syntax.[1]
+Asserts that a given step ID is valid in the context of a wizard (`wizard.valid?(step_id)`), using subject-first syntax.
 
 ```ruby
 expect(:nationality).to be_valid_step.in(wizard)
@@ -1714,22 +1729,21 @@ expect(:nationality).to be_valid_step.in(wizard)
 
 ### `have_step_attribute`
 
-Asserts that the state store has a given attribute key, optionally with a specific value.[1]
+Asserts that the state store has a given attribute key, optionally with a specific value.
 
 ```ruby
 # Just presence
 expect(state_store).to have_step_attribute(:first_name)
 
 # Presence and value
-expect(state_store).to have_step_attribute(:nationality)
-  .with_value("british")
+expect(state_store).to have_step_attribute(:nationality).with_value("british")
 ```
 
 ***
 
 ### `have_step_operations`
 
-Asserts that the wizard’s `steps_operator` has the expected operation pipeline per step.[1]
+Asserts that the wizard’s `steps_operator` has the expected operation pipeline per step.
 
 ```ruby
 expect(wizard).to have_step_operations(
