@@ -179,6 +179,10 @@ module DfE
     #
     # @api public
     module StepsProcessor
+      # Base step processor
+      # @api public
+      autoload :Base, 'dfe/wizard/steps_processor/base'
+
       # Graph-based step processor
       # @api public
       autoload :Graph, 'dfe/wizard/steps_processor/graph'
