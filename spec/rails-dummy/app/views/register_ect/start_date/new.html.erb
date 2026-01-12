@@ -1,0 +1,20 @@
+<%= govuk_back_link href: @wizard.previous_step_path || register_ect_email_address_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">When did or when will <%= @wizard.state_store.read[:correct_full_name].presence || "the ECT" %> start teaching as an ECT at your school?</h1>
+
+    <%= form_with(model: @wizard.current_step,
+                  url: @wizard.current_step_path,
+                  scope: @wizard.current_step_name) do |f| %>
+      <%= f.govuk_error_summary %>
+
+      <%= f.govuk_date_field :start_date,
+                             width: "two-thirds",
+                             legend: { text: "Start date", size: "m", tag: "h2", hidden: true },
+                             hint: { text: "For example, 17 9 #{Date.current.year}" } %>
+
+      <%= f.govuk_submit "Continue" %>
+    <% end %>
+  </div>
+</div>
