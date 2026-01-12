@@ -1,0 +1,24 @@
+<%= govuk_back_link href: @wizard.previous_step_path || register_ect_start_date_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <% name = @wizard.state_store.read[:correct_full_name].presence || "the ECT" %>
+    <h1 class="govuk-heading-l">Is <%= name %>’s working pattern as an ECT full or part time?</h1>
+
+    <p class="govuk-body">We’ll pass this information on so adjustments can be made to training if needed.</p>
+
+    <%= form_with(model: @wizard.current_step,
+                  url: @wizard.current_step_path,
+                  scope: @wizard.current_step_name) do |f| %>
+      <%= f.govuk_error_summary %>
+
+      <%= f.govuk_radio_buttons_fieldset :working_pattern,
+                                         legend: { text: "Is #{name}’s working pattern as an ECT full or part time?", hidden: true } do %>
+        <%= f.govuk_radio_button :working_pattern, "full_time", label: { text: "Full time" }, link_errors: true %>
+        <%= f.govuk_radio_button :working_pattern, "part_time", label: { text: "Part time" } %>
+      <% end %>
+
+      <%= f.govuk_submit "Continue" %>
+    <% end %>
+  </div>
+</div>
