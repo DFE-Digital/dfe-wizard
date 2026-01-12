@@ -109,9 +109,13 @@ RSpec.describe RegisterECTWizard do
         wizard.state_store.write(
           trn: '9999999',
           date_of_birth: Date.new(2000, 1, 1),
+          start_date: Date.new(2024, 9, 17),
+          working_pattern: 'full_time',
           email: 'free@example.com',
           school_type: 'independent',
           training_programme: 'provider_led',
+          appropriate_body_type: 'national',
+          lead_provider_id: 'teach_first',
           details_correct: 'no',
           correct_full_name: 'Some full name',
         )
@@ -258,6 +262,8 @@ RSpec.describe RegisterECTWizard do
       wizard.state_store.write(
         trn: '9999999',
         date_of_birth: Date.new(2000, 1, 1),
+        start_date: Date.new(2024, 9, 17),
+        working_pattern: 'full_time',
         details_correct: 'yes',
         email: 'free@example.com',
         school_type: 'state',
@@ -353,10 +359,13 @@ RSpec.describe RegisterECTWizard do
     wizard.state_store.write(
       trn: '9999999',
       date_of_birth: Date.new(2000, 1, 1),
+      start_date: Date.new(2024, 9, 17),
+      working_pattern: 'full_time',
       email: 'free@example.com',
       training_programme: 'school_led',
       details_correct: 'yes',
       school_type: 'independent',
+      appropriate_body_type: 'national',
     )
   end
 end
