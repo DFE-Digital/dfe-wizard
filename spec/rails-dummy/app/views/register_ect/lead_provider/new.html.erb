@@ -1,0 +1,25 @@
+<%= govuk_back_link href: @wizard.previous_step_path || register_ect_programme_type_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">Which lead provider will be training <%= name = @wizard.state_store.read[:correct_full_name].presence || "the ECT" %>?</h1>
+
+    <p class="govuk-body">Lead providers are responsible for creating the materials and learning platforms used for training ECTs and mentors.</p>
+
+    <p class="govuk-body">We will let the lead provider know your school wants to work with them so they can arrange training. They’ll confirm which delivery partner they’ll be working with to deliver training events.</p>
+
+    <%= form_with(model: @wizard.current_step,
+                  url: @wizard.current_step_path,
+                  scope: @wizard.current_step_name) do |f| %>
+      <%= f.govuk_error_summary %>
+
+      <%= f.govuk_radio_buttons_fieldset :lead_provider_id, legend: { text: "Select lead provider", hidden: true } do %>
+        <%= f.govuk_radio_button :lead_provider_id, "teach_first", label: { text: "Teach First" }, link_errors: true %>
+        <%= f.govuk_radio_button :lead_provider_id, "ambition", label: { text: "Ambition Institute" } %>
+        <%= f.govuk_radio_button :lead_provider_id, "ucl", label: { text: "UCL Institute of Education" } %>
+      <% end %>
+
+      <%= f.govuk_submit "Continue" %>
+    <% end %>
+  </div>
+</div>
