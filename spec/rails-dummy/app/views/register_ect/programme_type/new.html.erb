@@ -1,0 +1,29 @@
+<%= govuk_back_link href: @wizard.previous_step_path || register_ect_working_pattern_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <% name = @wizard.state_store.read[:correct_full_name].presence || "the ECT" %>
+    <h1 class="govuk-heading-l">Which training programme will <%= name %> follow?</h1>
+
+    <%= form_with(model: @wizard.current_step,
+                  url: @wizard.current_step_path,
+                  scope: @wizard.current_step_name) do |f| %>
+      <%= f.govuk_error_summary %>
+
+      <%= f.govuk_radio_buttons_fieldset :training_programme,
+                                         legend: { text: "Which training programme will #{name} follow?", hidden: true } do %>
+        <%= f.govuk_radio_button :training_programme,
+                                 "provider_led",
+                                 label: { text: "Provider-led" },
+                                 hint: { text: "Your school will use DfE funded providers to design and deliver training based on the initial teacher training and early career framework" },
+                                 link_errors: true %>
+        <%= f.govuk_radio_button :training_programme,
+                                 "school_led",
+                                 label: { text: "School-led" },
+                                 hint: { text: "Your school will design and deliver its own training based on the initial teacher training and early career framework" } %>
+      <% end %>
+
+      <%= f.govuk_submit "Continue" %>
+    <% end %>
+  </div>
+</div>
