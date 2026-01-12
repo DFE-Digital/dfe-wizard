@@ -4,13 +4,13 @@ module Steps
       include DfE::Wizard::Step
 
       attribute :appropriate_body_type, :string
-      attribute :appropriate_body_name, :string
+      attribute :independent_appropriate_body_name, :string
 
       validates :appropriate_body_type, presence: true
-      validates :appropriate_body_name, presence: true, if: -> { appropriate_body_type == 'teaching_school_hub' }
+      validates :independent_appropriate_body_name, presence: true, if: -> { appropriate_body_type == 'teaching_school_hub' }
 
       def self.permitted_params
-        %w[appropriate_body_type appropriate_body_name]
+        %w[appropriate_body_type independent_appropriate_body_name]
       end
     end
   end

@@ -22,6 +22,8 @@
     <% appropriate_body_type = @wizard.state_store.read[:appropriate_body_type].to_s %>
     <% appropriate_body_name = if appropriate_body_type == "national"
                                  "Independent Schools Teacher Induction Panel (ISTIP)"
+                               elsif appropriate_body_type.present?
+                                 @wizard.state_store.read[:independent_appropriate_body_name]
                                else
                                  @wizard.state_store.read[:appropriate_body_name]
                                end %>
