@@ -1,0 +1,13 @@
+<%= govuk_back_link href: @wizard.previous_step_path || register_ect_find_ect_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">We’re unable to match the ECT with the details you provided</h1>
+
+    <p class="govuk-body">Check that you’ve entered their details correctly.</p>
+    <p class="govuk-body">You can check their TRN by <%= govuk_link_to('reviewing their teacher record', 'https://www.gov.uk/guidance/check-a-teachers-record') %>.</p>
+    <p class="govuk-body">Alternatively, you can ask the ECT to check their TRN by using the <%= govuk_link_to('Find a lost TRN service', 'https://find-a-lost-trn.education.gov.uk/start') %>.</p>
+
+    <%= govuk_link_to "Try again", register_ect_find_ect_path, class: "govuk-button" %>
+  </div>
+</div>
