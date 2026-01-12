@@ -1,0 +1,90 @@
+<%= govuk_back_link href: @wizard.previous_step_path || register_ect_find_ect_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <% name = @wizard.state_store.read[:correct_full_name].presence || "the ECT" %>
+    <% raw_start_date = @wizard.state_store.read[:start_date] %>
+    <% formatted_start_date = begin
+                                raw_start_date.respond_to?(:strftime) ? raw_start_date.strftime("%-d %B %Y") : Date.parse(raw_start_date.to_s).strftime("%-d %B %Y")
+                              rescue StandardError
+                                raw_start_date.presence
+                              end %>
+    <% working_pattern_value = @wizard.state_store.read[:working_pattern].to_s %>
+    <% working_pattern_label = { "full_time" => "Full time", "part_time" => "Part time" }[working_pattern_value] || working_pattern_value %>
+    <% training_programme_value = @wizard.state_store.read[:training_programme].to_s %>
+    <% training_programme_label = { "provider_led" => "Provider-led", "school_led" => "School-led" }[training_programme_value] || training_programme_value %>
+    <% lead_provider_value = @wizard.state_store.read[:lead_provider_id].to_s %>
+    <% lead_provider_label = {
+         "teach_first" => "Teach First",
+         "ambition" => "Ambition Institute",
+         "ucl" => "UCL Institute of Education",
+       }[lead_provider_value] || lead_provider_value.presence %>
+    <% appropriate_body_type = @wizard.state_store.read[:appropriate_body_type].to_s %>
+    <% appropriate_body_name = if appropriate_body_type == "national"
+                                 "Independent Schools Teacher Induction Panel (ISTIP)"
+                               else
+                                 @wizard.state_store.read[:appropriate_body_name]
+                               end %>
+
+    <h1 class="govuk-heading-l">Check your answers before submitting</h1>
+
+    <h2 class="govuk-heading-m">Teacher details</h2>
+
+    <%= govuk_summary_list do |summary_list| %>
+      <%= summary_list.with_row do |row| %>
+        <%= row.with_key { "Name" } %>
+        <%= row.with_value { name } %>
+      <% end %>
+
+      <%= summary_list.with_row do |row| %>
+        <%= row.with_key { "Teacher Reference Number (TRN)" } %>
+        <%= row.with_value { @wizard.state_store.read[:trn].presence || "Not provided" } %>
+      <% end %>
+
+      <%= summary_list.with_row do |row| %>
+        <%= row.with_key { "Email address" } %>
+        <%= row.with_value { @wizard.state_store.read[:email].presence || "Not provided" } %>
+      <% end %>
+
+      <%= summary_list.with_row do |row| %>
+        <%= row.with_key { "School start date" } %>
+        <%= row.with_value { formatted_start_date || "Not provided" } %>
+      <% end %>
+
+      <%= summary_list.with_row do |row| %>
+        <%= row.with_key { "Working pattern" } %>
+        <%= row.with_value { working_pattern_label.presence || "Not provided" } %>
+      <% end %>
+    <% end %>
+
+    <h2 class="govuk-heading-m">Programme details</h2>
+
+    <%= govuk_summary_list do |summary_list| %>
+      <%= summary_list.with_row do |row| %>
+        <%= row.with_key { "Appropriate body" } %>
+        <%= row.with_value { appropriate_body_name.presence || "Not provided" } %>
+      <% end %>
+
+      <%= summary_list.with_row do |row| %>
+        <%= row.with_key { "Training programme" } %>
+        <%= row.with_value { training_programme_label.presence || "Not provided" } %>
+      <% end %>
+
+      <% if @wizard.state_store.provider_led? %>
+        <%= summary_list.with_row do |row| %>
+          <%= row.with_key { "Lead provider" } %>
+          <%= row.with_value { lead_provider_label.presence || "Not provided" } %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <%= form_with(model: @wizard.current_step,
+                  url: @wizard.current_step_path,
+                  scope: @wizard.current_step_name) do |f| %>
+      <%= f.govuk_error_summary %>
+
+      <%= f.hidden_field :confirm, value: "1" %>
+      <%= f.govuk_submit "Confirm details" %>
+    <% end %>
+  </div>
+</div>
