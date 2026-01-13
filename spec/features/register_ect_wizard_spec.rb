@@ -58,6 +58,17 @@ RSpec.feature 'Register ECT wizard', type: :feature do
     then_i_should_be_on_the_find_ect_step
   end
 
+  scenario 'skipping steps' do
+    when_i_go_to_the_programme_type_step_directly
+    then_i_see_a_404
+
+    when_i_go_to_the_check_answers_step_directly
+    then_i_see_a_404
+
+    when_i_go_to_the_confirmation_step_directly
+    then_i_see_a_404
+  end
+
   def given_i_start_the_register_ect_wizard
     visit root_path
     click_link_or_button 'Wizards'
@@ -175,6 +186,22 @@ RSpec.feature 'Register ECT wizard', type: :feature do
 
   def when_i_try_again
     click_link_or_button 'Try again'
+  end
+
+  def when_i_go_to_the_programme_type_step_directly
+    visit register_ect_programme_type_path
+  end
+
+  def when_i_go_to_the_check_answers_step_directly
+    visit register_ect_check_answers_path
+  end
+
+  def when_i_go_to_the_confirmation_step_directly
+    visit register_ect_confirmation_path
+  end
+
+  def then_i_see_a_404
+    expect(page.status_code).to eq(404)
   end
 
   def and_i_continue
