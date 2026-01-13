@@ -1,7 +1,7 @@
 # Wizard Documentation
 
 **Structure Type:** `graph`
-**Generated:** 2026-01-13T18:48:16Z
+**Generated:** 2026-01-13T20:21:32Z
 **Processor:** DfE::Wizard::StepsProcessor
 
 
