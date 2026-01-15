@@ -1,4 +1,4 @@
-digraph Personal information wizard {
+digraph Personal_information_wizard {
   rankdir=LR;
   bgcolor="#ffffff";
   node [shape=box, style="rounded,filled", fillcolor="#e8f4f8", fontname="Helvetica"];

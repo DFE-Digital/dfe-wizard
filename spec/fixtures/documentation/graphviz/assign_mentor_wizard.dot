@@ -1,4 +1,4 @@
-digraph Assign mentor wizard {
+digraph Assign_mentor_wizard {
   rankdir=LR;
   bgcolor="#ffffff";
   node [shape=box, style="rounded,filled", fillcolor="#e8f4f8", fontname="Helvetica"];
