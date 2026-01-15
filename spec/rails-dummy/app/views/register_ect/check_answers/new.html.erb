@@ -2,94 +2,57 @@
 
 <div class="govuk-grid-row">
   <div class="govuk-grid-column-two-thirds">
-    <% name = @wizard.state_store.read[:correct_full_name].presence || "the ECT" %>
-    <% raw_start_date = @wizard.state_store.read[:start_date] %>
-    <% formatted_start_date = begin
-                                raw_start_date.respond_to?(:strftime) ? raw_start_date.strftime("%-d %B %Y") : Date.parse(raw_start_date.to_s).strftime("%-d %B %Y")
-                              rescue StandardError
-                                raw_start_date.presence
-                              end %>
-    <% working_pattern_value = @wizard.state_store.read[:working_pattern].to_s %>
-    <% working_pattern_label = { "full_time" => "Full time", "part_time" => "Part time" }[working_pattern_value] || working_pattern_value %>
-    <% training_programme_value = @wizard.state_store.read[:training_programme].to_s %>
-    <% training_programme_label = { "provider_led" => "Provider-led", "school_led" => "School-led" }[training_programme_value] || training_programme_value %>
-    <% lead_provider_value = @wizard.state_store.read[:lead_provider_id].to_s %>
-    <% lead_provider_label = {
-         "teach_first" => "Teach First",
-         "ambition" => "Ambition Institute",
-         "ucl" => "UCL Institute of Education",
-       }[lead_provider_value] || lead_provider_value.presence %>
-    <% appropriate_body_type = @wizard.state_store.read[:appropriate_body_type].to_s %>
-    <% appropriate_body_name = if appropriate_body_type == "national"
-                                 "Independent Schools Teacher Induction Panel (ISTIP)"
-                               elsif appropriate_body_type.present?
-                                 @wizard.state_store.read[:independent_appropriate_body_name]
-                               else
-                                 @wizard.state_store.read[:appropriate_body_name]
-                               end %>
-
     <h1 class="govuk-heading-l">Check your answers before submitting</h1>
 
     <h2 class="govuk-heading-m">Teacher details</h2>
 
+    <% teacher_details_reviewable_attributes = %w[correct_full_name trn email start_date working_pattern] %>
+
     <%= govuk_summary_list do |summary_list| %>
-      <%= summary_list.with_row do |row| %>
-        <%= row.with_key { "Name" } %>
-        <%= row.with_value { name } %>
-        <%= row.with_action(
-              text: "Change",
-              href: @wizard.resolve_step_path(:review_ect_details, return_to_review: :review_ect_details),
-              visually_hidden_text: "name"
-            ) %>
-      <% end %>
+      <% @wizard.flow_steps.each do |step| %>
+        <% step.attributes.each do |attribute_name, attribute_value| %>
+          <% next unless attribute_name.in?(teacher_details_reviewable_attributes) %>
+          <%= summary_list.with_row do |row| %>
+            <%= row.with_key { step.class.human_attribute_name(attribute_name) } %>
 
-      <%= summary_list.with_row do |row| %>
-        <%= row.with_key { "Teacher Reference Number (TRN)" } %>
-        <%= row.with_value { @wizard.state_store.read[:trn].presence || "Not provided" } %>
-        <%= row.with_action(
-              text: "Change",
-              href: @wizard.resolve_step_path(:find_ect, return_to_review: :find_ect),
-              visually_hidden_text: "teacher reference number (TRN)"
-            ) %>
-      <% end %>
-
-      <%= summary_list.with_row do |row| %>
-        <%= row.with_key { "Email address" } %>
-        <%= row.with_value { @wizard.state_store.read[:email].presence || "Not provided" } %>
-        <%= row.with_action(
-              text: "Change",
-              href: @wizard.resolve_step_path(:email_address, return_to_review: :email_address),
-              visually_hidden_text: "email address"
-            ) %>
-      <% end %>
-
-      <%= summary_list.with_row do |row| %>
-        <%= row.with_key { "School start date" } %>
-        <%= row.with_value { formatted_start_date || "Not provided" } %>
-        <%= row.with_action(
-              text: "Change",
-              href: @wizard.resolve_step_path(:start_date, return_to_review: :start_date),
-              visually_hidden_text: "school start date"
-            ) %>
-      <% end %>
-
-      <%= summary_list.with_row do |row| %>
-        <%= row.with_key { "Working pattern" } %>
-        <%= row.with_value { working_pattern_label.presence || "Not provided" } %>
-        <%= row.with_action(
-              text: "Change",
-              href: @wizard.resolve_step_path(:working_pattern, return_to_review: :working_pattern),
-              visually_hidden_text: "working pattern"
-            ) %>
+            <% if attribute_name == "working_pattern" %>
+              <%= row.with_value { attribute_value.humanize } %>
+            <% else %>
+              <%= row.with_value { attribute_value.is_a?(Date) ? attribute_value.to_fs(:govuk_date) : attribute_value.to_s } %>
+            <% end %>
+            <%= row.with_action(
+                  text: "Change",
+                  href: @wizard.resolve_step_path(step.step_id, return_to_review: step.step_id),
+                  visually_hidden_text: attribute_name
+                ) %>
+          <% end %>
+        <% end %>
       <% end %>
     <% end %>
 
     <h2 class="govuk-heading-m">Programme details</h2>
 
+    <% programme_details_reviewable_attributes = %w[lead_provider_id training_programme] %>
+
     <%= govuk_summary_list do |summary_list| %>
+      <% @wizard.flow_steps.each do |step| %>
+        <% step.attributes.each do |attribute_name, attribute_value| %>
+          <% next unless attribute_name.in?(programme_details_reviewable_attributes) %>
+          <%= summary_list.with_row do |row| %>
+            <%= row.with_key { step.class.human_attribute_name(attribute_name) } %>
+            <%= row.with_value { attribute_value.humanize } %>
+            <%= row.with_action(
+                  text: "Change",
+                  href: @wizard.resolve_step_path(step.step_id, return_to_review: step.step_id),
+                  visually_hidden_text: attribute_name
+                ) %>
+          <% end %>
+        <% end %>
+      <% end %>
+
       <%= summary_list.with_row do |row| %>
         <%= row.with_key { "Appropriate body" } %>
-        <%= row.with_value { appropriate_body_name.presence || "Not provided" } %>
+        <%= row.with_value { @wizard.state_store.appropriate_body_text } %>
         <%= row.with_action(
               text: "Change",
               href: @wizard.resolve_step_path(
@@ -98,28 +61,6 @@
               ),
               visually_hidden_text: "appropriate body"
             ) %>
-      <% end %>
-
-      <%= summary_list.with_row do |row| %>
-        <%= row.with_key { "Training programme" } %>
-        <%= row.with_value { training_programme_label.presence || "Not provided" } %>
-        <%= row.with_action(
-              text: "Change",
-              href: @wizard.resolve_step_path(:programme_type, return_to_review: :programme_type),
-              visually_hidden_text: "training programme"
-            ) %>
-      <% end %>
-
-      <% if @wizard.state_store.provider_led? %>
-        <%= summary_list.with_row do |row| %>
-          <%= row.with_key { "Lead provider" } %>
-          <%= row.with_value { lead_provider_label.presence || "Not provided" } %>
-          <%= row.with_action(
-                text: "Change",
-                href: @wizard.resolve_step_path(:lead_provider, return_to_review: :lead_provider),
-                visually_hidden_text: "lead provider"
-              ) %>
-        <% end %>
       <% end %>
     <% end %>
 

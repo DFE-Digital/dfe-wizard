@@ -45,6 +45,18 @@ module StateStores
       read[:training_programme] == 'provider_led'
     end
 
+    def appropriate_body_text
+      appropriate_body_name = if appropriate_body_type == 'national'
+                                'Independent Schools Teacher Induction Panel (ISTIP)'
+                              elsif appropriate_body_type.present?
+                                read[:independent_appropriate_body_name]
+                              else
+                                read[:appropriate_body_name]
+                              end
+
+      appropriate_body_name.presence || 'Not provided'
+    end
+
     private
 
     def trn

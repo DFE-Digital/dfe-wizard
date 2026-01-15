@@ -5,14 +5,14 @@ RSpec.feature 'Register ECT wizard', type: :feature do
 
     when_i_complete_happy_path_to_check_answers
     and_i_see_the_check_answers_summary(
-      'Name' => 'Pat Ect',
+      'Name' => 'Pat ECT',
       'Teacher Reference Number (TRN)' => '1234567',
       'Email address' => 'ect@example.com',
       'School start date' => '17 September 2024',
       'Working pattern' => 'Full time',
       'Appropriate body' => 'Example Appropriate Body',
-      'Training programme' => 'Provider-led',
-      'Lead provider' => 'Teach First',
+      'Training programme' => 'Provider led',
+      'Lead provider' => 'Teach first',
     )
     and_i_confirm_details
 
@@ -41,7 +41,7 @@ RSpec.feature 'Register ECT wizard', type: :feature do
     when_i_change_training_programme_to('School-led')
 
     then_i_should_be_on_the_check_answers_step
-    and_i_see_the_check_answers_summary('Training programme' => 'School-led')
+    and_i_see_the_check_answers_summary('Training programme' => 'School led')
     and_i_do_not_see_lead_provider_in_summary
   end
 
@@ -109,7 +109,7 @@ RSpec.feature 'Register ECT wizard', type: :feature do
   def when_i_complete_happy_path_to_check_answers
     when_i_find_an_ect(trn: '1234567', day: '1', month: '11', year: '1980')
     then_i_should_be_on_the_review_ect_details_step
-    when_i_confirm_ect_details_and_enter_name('Pat Ect')
+    when_i_confirm_ect_details_and_enter_name('Pat ECT')
     and_i_continue
 
     then_i_should_be_on_the_email_address_step
@@ -142,7 +142,7 @@ RSpec.feature 'Register ECT wizard', type: :feature do
   def when_i_complete_happy_path_to_check_answers_for_independent_school
     when_i_find_an_ect(trn: '1234567', day: '1', month: '11', year: '1980')
     then_i_should_be_on_the_review_ect_details_step
-    when_i_confirm_ect_details_and_enter_name('Pat Ect')
+    when_i_confirm_ect_details_and_enter_name('Pat ECT')
     and_i_continue
 
     then_i_should_be_on_the_email_address_step

@@ -1,0 +1,17 @@
+en:
+  activemodel:
+    attributes:
+      steps/register_ect/find_ect_step:
+        trn: Teacher Reference Number (TRN)
+      steps/register_ect/review_ect_details_step:
+        correct_full_name: Name
+      steps/register_ect/email_address_step:
+        email: Email address
+      steps/register_ect/working_pattern_step:
+        working_pattern: Working pattern
+      steps/register_ect/start_date_step:
+        start_date: School start date
+      steps/register_ect/lead_provider_step:
+        lead_provider_id: Lead provider
+      steps/register_ect/programme_type_step:
+        training_programme: Training programme
