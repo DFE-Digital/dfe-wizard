@@ -20,7 +20,6 @@ namespace :wizard do
         AssignMentorWizard,
         ALevelsRequirementsWizard,
         AddCourseWizard,
-        ApplyTeacherTrainingWizard,
         RegisterECTWizard,
       ].each do |wizard_class|
         wizard = wizard_class.new(state_store: OpenStruct.new)

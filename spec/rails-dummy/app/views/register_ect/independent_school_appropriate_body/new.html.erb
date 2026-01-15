@@ -1,0 +1,35 @@
+<%= govuk_back_link href: @wizard.previous_step_path || register_ect_working_pattern_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <% name = @wizard.state_store.read[:correct_full_name].presence || "the ECT" %>
+    <h1 class="govuk-heading-l">Which appropriate body will be supporting <%= name %>’s induction?</h1>
+
+    <p class="govuk-body">Appropriate bodies are responsible for assuring the quality of the statutory induction of ECTs.</p>
+
+    <p class="govuk-body">We share the ECT’s details with the appropriate body to check the ECT has been registered correctly.</p>
+
+    <%= form_with(model: @wizard.current_step,
+                  url: @wizard.current_step_path(return_to_review: params[:return_to_review]),
+                  scope: @wizard.current_step_name) do |f| %>
+      <%= f.govuk_error_summary %>
+
+      <%= f.govuk_radio_buttons_fieldset :appropriate_body_type,
+                                         legend: { text: "What type of appropriate body will be supporting #{name}’s induction", hidden: true } do %>
+        <%= f.govuk_radio_button :appropriate_body_type,
+                                 "national",
+                                 label: { text: "Independent Schools Teacher Induction Panel (ISTIP)" },
+                                 link_errors: true %>
+
+        <%= f.govuk_radio_button :appropriate_body_type,
+                                 "teaching_school_hub",
+                                 label: { text: "A different appropriate body (teaching school hub)" } do %>
+          <%= f.govuk_text_field :independent_appropriate_body_name,
+                                 label: { text: "Enter appropriate body name" } %>
+        <% end %>
+      <% end %>
+
+      <%= f.govuk_submit "Continue" %>
+    <% end %>
+  </div>
+</div>

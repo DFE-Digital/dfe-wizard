@@ -1,7 +1,7 @@
 # Wizard Documentation
 
 **Structure Type:** `graph`
-**Generated:** 2025-12-22T07:03:20Z
+**Generated:** 2026-01-13T20:21:32Z
 **Processor:** DfE::Wizard::StepsProcessor
 
 
@@ -147,6 +147,12 @@ this step's purpose, user interactions, and business logic.
 Placeholder for step description. Add contextual information about
 this step's purpose, user interactions, and business logic.
 
+#### Attributes
+
+| Attribute | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `confirm` | `ActiveModel::Type::String` | ✗ |  |
+
 #### Operations
 
 | Operation | Description |
@@ -249,16 +255,6 @@ this step's purpose, user interactions, and business logic.
 Placeholder for step description. Add contextual information about
 this step's purpose, user interactions, and business logic.
 
-#### Attributes
-
-| Attribute | Type | Required | Description |
-|-----------|------|:--------:|-------------|
-| `national_insurance_number` | `ActiveModel::Type::String` | ✗ |  |
-
-#### Validations
-
-- **national_insurance_number** (`presence`): 
-
 #### Operations
 
 | Operation | Description |
@@ -298,6 +294,18 @@ this step's purpose, user interactions, and business logic.
 
 Placeholder for step description. Add contextual information about
 this step's purpose, user interactions, and business logic.
+
+#### Attributes
+
+| Attribute | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `appropriate_body_type` | `ActiveModel::Type::String` | ✗ |  |
+| `independent_appropriate_body_name` | `ActiveModel::Type::String` | ✗ |  |
+
+#### Validations
+
+- **appropriate_body_type** (`presence`): 
+- **independent_appropriate_body_name** (`presence`): 
 
 #### Operations
 
@@ -379,6 +387,16 @@ this step's purpose, user interactions, and business logic.
 Placeholder for step description. Add contextual information about
 this step's purpose, user interactions, and business logic.
 
+#### Attributes
+
+| Attribute | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `lead_provider_id` | `ActiveModel::Type::String` | ✗ |  |
+
+#### Validations
+
+- **lead_provider_id** (`presence`): 
+
 #### Operations
 
 | Operation | Description |
@@ -398,6 +416,16 @@ this step's purpose, user interactions, and business logic.
 
 Placeholder for step description. Add contextual information about
 this step's purpose, user interactions, and business logic.
+
+#### Attributes
+
+| Attribute | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `national_insurance_number` | `ActiveModel::Type::String` | ✗ |  |
+
+#### Validations
+
+- **national_insurance_number** (`presence`): 
 
 #### Operations
 
@@ -438,6 +466,16 @@ this step's purpose, user interactions, and business logic.
 
 Placeholder for step description. Add contextual information about
 this step's purpose, user interactions, and business logic.
+
+#### Attributes
+
+| Attribute | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `training_programme` | `ActiveModel::Type::String` | ✗ |  |
+
+#### Validations
+
+- **training_programme** (`presence`): 
 
 #### Operations
 
@@ -491,6 +529,16 @@ this step's purpose, user interactions, and business logic.
 Placeholder for step description. Add contextual information about
 this step's purpose, user interactions, and business logic.
 
+#### Attributes
+
+| Attribute | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `start_date` | `ActiveModel::Type::Date` | ✗ |  |
+
+#### Validations
+
+- **start_date** (`presence`): 
+
 #### Operations
 
 | Operation | Description |
@@ -540,6 +588,16 @@ this step's purpose, user interactions, and business logic.
 
 Placeholder for step description. Add contextual information about
 this step's purpose, user interactions, and business logic.
+
+#### Attributes
+
+| Attribute | Type | Required | Description |
+|-----------|------|:--------:|-------------|
+| `working_pattern` | `ActiveModel::Type::String` | ✗ |  |
+
+#### Validations
+
+- **working_pattern** (`presence`): 
 
 #### Operations
 
@@ -747,7 +805,12 @@ Custom branching uses a method to evaluate complex logic and route to multiple p
     :check_answers: {
       :class: "Steps::RegisterECT::CheckAnswersStep",
       :label: "Check Answers",
-      :attributes: [],
+      :attributes: [
+        {
+          :name: "confirm",
+          :type: "ActiveModel::Type::String"
+        }
+      ],
       :validators: [],
       :operations: [
         {
@@ -845,20 +908,8 @@ Custom branching uses a method to evaluate complex logic and route to multiple p
     :trn_not_found: {
       :class: "Steps::RegisterECT::TRNNotFoundStep",
       :label: "Trn Not Found",
-      :attributes: [
-        {
-          :name: "national_insurance_number",
-          :type: "ActiveModel::Type::String"
-        }
-      ],
-      :validators: [
-        {
-          :name: "national_insurance_number",
-          :class: "ActiveModel::Validations::PresenceValidator",
-          :type: "presence",
-          :message: null
-        }
-      ],
+      :attributes: [],
+      :validators: [],
       :operations: [
         {
           :name: "validate",
@@ -889,8 +940,30 @@ Custom branching uses a method to evaluate complex logic and route to multiple p
     :independent_school_appropriate_body: {
       :class: "Steps::RegisterECT::IndependentSchoolAppropriateBodyStep",
       :label: "Independent School Appropriate Body",
-      :attributes: [],
-      :validators: [],
+      :attributes: [
+        {
+          :name: "appropriate_body_type",
+          :type: "ActiveModel::Type::String"
+        },
+        {
+          :name: "independent_appropriate_body_name",
+          :type: "ActiveModel::Type::String"
+        }
+      ],
+      :validators: [
+        {
+          :name: "appropriate_body_type",
+          :class: "ActiveModel::Validations::PresenceValidator",
+          :type: "presence",
+          :message: null
+        },
+        {
+          :name: "independent_appropriate_body_name",
+          :class: "ActiveModel::Validations::PresenceValidator",
+          :type: "presence",
+          :message: null
+        }
+      ],
       :operations: [
         {
           :name: "validate",
@@ -953,8 +1026,20 @@ Custom branching uses a method to evaluate complex logic and route to multiple p
     :lead_provider: {
       :class: "Steps::RegisterECT::LeadProviderStep",
       :label: "Lead Provider",
-      :attributes: [],
-      :validators: [],
+      :attributes: [
+        {
+          :name: "lead_provider_id",
+          :type: "ActiveModel::Type::String"
+        }
+      ],
+      :validators: [
+        {
+          :name: "lead_provider_id",
+          :class: "ActiveModel::Validations::PresenceValidator",
+          :type: "presence",
+          :message: null
+        }
+      ],
       :operations: [
         {
           :name: "validate",
@@ -969,8 +1054,20 @@ Custom branching uses a method to evaluate complex logic and route to multiple p
     :national_insurance_number: {
       :class: "Steps::RegisterECT::NationalInsuranceNumberStep",
       :label: "National Insurance Number",
-      :attributes: [],
-      :validators: [],
+      :attributes: [
+        {
+          :name: "national_insurance_number",
+          :type: "ActiveModel::Type::String"
+        }
+      ],
+      :validators: [
+        {
+          :name: "national_insurance_number",
+          :class: "ActiveModel::Validations::PresenceValidator",
+          :type: "presence",
+          :message: null
+        }
+      ],
       :operations: [
         {
           :name: "validate",
@@ -1001,8 +1098,20 @@ Custom branching uses a method to evaluate complex logic and route to multiple p
     :programme_type: {
       :class: "Steps::RegisterECT::ProgrammeTypeStep",
       :label: "Programme Type",
-      :attributes: [],
-      :validators: [],
+      :attributes: [
+        {
+          :name: "training_programme",
+          :type: "ActiveModel::Type::String"
+        }
+      ],
+      :validators: [
+        {
+          :name: "training_programme",
+          :class: "ActiveModel::Validations::PresenceValidator",
+          :type: "presence",
+          :message: null
+        }
+      ],
       :operations: [
         {
           :name: "validate",
@@ -1055,8 +1164,20 @@ Custom branching uses a method to evaluate complex logic and route to multiple p
     :start_date: {
       :class: "Steps::RegisterECT::StartDateStep",
       :label: "Start Date",
-      :attributes: [],
-      :validators: [],
+      :attributes: [
+        {
+          :name: "start_date",
+          :type: "ActiveModel::Type::Date"
+        }
+      ],
+      :validators: [
+        {
+          :name: "start_date",
+          :class: "ActiveModel::Validations::PresenceValidator",
+          :type: "presence",
+          :message: null
+        }
+      ],
       :operations: [
         {
           :name: "validate",
@@ -1099,8 +1220,20 @@ Custom branching uses a method to evaluate complex logic and route to multiple p
     :working_pattern: {
       :class: "Steps::RegisterECT::WorkingPatternStep",
       :label: "Working Pattern",
-      :attributes: [],
-      :validators: [],
+      :attributes: [
+        {
+          :name: "working_pattern",
+          :type: "ActiveModel::Type::String"
+        }
+      ],
+      :validators: [
+        {
+          :name: "working_pattern",
+          :class: "ActiveModel::Validations::PresenceValidator",
+          :type: "presence",
+          :message: null
+        }
+      ],
       :operations: [
         {
           :name: "validate",

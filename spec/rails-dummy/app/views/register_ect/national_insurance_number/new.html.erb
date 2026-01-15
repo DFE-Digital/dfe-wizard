@@ -7,7 +7,7 @@
     <p class="govuk-body">We cannot find a match with the details you've given. You'll need to provide more information about your ECT to help us locate them.</p>
 
     <%= form_with(model: @wizard.current_step,
-                  url: @wizard.current_step_path,
+                  url: @wizard.current_step_path(return_to_review: params[:return_to_review]),
                   scope: @wizard.current_step_name) do |f| %>
       <%= f.govuk_error_summary %>
 

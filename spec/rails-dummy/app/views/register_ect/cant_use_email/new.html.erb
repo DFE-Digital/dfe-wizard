@@ -1,0 +1,13 @@
+<%= govuk_back_link href: @wizard.previous_step_path || register_ect_email_address_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">This email is already in use for a different ECT or mentor</h1>
+
+    <p class="govuk-body">Make sure you use an email that belongs to the person you’re registering.</p>
+
+    <p class="govuk-body">Do not use a generic email like headteacher@school.com.</p>
+
+    <%= govuk_link_to "Try another email", @wizard.previous_step_path, class: "govuk-button" %>
+  </div>
+</div>

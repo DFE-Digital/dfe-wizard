@@ -8,6 +8,10 @@ module Steps
                 presence: {
                   message: "Enter the name of the appropriate body which will be supporting the ECT's induction",
                 }
+
+      def self.permitted_params
+        %w[appropriate_body_name]
+      end
     end
   end
 end

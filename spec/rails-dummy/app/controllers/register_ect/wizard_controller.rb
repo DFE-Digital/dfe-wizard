@@ -1,6 +1,7 @@
 module RegisterECT
   class WizardController < ApplicationController
     before_action :assign_wizard
+    before_action :verify_step_access
 
     def new = nil
 
@@ -14,10 +15,18 @@ module RegisterECT
 
     private
 
+    def verify_step_access
+      unless @wizard.valid_path_to_current_step?
+        render status: :not_found, formats: [:html],
+               template: 'errors/not_found'
+      end
+    end
+
     def assign_wizard
       state_store = StateStores::RegisterECTStore.new(
         repository: DfE::Wizard::Repository::Session.new(session:, key: :register_ect_wizard),
       )
+      state_store.write(school_type: params[:school_type]) if params[:school_type].present?
 
       @wizard = RegisterECTWizard.new(
         current_step: current_step,
