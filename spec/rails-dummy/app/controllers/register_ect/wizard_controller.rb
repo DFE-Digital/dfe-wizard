@@ -26,6 +26,7 @@ module RegisterECT
       state_store = StateStores::RegisterECTStore.new(
         repository: DfE::Wizard::Repository::Session.new(session:, key: :register_ect_wizard),
       )
+      state_store.write(school_type: params[:school_type]) if params[:school_type].present?
 
       @wizard = RegisterECTWizard.new(
         current_step: current_step,

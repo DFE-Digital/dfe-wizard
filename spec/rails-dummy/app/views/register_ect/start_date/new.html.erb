@@ -5,7 +5,7 @@
     <h1 class="govuk-heading-l">When did or when will <%= @wizard.state_store.read[:correct_full_name].presence || "the ECT" %> start teaching as an ECT at your school?</h1>
 
     <%= form_with(model: @wizard.current_step,
-                  url: @wizard.current_step_path,
+                  url: @wizard.current_step_path(return_to_review: params[:return_to_review]),
                   scope: @wizard.current_step_name) do |f| %>
       <%= f.govuk_error_summary %>
 
