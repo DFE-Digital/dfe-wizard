@@ -63,7 +63,7 @@ module DfE
           private
 
           def render_digraph_start
-            wizard_name = @metadata[:wizard_name]
+            wizard_name = sanitize_identifier(@metadata[:wizard_name].to_s)
             "digraph #{wizard_name} {"
           end
 
