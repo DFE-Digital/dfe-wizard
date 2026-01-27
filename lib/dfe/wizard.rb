@@ -139,10 +139,11 @@ module DfE
     # @api public
     module Repository
       autoload :Base, 'dfe/wizard/repository/base'
-      autoload :InMemory, 'dfe/wizard/repository/in_memory'
-      autoload :Session, 'dfe/wizard/repository/session'
-      autoload :Redis, 'dfe/wizard/repository/redis'
       autoload :Cache, 'dfe/wizard/repository/cache'
+      autoload :InMemory, 'dfe/wizard/repository/in_memory'
+      autoload :Model, 'dfe/wizard/repository/model'
+      autoload :Redis, 'dfe/wizard/repository/redis'
+      autoload :Session, 'dfe/wizard/repository/session'
       autoload :WizardState, 'dfe/wizard/repository/wizard_state'
     end
     # @!endgroup
