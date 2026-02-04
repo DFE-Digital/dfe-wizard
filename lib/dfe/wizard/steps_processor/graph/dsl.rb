@@ -9,9 +9,10 @@ module DfE
         #
         # @api private
         class DSL
-          def initialize(registry, wizard)
+          def initialize(registry, wizard, predicate_caller:)
             @registry = registry
             @wizard = wizard
+            @predicate_caller = predicate_caller
           end
 
           # Add a step node to the graph.
@@ -226,7 +227,7 @@ module DfE
           #     ]
           #   )
           def add_custom_branching_edge(from:, conditional:, potential_transitions:)
-            predicate = build_predicate(conditional)
+            predicate = build_predicate(conditional, caller: @wizard)
 
             @registry.add_custom_branching_edge(
               from: from,
@@ -285,19 +286,22 @@ module DfE
 
           private
 
-          def build_predicate(raw)
+          # Build a predicate callable.
+          #
+          # @param raw [Symbol, Proc] Method name or callable
+          # @param caller [Object] Object to call the method on (defaults to predicate_caller)
+          def build_predicate(raw, caller: @predicate_caller)
             if raw.is_a?(Symbol)
-              unless @wizard.respond_to?(raw, include_private: true)
-                raise ArgumentError, "Predicate method :#{raw} not found on #{@wizard.class.name}"
+              unless caller.respond_to?(raw, include_private: true)
+                raise ArgumentError, "Predicate method :#{raw} not found on #{caller.class.name}"
               end
 
-              method = @wizard.method(raw)
-              arity = method.arity
+              bound_method = caller.method(raw)
 
-              if arity.zero? || arity.negative?
-                proc { method.call }
+              if bound_method.arity.zero? || bound_method.arity.negative?
+                proc { bound_method.call }
               else
-                proc { |step| method.call(step) }
+                proc { |step| bound_method.call(step) }
               end
 
             elsif raw.respond_to?(:call)

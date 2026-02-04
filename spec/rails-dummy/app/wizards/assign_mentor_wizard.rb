@@ -1,10 +1,8 @@
 class AssignMentorWizard
   include DfE::Wizard
 
-  delegate :lead_provider_will_not_provide?, to: :state_store
-
   def steps_processor
-    DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+    DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
       graph.add_node :who_will_be_the_mentor, Steps::WhoWillBeTheMentor
       graph.add_node :can_receive_mentor_training, Steps::CanReceiveMentorTraining
       graph.add_node :which_lead_provider, Steps::WhichLeadProvider

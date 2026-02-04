@@ -12,10 +12,10 @@ module DfE
         #
         # @api private
         class NavigationResolver
-          def initialize(registry:, wizard:)
+          def initialize(registry:, wizard:, predicate_caller:)
             @registry = registry
             @wizard = wizard
-            @predicate_caller = @wizard
+            @predicate_caller = predicate_caller
           end
 
           # Navigate to next step.
@@ -60,7 +60,7 @@ module DfE
           #
           # @param target_step [Symbol, nil]
           # @return [Array<Symbol>]
-          def path_traversal(target_step = @wizard.current_step_name, max_depth: 20)
+          def path_traversal(target_step = @wizard.current_step_name, max_depth: @registry.nodes.size)
             root = compute_root_node
 
             path = dfs_path(root, target_step, Set.new, max_depth:)
@@ -85,9 +85,9 @@ module DfE
             return @registry.root_node if @registry.root_node
 
             if @registry.conditional_root_block
-              @registry.conditional_root_block.call(@wizard.state_store)
+              @registry.conditional_root_block.call(@predicate_caller)
             elsif @registry.conditional_root_method
-              @predicate_caller.method(@registry.conditional_root_method).call
+              @wizard.method(@registry.conditional_root_method).call
             end
           end
 

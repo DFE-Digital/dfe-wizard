@@ -24,7 +24,7 @@ RSpec.describe DfE::Wizard::Behaviours::StepManagement do
       include DfE::Wizard
 
       def steps_processor
-        DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+        DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
           graph.add_node :start, Steps::EflStart
           graph.add_node :qualification_type, Steps::QualificationType
           graph.add_node :ielts_details, Steps::IeltsDetails
@@ -69,8 +69,6 @@ RSpec.describe DfE::Wizard::Behaviours::StepManagement do
         DfE::Wizard::Logger.new(Rails.logger)
       end
 
-      delegate :has_qualification?, :is_ielts?, :is_toefl?, :is_other?,
-               to: :state_store
     end
   end
 

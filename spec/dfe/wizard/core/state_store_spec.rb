@@ -8,7 +8,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
       include DfE::Wizard
 
       def steps_processor
-        DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+        DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
           graph.add_node :start, DBSSteps::Start
           graph.add_node :what_service, DBSSteps::WhatService
           graph.add_node :personal_details, DBSSteps::PersonalDetails
@@ -47,7 +47,6 @@ RSpec.describe DfE::Wizard::Core::StateStore do
         @logger ||= DfE::Wizard::Logger.new(Rails.logger)
       end
 
-      delegate :has_previous_names?, to: :state_store
     end
   end
 

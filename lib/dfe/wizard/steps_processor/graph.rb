@@ -37,7 +37,10 @@ module DfE
       class Graph < Base
         # Builds a wizard graph, yielding the DSL so the caller can add nodes/edges.
         #
-        # @param wizard [Object] The wizard instance (for method predicates)
+        # @param wizard [Object] The wizard instance
+        # @param predicate_caller [Object] Object to call predicate methods on.
+        #   Typically the state_store, so predicates like `:needs_permission?` are called
+        #   on the state store directly, keeping predicate logic in the state store.
         # @yieldparam dsl [DSL] The graph DSL builder
         # @return [Graph]
         #
@@ -45,15 +48,15 @@ module DfE
         # @raise [ArgumentError] If root node not set
         #
         # @example
-        #   Graph.draw(wizard) do |g|
-        #     g.add_node :step1, Step1
-        #     g.root :step1
+        #   Graph.draw(wizard, predicate_caller: state_store) do |g|
+        #     g.add_node :nationality, NationalityStep
+        #     g.add_conditional_edge from: :nationality, when: :needs_visa?, then: :visa, else: :review
         #   end
-        def self.draw(wizard)
+        def self.draw(wizard, predicate_caller:)
           raise ArgumentError, 'A block must be given to Graph.draw' unless block_given?
 
-          graph = new(wizard)
-          dsl = DSL.new(graph.registry, wizard)
+          graph = new(wizard, predicate_caller:)
+          dsl = DSL.new(graph.registry, wizard, predicate_caller:)
           yield(dsl)
 
           unless graph.root_step
@@ -66,11 +69,13 @@ module DfE
         attr_reader :registry, :resolver
 
         # @param wizard [Object] The wizard instance
+        # @param predicate_caller [Object] Object to call predicate methods on
         # @api public
-        def initialize(wizard)
+        def initialize(wizard, predicate_caller:)
           @wizard = wizard
+          @predicate_caller = predicate_caller
           @registry = Registry.new
-          @resolver = NavigationResolver.new(registry: @registry, wizard:)
+          @resolver = NavigationResolver.new(registry: @registry, wizard:, predicate_caller:)
         end
 
         # Return the root (starting) step for this graph.
@@ -100,7 +105,7 @@ module DfE
           return @registry.root_node if @registry.root_node
 
           if @registry.conditional_root_block
-            @registry.conditional_root_block.call(@wizard.state_store)
+            @registry.conditional_root_block.call(@predicate_caller)
           elsif @registry.conditional_root_method
             @wizard.method(@registry.conditional_root_method).call
           end
