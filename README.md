@@ -1,85 +1,88 @@
-# DfE::Wizard — Multi-Step Form Framework for Ruby on Rails
+# DfE::Wizard
 
-**A powerful, flexible wizard framework for building complex multi-step forms with
-conditional branching, state management, logging and testing and auto generated documentation.**
+A multi-step form framework for Ruby on Rails applications.
 
-- **Version**: 1.0.0.beta
-
-DfE::Wizard 1.0.0 is currently in **beta**, and is ideal for people who want to experiment with its API,
-patterns, and behaviours before the official 1.0 release.
-
-Please use it in non-critical projects or in development environment first, report bugs, and share
-feedback so the final version can be more stable and developer-friendly.
-
-For history purposes 0.1.x version will be maintained in a separate branch but will be only to fix
-bugs (see 0-stable).
+**Version**: 1.0.0.beta
 
 ---
 
 ## Table of Contents
 
-1. [Architecture Overview](#architecture-overview)
+1. [Introduction](#introduction)
 2. [Installation](#installation)
 3. [Core Concepts](#core-concepts)
-   - [Steps Processor (Flow)](#steps-processor-flow)
-   - [Step (Form Object)](#step-form-object)
-   - [State Store](#state-store)
-   - [Repository](#repository)
-   - [Step Operators (Optional)](#step-operators-optional)
-   - [Routing (Optional)](#routing-optional)
-   - [Logging (Optional)](#logging-optional)
-   - [Inspect (Optional)](#inspect-optional)
-4. [Quick Start](#quick-start)
-5. [Usage Guide](#usage-guide)
-5. [Testing](#testing)
-7. [Auto generated documentation](#auto-generated-documentation)
-8. [Wizard Examples](#wizard-examples)
-9. [API Reference](#api-reference)
-10. [Troubleshooting](#troubleshooting)
-11. [Support](#support)
-12. [Contact](#contact)
+4. [Data Flow](#data-flow)
+5. [Getting Started](#getting-started)
+6. [Navigation](#navigation)
+7. [Conditional Branching](#conditional-branching)
+8. [Check Your Answers](#check-your-answers)
+9. [Step Operators](#step-operators)
+10. [Testing](#testing)
+11. [Auto-generated Documentation](#auto-generated-documentation)
+12. [In Depth: Repositories](#in-depth-repositories)
+13. [In Depth: Steps](#in-depth-steps)
+14. [In Depth: Conditional Edges](#in-depth-conditional-edges)
+15. [In Depth: Route Strategies](#in-depth-route-strategies)
+16. [Advanced: Custom Implementations](#advanced-custom-implementations)
+17. [Examples](#examples)
+18. [Troubleshooting](#troubleshooting)
 
 ---
 
-## Architecture Overview
+## Introduction
+
+DfE::Wizard helps you build multi-step forms (wizards) with:
+
+- Conditional branching based on user answers
+- State persistence across requests
+- Validation at each step
+- "Check your answers" review pages
+- Auto-generated documentation
+
+### When to use this gem
+
+Use DfE::Wizard when you need:
+
+- A form split across multiple pages
+- Different paths based on user input
+- Data saved between steps
+- A review page before final submission
+
+### Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         WIZARD (Orchestrator)                           │
-│  - Manages step lifecycle                                               │
-│  - Provides high-level navigation API                                   │
-│  - Handles wizard high level orchestration                              │
-└──────────────────┬─────────────────────────────┬────────────────────────┘
-                   │                             │
-         ┌─────────▼────────────┐      ┌─────────▼──────────────┐
-         │   STEPS PROCESSOR    │      │   STATE MANAGEMENT     │
-         │   (Flow Definition)  │      │                        │
-         │                      │      │ - StateStore           │
-         │ - Graph structure    │      │ - Flat→Nested transform│
-         │ - Transitions        │      │ - Metadata tracking    │
-         │ - Branching flow     │      │ - Branching predicates │
-         │ - Path resolution    │      └────────┬───────────────┘
-         └──────────┬───────────┘               │
-                    │                           │
-                    │        ┌──────────────────┴─────────────────┐
-                    │        │                                    │
-         ┌──────────▼────────▼──────────────────┐    ┌────────────▼──────┐
-         │        STATE STORE (Bridge)          │    │   REPOSITORY      │
-         │                                      │    │   (Persistence)   │
-         │ - Read/Write delegation             │     │ - Redis           │
-         │ - Attribute validation              │     │ - Session/Cache   │
-         │ - Context binding                   │     │ - In-Memory       │
-         │ - Operation execution               │     │ - Database        │
-         └──────────────────────────────────────┘    └───────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                           WIZARD                                │
+│                      (Orchestrator)                             │
+│                                                                 │
+│  Coordinates everything: steps, navigation, validation, state  │
+└───────────────┬─────────────────────────────┬───────────────────┘
+                │                             │
+      ┌─────────▼──────────┐        ┌─────────▼──────────┐
+      │  STEPS PROCESSOR   │        │    STATE STORE     │
+      │  (Flow Definition) │        │  (Data + Logic)    │
+      │                    │        │                    │
+      │  Defines which     │        │  Holds all data    │
+      │  steps exist and   │        │  and branching     │
+      │  how they connect  │        │  predicates        │
+      └────────────────────┘        └─────────┬──────────┘
+                                              │
+                                    ┌─────────▼──────────┐
+                                    │    REPOSITORY      │
+                                    │   (Persistence)    │
+                                    │                    │
+                                    │  Session, Redis,   │
+                                    │  Database, Memory  │
+                                    └────────────────────┘
 
-         ┌──────────────────────────────────────┐    ┌───────────────────┐
-         │   STEP (Form Object)                 │    │  OPERATIONS       │
-         │                                      │    │  (Pipelines)      │
-         │ - ActiveModel validations            │    │                   │
-         │ - Attributes with types              │    │ - Validate        │
-         │ - serializable_data for persistence │     │ - Persist         │
-         │ - Rails form helpers support         │    │ - Custom ops      │
-         └──────────────────────────────────────┘    └───────────────────┘
+      ┌────────────────────┐
+      │       STEP         │
+      │   (Form Object)    │
+      │                    │
+      │  Attributes,       │
+      │  validations,      │
+      │  one per screen    │
+      └────────────────────┘
 ```
 
 ---
@@ -92,6 +95,8 @@ Add to your Gemfile:
 gem 'dfe-wizard', require: 'dfe/wizard', github: 'DFE-Digital/dfe-wizard', tag: 'v1.0.0.beta'
 ```
 
+Then run:
+
 ```bash
 bundle install
 ```
@@ -100,1746 +105,1810 @@ bundle install
 
 ## Core Concepts
 
-### Steps Processor (Flow)
+Before building a wizard, understand these five components:
 
-The **Steps Processor** defines the wizard's structure: which steps exist, how they connect,
-and how to navigate between them.
+| Component | Purpose | You Create |
+|-----------|---------|------------|
+| **Repository** | Where data is stored (Session, Redis, DB) | Choose one |
+| **State Store** | Holds data + branching logic | Yes, one per wizard |
+| **Step** | One form screen with fields + validations | Yes, one per screen |
+| **Steps Processor** | Defines flow between steps | Yes, inside wizard |
+| **Wizard** | Orchestrates everything | Yes, one per wizard |
 
-#### What it does:
+### 1. Repository
 
-- Defines the step graph (linear or conditional branching)
-- Manages transitions and path traversal
-- Calculates next/previous steps based on current state
-- Determines which steps are reachable given user data
+The Repository is the **storage backend**. It persists wizard data between HTTP requests.
 
-The gem provides two steps processors:
+| Repository | Storage | Use Case |
+|------------|---------|----------|
+| `InMemory` | Ruby hash | Testing only |
+| `Session` | Rails session | Simple wizards |
+| `Cache` | Rails.cache | Fast, temporary |
+| `Redis` | Redis server | Production, distributed |
+| `Model` | ActiveRecord model | Save to model each step |
+| `WizardState` | Database (JSONB) | Persistent wizard state |
 
-* Linear: very simple wizards. Very rarely usage.
-* Graph: real world wizards.
-
-Although you can create your own if the above doesn't solve your problem, as long you respect
-the interface:
-
-| Method             | Short explanation                                                                                        |
-|--------------------|----------------------------------------------------------------------------------------------------------|
-| `next_step`        | Returns next step ID from a given or current step, returns `nil` when there is no valid transition.      |
-| `previous_step`    | Returns the previous step ID by reversing traversal from a given or current step, returns `nil` at root. |
-| `find_step`        | Looks up and returns the step class for a given step/node ID, or `nil` if the step is not defined.       |
-| `step_definitions` | Returns a hash of all steps `{ step_id => step_class }` defined in the processor.                        |
-| `path_traversal`   | Returns an array, path from root step to a target (or current) step, or `[]` if unreachable.             |
-| `metadata`         | Returns a rich hash describing structure type, root, steps, etc for documentation and any custom tools.  |
-
-
-#### Example: Linear Processor
+See [In Depth: Repositories](#in-depth-repositories) for detailed examples and encryption.
 
 ```ruby
-class SimpleWizard
-  include DfE::Wizard
+# Testing
+repository = DfE::Wizard::Repository::InMemory.new
 
-  def steps_processor
-    processor = Linear.draw(self) do |linear|
-      linear.add_step :name, NameStep
-      linear.add_step :email, EmailStep
-      linear.add_step :phone, PhoneStep
-      linear.add_step :review, ReviewStep
-    end
-  end
-end
+# Production - Session
+repository = DfE::Wizard::Repository::Session.new(
+  session: session,
+  key: :my_wizard
+)
 
-# Usage
-wizard = SimpleWizard.new
-wizard.current_step_name    # => :name
-wizard.next_step            # => :email
-wizard.previous_step        # => nil
-wizard.flow_path            # => [:name, :email, :phone, :review]
-wizard.in_flow?(:phone)     # => true
-wizard.saved?(:phone)       # => false
-wizard.valid?(:phone)       # => false
+# Production - Database
+model = WizardState.find_or_create_by(key: :my_wizard, user_id: current_user.id)
+repository = DfE::Wizard::Repository::WizardState.new(model: model)
 ```
 
-#### Example: Graph Processor (Conditional Branching)
+### 2. State Store
 
-Linear is too basic. Usually many wizard has conditional and more complicated scenarios.
+The State Store is the **bridge between your wizard and the repository**. It:
 
-For this we will use a graph data structure.
-
-**As an example**, let's implement a simple wizard like a Personal Information Wizard.
-
-A wizard that collects personal information with conditional flows
-
-**Steps:**
-1. Name & Date of Birth
-2. Nationality
-3. Right to Work/Study *(conditional)*
-4. Immigration Status *(conditional)*
-5. Review
-
-**Conditionals:**
-- UK/Irish nationals skip visa questions
-- Non-UK nationals may need immigration status info if they have right to work
-
-Here a diagram of the wizard that we will implement below:
-
-```mermaid
-flowchart TD
-  name_and_date_of_birth["Name And Date Of Birth"]
-  nationality["Nationality"]
-  right_to_work_or_study["Right To Work Or Study"]
-  immigration_status["Immigration Status"]
-  review["Review"]
-  name_and_date_of_birth --> nationality
-  immigration_status --> review
-  nationality -->|Non-UK/Non-Irish: ✓ yes| right_to_work_or_study
-  nationality -->|Non-UK/Non-Irish: ✗ no| review
-  right_to_work_or_study -->|Right to work or study?: ✓ yes| immigration_status
-  right_to_work_or_study -->|Right to work or study?: ✗ no| review
-```
-
-So now we need to define a method called #steps_processor which will contain only the definitions
-of the flow and will be evaluated when calling #next_step, #previous_step, etc.
+- Reads/writes data via the repository
+- Provides attribute access (`state_store.first_name`)
+- Contains **branching predicates** (methods that decide which path to take)
 
 ```ruby
-class PersonalInformationWizard
-  include DfE::Wizard
-
-  delegate :needs_permission_to_work_or_study?,
-           :right_to_work_or_study?,
-           to: :state_store
-
-  def steps_processor
-    DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
-      graph.add_node :name_and_date_of_birth, Steps::NameAndDateOfBirth
-      graph.add_node :nationality, Steps::Nationality
-      graph.add_node :right_to_work_or_study, Steps::RightToWorkOrStudy
-      graph.add_node :immigration_status, Steps::ImmigrationStatus
-      graph.add_node :review, Steps::Review
-
-      graph.root :name_and_date_of_birth
-
-      graph.add_edge from: :name_and_date_of_birth, to: :nationality
-      graph.add_conditional_edge(
-        from: :nationality,
-        when: :needs_permission_to_work_or_study?,
-        then: :right_to_work_or_study,
-        else: :review,
-      )
-      graph.add_conditional_edge(
-        from: :right_to_work_or_study,
-        when: :right_to_work_or_study?,
-        then: :immigration_status,
-        else: :review,
-      )
-      graph.add_edge from: :immigration_status, to: :review
-    end
-  end
-end
-
 module StateStores
-  class PersonalInformation
+  class Registration
     include DfE::Wizard::StateStore
 
-    def needs_permission_to_work_or_study?
-      # nationalities is an attribute from the Steps::Nationality
-      !Array(nationalities).intersect?(%w[british irish])
+    # Branching predicates - these decide the flow
+    def needs_visa?
+      nationality != 'british'
     end
 
-    def right_to_work_or_study?
-      # right_to_work_or_study is an attribute from the Steps::RightToWorkOrStudy
-      right_to_work_or_study == 'yes'
-    end
-  end
-end
-```
-
-Now we can define a controller to handle everything now:
-
-```ruby
-  class WizardController < ApplicationController
-    before_action :assign_wizard
-
-    def new; end
-
-    def create
-      if @wizard.save_current_step
-        redirect_to @wizard.next_step_path
-      else
-        render :new
-      end
+    def has_right_to_work?
+      right_to_work == 'yes'
     end
 
-    def assign_wizard
-      state_store = StateStores::PersonalInformation.new(
-        repository: DfE::Wizard::Repository::Session.new(session:, key: :personal_information),
-      )
-
-      @wizard = PersonalInformationWizard.new(
-        current_step:,
-        current_step_params: params,
-        state_store:,
-      )
-    end
-
-    def current_step
-      # define current step here. Could be via params (but needs validation!) or hard coded, etc
-      :name_and_date_of_birth # or params[:step]
-    end
-  end
-```
-
-Now we can play with both wizard and the state store:
-```ruby
-# Usage with conditional data
-state_store = StateStore::PersonalInformation.new # we will see state stores more below
-wizard = PersonalInformationWizard.new(state_store:)
-wizard.current_step_name # => :name_and_date_of_birth
-
-wizard.previous_step # => nil
-wizard.next_step # => :nationality
-
-wizard.current_step_name = :nationality
-
-# User selects UK
-state_store.write(nationality: 'British')
-wizard.next_step # => :review (skips work visa)
-
-# User selects another nationality
-state_store.write(nationality: 'Brazil')
-wizard.next_step # => :right_to_work_or_study (needs visa info)
-wizard.previous_step # => :name_and_date_of_birth
-
-wizard.current_step_name = :right_to_work_or_study
-wizard.previous_step # => :nationality
-state_store.write(right_to_work_or_study: 'yes')
-wizard.next_step # => :immigration_status
-
-state_store.write(right_to_work_or_study: 'no')
-wizard.next_step # => :review (skips immigration_status)
-
-state_store.write(first_name: 'John', last_name: 'Smith', nationality: 'British')
-wizard.current_step_name = :review
-wizard.flow_path # => [:name_and_date_of_birth, :nationality, :review]
-wizard.saved_path # => [:name_and_date_of_birth, :nationality]
-wizard.valid_path # => [:name_and_date_of_birth, :nationality]
-
-wizard.flow_steps # => [#<Steps::NameAndDateOfBirth ...>, #<Steps::Nationality ...>, #<Steps::Review>]
-wizard.saved_steps # => [#<Steps::NameAndDateOfBirth ...>, #<Steps::Nationality ...>]
-wizard.valid_steps # => [#<Steps::NameAndDateOfBirth ...>, #<Steps::Nationality ...>]
-
-wizard.in_flow?(:review) # => true
-wizard.in_flow?(:right_to_work_or_study) # => false
-
-wizard.saved?(:right_to_work_or_study) # => false
-wizard.saved?(:nationality) # => true
-
-wizard.valid_path_to?(:review) # => true
-
-state_store.write(first_name: nil) # Assuming Steps::NameAndDateOfBirth has validates presence
-wizard.valid_path_to?(:review) # => false
-```
-
-#### Binary conditionals
-
-Simple transition from one step to the other. **Use case:** Always proceed to next step:
-
-```ruby
-graph.add_edge from: :name_and_date_of_birth, to: :nationality
-graph.add_edge from: :immigration_status, to: :review
-```
-
-Simple conditionals. **Use case**: when there is only one decision that could go to 2 steps.
-
-```ruby
-# Branch based on nationality
-graph.add_conditional_edge(
-  from: :nationality,
-  when: :needs_permission_to_work_or_study?,
-  then: :right_to_work_or_study,
-  else: :review,
-)
-
-# Branch based on visa status
-graph.add_conditional_edge(
-  from: :right_to_work_or_study,
-  when: :right_to_work_or_study?,
-  then: :immigration_status,
-  else: :review,
-  label: 'Right to work or study?' # for auto-generated documentation
-)
-```
-
-**Predicates**  defined in state store determine path.
-
-```ruby
-# State store predicates determine branching
-module StateStores
-  class PersonalInformation
-    def needs_permission_to_work_or_study?
-      !['british', 'irish'].include?(nationality)
-    end
-
-    def right_to_work_or_study?
-      right_to_work_or_study == 'yes'
+    # Helper methods
+    def full_name
+      "#{first_name} #{last_name}"
     end
   end
 end
 ```
 
-### Important gotcha when building predicates
+**Important**: Step attributes (like `first_name`, `nationality`) are automatically available in the state store after the wizard initialises.
 
-**Observation**: The wizard calls the flow path at least 1 or 2 times on next step/previous step,
-so **if you are calling an API** you need to cache that somehow!!!!!!!
+### 3. Step
 
-### Multiple Conditional Edges. **Use case**: N-Way Branching.
+A Step is a **form object representing one screen**. Each step has:
 
-Problem: Need to route to 3+ different steps based on state
-Use when: More than 2 possible next steps from one step
-
-```ruby
-graph.add_multiple_conditional_edges(
-  from: :visa_type_selection,
-  branches: [
-    { when: :student_visa?, then: :student_visa_details },
-    { when: :work_visa?, then: :work_visa_details },
-    { when: :family_visa?, then: :family_visa_details },
-    { when: :tourist_visa?, then: :tourist_visa_details }
-  ],
-  default: :other_visa_details
-)
-```
-
-- **Evaluated in order** - First match wins
-- **Default fallback** - When no condition matches
-- **4+ destinations** from one step
-
-Example: Visa Type Routing
-
-```ruby
-# State store predicates
-def student_visa?
-  visa_type == 'student'
-end
-
-def work_visa?
-  visa_type == 'work'
-end
-
-def family_visa?
-  visa_type == 'family'
-end
-
-def tourist_visa?
-  visa_type == 'tourist'
-end
-```
-
-Order Matters!:
-
-```ruby
-graph.add_multiple_conditional_edges(
-  from: :age_verification,
-  branches: [
-    { when: :under_18?, then: :parental_consent },    # Check FIRST
-    { when: :over_65?, then: :senior_discount },
-    { when: :adult?, then: :standard_process },    # More general
-  ],
-)
-```
-
-- **Specific conditions first** - Avoid unreachable branches
-- **More general last** - Catches remaining cases
-- **Order = priority**
-
-### Custom branching
-
-Custom Branching Edge. **Use case:** If you wanna custom and not use DSL:
-
-**Use when:**
-- Step determines multiple possible destinations
-- Complex business logic decides routing
-- Destination depends on external service
-
-```ruby
-graph.add_custom_branching_edge(
-  from: :payment_processing,
-  conditional: :determine_payment_outcome,
-  potential_transitions: [
-    { label: 'Success', nodes: [:receipt] },
-    { label: 'Partial', nodes: [:payment_plan] },
-    { label: 'Failed', nodes: [:payment_retry] },
-    { label: 'Fraud', nodes: [:security_check] },
-    { label: 'Manual Review', nodes: [:admin_review] }
-  ]
-)
-```
-
-- **Method returns step symbol** directly
-- **potential_transitions** - For documentation only
-- **Full control** over routing logic
-
-```ruby
-def determine_payment_outcome
-  payment_result = PaymentService.process(
-    amount: state_store.amount,
-    card: state_store.card_details
-  )
-
-  case payment_result.status
-  when 'success' then :receipt
-  when 'partial' then :payment_plan
-  when 'failed' then :payment_retry
-  when 'fraud_detected' then :security_check
-  else :admin_review
-  end
-end
-
-# Returns step symbol - wizard navigates there
-# Can include ANY Ruby logic
-```
-
-Custom Branching: Real-World Example
-
-```ruby
-def route_application
-  # Call external API this needs to be cached!!!!!
-  eligibility = EligibilityService.check(application_data)
-
-  return :approved if eligibility.score > 80
-  return :additional_documents if eligibility.score > 60
-  return :interview_required if eligibility.needs_clarification?
-  return :rejected if eligibility.score < 40
-
-  :manual_review # Default
-end
-```
-
-**External service determines routing** - Full flexibility
-
-### When to Use Each Type
-
-**Binary Conditional** (`add_conditional_edge`)
-- ✅ Yes/No decisions
-- ✅ Two possible paths
-- ✅ Simple predicate check
-
-**Multiple Conditional** (`add_multiple_conditional_edges`)
-- ✅ 3+ mutually exclusive paths
-- ✅ Category-based routing
-- ✅ Clear, discrete options
-
-**Custom Branching** (`add_custom_branching_edge`)
-- ✅ Complex calculation needed
-- ✅ External service determines path
-- ✅ Dynamic destination logic
-
-
-Comparison Example:
-
-```ruby
-# Binary: UK vs Non-UK
-graph.add_conditional_edge(
-  from: :nationality,
-  when: :uk_national?,
-  then: :employment,
-  else: :visa_check
-)
-
-# Multiple: Visa categories
-graph.add_multiple_conditional_edges(
-  from: :visa_type,
-  branches: [
-    { when: :student?, then: :student_path },
-    { when: :work?, then: :work_path },
-    { when: :family?, then: :family_path }
-  ]
-)
-
-# Custom: Dynamic API result
-graph.add_custom_branching_edge(
-  from: :eligibility,
-  conditional: :check_external_api,
-  potential_transitions: [...]
-)
-```
-
-### Dynamic root
-
-A dynamic root is configured via graph.conditional_root, which receives a block and a list of potential roots, for example:
-
-```ruby
-graph.conditional_root(potential_root: %i[add_a_level_to_a_list what_a_level_is_required]) do |state_store|
-  if state_store.any_a_levels?
-    :add_a_level_to_a_list
-  else
-    :what_a_level_is_required
-  end
-end
-```
-
-At runtime, the block inspects the state_store and returns one of the allowed root step IDs,
-so users with existing A-levels start at :add_a_level_to_a_list while others start at :what_a_level_is_required.
-
-Potential root is required for documentation!
-
-Why potential_root is required:
-
-* `potential_root:` declares the set of valid root candidates and is mandatory for conditional
-* roots so the graph can still be fully documented, visualised, and validated at design time.
-
-### Skip steps
-
-**Skip steps**. Sometimes you need to skip a step because of a feature flag, existing data, etc.
-
-A skipped step is a node that exists in the graph but is dynamically omitted from the user’s path
-when a skip_when predicate evaluates to true, for example
-`skip_when: :single_accredited_provider_or_self_accredited?` on `:accredited_provider`.
-
-Conceptually, the node stays in the model (so visualisations, docs, tests, and future changes can
-still reason about it), but navigation treats it as if it were already completed and jumps over it.
-
-example:
-
-```ruby
-graph.add_node(:name, Name)
-graph.add_node(:age, Age)
-graph.add_node(:visa, Visa)
-graph.add_node(:some_experimental_feature, SomeExperimentalFeature, skip_when: :experimental_feature_inactive?)
-graph.add_node(:schools, Schools, skip_when: :single_school?) # e.g choose single school for user
-graph.add_node(:review, Review)
-
-graph.add_edge(from: :name, to: :age)
-graph.add_edge(from: :age, to: :visa)
-graph.add_edge(from: :visa, to: :some_experimental_feature)
-graph.add_edge(from: :some_experimental_feature, to: :schools)
-graph.add_edge(from: :schools, to: :review)
-
-## on state store
-def single_school?
- # logic that returns true or false
-end
-
-def experimental_feature_inactive?
- # logic that returns true or false
-end
-```
-
-Why skipping is important:
-
-* Without explicit skipping, a conditional edge on step A must decide not only whether to go to B,
-but also where to go after B if B is not needed, leading to logic like:
-  * “if X then go to B else go to C, but if Y also skip straight to D”, which quickly gets messy as you add “next next next” possibilities.
-* With skipping, conditional edges remain local: A still points to B, B still points to C, and only B knows when it should be removed from the path, keeping branching logic simpler, more testable, and easier to extend over time.
-
-Be careful with this feature, use this feature wisely!
-
-### Flow vs Saved vs Valid
-
-The gem provide methods for flow control:
-
-* `flow_path` shows the theoretical route a user would take through the wizard given their answers.
-* `saved_path` shows the steps that already have data stored.
-* `valid_path` shows the subset of those steps whose data passes validation.
-
-So using all three together tells you:
-
-1. `flow_path` where the user could go
-2. `saved_path` where they have been
-3. `valid_path` which parts of their journey are currently valid
-
-Use cases:
-
-1. If user tries to jump steps through URL manipulation
-2. Progress bars
-3. Percentage completion
-
-```ruby
-# Theoretical path (based on state - only evaluate branching)
-wizard.flow_path
-# => [:name, :nationality, :right_to_work_or_study, :immigration, :review]
-wizard.flow_path(:nationality) # flow path from root to a target
-# => [:name, :nationality]
-wizard.flow_path(:unreachable_step_by_current_flow) # => []
-
-wizard.flow_steps # => [<#Name>, ...]
-wizard.in_flow?(:nationality) # => true
-
-# Steps with any data
-wizard.saved_path
-# => [:name, :nationality, :right_to_work_or_study]
-wizard.saved_steps # => [<#Name>, ...]
-wizard.saved?(:immigration_status) # => false
-
-# Steps with VALID data
-wizard.valid_path
-# => [:name, :nationality]
-# (right_to_work_or_study has validation errors)
-wizard.valid_steps # => [<#Name>, ...]
-wizard.valid_path_to?(:review) # => false # right_to_work_or_study has errors
-wizard.valid_path_to?(:immigration_status) # => false # path is unreachable based on answers
-```
-
-**Use together** for complete picture:
-- `flow_path` - Where going, theoretical path based on current state & only evaluates branching!
-- `saved_path` - Where been, what the current state holds data for each step
-- `valid_path` - What's confirmed, steps that are on the flow and are valid!
-
-With this we can create logic for:
-
-- All steps leading to target are valid
-- Guards against URL manipulation
-- Enforces step-by-step completion
-
-**Usage:**
-
-```ruby
-before_action :validate_access
-
-def validate_access
-  redirect_to wizard_start_path unless wizard.valid_path_to?(params[:step])
-end
-```
-
----
-
-### Step (Form Object)
-
-A **Step** is a standalone form object representing one screen of the wizard. Each step encapsulates:
-- Input fields (attributes)
-- Validation rules
-- Parameter whitelisting
-- Serialization for storage
-
-#### Creating a Step
+- Attributes (form fields)
+- Validations
+- Permitted parameters
 
 ```ruby
 module Steps
   class PersonalDetails
     include DfE::Wizard::Step
 
-    # Define fields with types
+    # Form fields
     attribute :first_name, :string
     attribute :last_name, :string
     attribute :date_of_birth, :date
-    attribute :nationality, :string
 
-    # Validation rules
+    # Validations
     validates :first_name, :last_name, presence: true
     validates :date_of_birth, presence: true
-    validate :some_age_validation
 
-    # Strong parameters allowlist
+    # Strong parameters
     def self.permitted_params
-      %i[first_name last_name date_of_birth nationality]
-    end
-
-    private
-
-    def some_age_validation
-      # ...
+      %i[first_name last_name date_of_birth]
     end
   end
 end
 ```
 
-#### Using Steps in the Wizard
+### 4. Steps Processor
+
+The Steps Processor **defines the flow** - which steps exist and how they connect.
 
 ```ruby
-# Get current step
-current_step = wizard.current_step
-current_step.first_name  # => "John"
+def steps_processor
+  DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+    # Register all steps
+    graph.add_node :personal_details, Steps::PersonalDetails
+    graph.add_node :contact, Steps::Contact
+    graph.add_node :review, Steps::Review
 
-# Validate step
-if current_step.valid?
-  wizard.save_current_step
-else
-  current_step.errors[:first_name]  # => ["can't be blank"]
+    # Set the starting step
+    graph.root :personal_details
+
+    # Define transitions
+    graph.add_edge from: :personal_details, to: :contact
+    graph.add_edge from: :contact, to: :review
+  end
 end
-
-# or in the controller you could do:
-@wizard = PersonalInformationWizard.new(
-  current_step: :name_and_date_of_birth,
-  current_step_params: params,
-  state_store:,
-)
-
-if @wizard.save_current_step
-  redirect_to @wizard.next_step_path
-else
-  render :new
-end
-
-# Serialize for storage
-current_step.serializable_data
-# => { first_name: "John", last_name: "Doe", date_of_birth: <Date> }
-
-# Get a specific step (hydrated from state)
-personal_details = wizard.step(:personal_details)
-personal_details.first_name  # => "John"
 ```
 
-**Step Data Flow:**
+**Key point**: `predicate_caller: state_store` tells the graph where to find branching methods (like `needs_visa?`).
 
-```
-┌─────────────────────────────────────────────┐
-│     HTTP Request (Form Submission)          │
-│  { personal_details: { first_name: ... } } │
-└──────────────────┬──────────────────────────┘
-                   │
-        ┌──────────▼──────────────┐
-        │  Strong Parameters      │
-        │  (permitted_params)     │
-        └──────────┬──────────────┘
-                   │
-      ┌────────────▼─────────────────┐
-      │  Step Instantiation          │
-      │  steps.PersonalDetails.new   │
-      └────────────┬────────────────┘
-                   │
-      ┌────────────▼────────────────┐
-      │  Validation                  │
-      │  step.valid?                 │
-      └────────────┬────────────────┘
-                   │
-                   YES  ─────────┐
-                   │             │
-                   NO            │
-                   │             │
-         ┌─────────▼───┐  ┌──────▼────────────┐
-         │  Errors     │  │ Serialization    │
-         │ Displayed   │  │ { first_name:... }
-         │ to User     │  │                  │
-         └─────────────┘  └──────┬───────────┘
-                                 │
-                        ┌────────▼────────┐
-                        │  State Store    │
-                        │  .write(data)   │
-                        └────────┬────────┘
-                                 │
-                        ┌────────▼────────┐
-                        │  Repository     │
-                        │  (Persist)      │
-                        └─────────────────┘
+### 5. Wizard
+
+The Wizard **orchestrates everything**. It must implement two methods:
+
+```ruby
+class RegistrationWizard
+  include DfE::Wizard
+
+  def steps_processor
+    # Define your flow (see above)
+  end
+
+  def route_strategy
+    # Define URL generation (see Optional Features)
+  end
+end
 ```
 
 ---
 
-### State Store
+## Data Flow
 
-The **State Store** bridges the wizard and repository. It:
-- Provides dynamic attribute access from the steps
-- Delegates reads/writes to the repository
-- Binds context (wizard instance)
+Understanding data flow is essential. Here's what happens during a wizard:
 
-#### State Store Features
+### Write Flow (User submits a form)
 
-Assuming we have a step:
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  1. HTTP Request                                                 │
+│     POST /wizard/personal_details                                │
+│     params: { personal_details: { first_name: "Sarah" } }        │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  2. Controller creates Wizard                                    │
+│                                                                  │
+│     @wizard = RegistrationWizard.new(                            │
+│       current_step: :personal_details,                           │
+│       current_step_params: params,                               │
+│       state_store: state_store                                   │
+│     )                                                            │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  3. Wizard extracts step params                                  │
+│                                                                  │
+│     Uses Step.permitted_params to filter:                        │
+│     { first_name: "Sarah" }                                      │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  4. Step validates                                               │
+│                                                                  │
+│     step = Steps::PersonalDetails.new(first_name: "Sarah")       │
+│     step.valid?  # runs ActiveModel validations                  │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+              ┌──────────┴──────────┐
+              │                     │
+         Valid?                 Invalid?
+              │                     │
+              ▼                     ▼
+┌─────────────────────┐   ┌─────────────────────┐
+│  5a. Save to State  │   │  5b. Return Errors  │
+│                     │   │                     │
+│  state_store.write( │   │  step.errors        │
+│    first_name:      │   │  # => { last_name:  │
+│      "Sarah"        │   │  #   ["can't be     │
+│  )                  │   │  #    blank"] }     │
+└──────────┬──────────┘   └─────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  6. Repository persists                                          │
+│                                                                  │
+│     Session/Redis/Database stores:                               │
+│     { first_name: "Sarah", last_name: nil, ... }                 │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Read Flow (Loading a step)
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  1. HTTP Request                                                 │
+│     GET /wizard/contact                                          │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  2. Repository reads persisted data                              │
+│                                                                  │
+│     { first_name: "Sarah", email: "sarah@example.com" }          │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  3. State Store provides data                                    │
+│                                                                  │
+│     state_store.first_name  # => "Sarah"                         │
+│     state_store.email       # => "sarah@example.com"             │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  4. Wizard hydrates Step                                         │
+│                                                                  │
+│     step = wizard.current_step                                   │
+│     # Step is pre-filled with saved data                         │
+│     step.email  # => "sarah@example.com"                         │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Key Points
+
+1. **Data is stored flat** - All attributes from all steps go into one hash
+2. **Repository handles persistence** - You choose where (session, Redis, DB)
+3. **State Store adds behaviour** - Predicates, helpers, attribute access
+4. **Steps are form objects** - They validate but don't persist directly
+
+---
+
+## Getting Started
+
+Let's build a registration wizard with conditional branching. Users provide their name, nationality, and email. Non-UK nationals are asked for visa details.
+
+```
+┌──────┐     ┌─────────────┐     ┌──────┐     ┌────────┐
+│ name │ ──▶ │ nationality │ ──▶ │ visa │ ──▶ │ email  │ ──▶ review
+└──────┘     └─────────────┘     └──────┘     └────────┘
+                   │                              ▲
+                   │     (UK national)            │
+                   └──────────────────────────────┘
+```
+
+### Step 1: Create the Steps
 
 ```ruby
+# app/wizards/steps/registration/name_step.rb
 module Steps
-  class NameAndDateOfBirth
-    include DfE::Wizard::Step
+  module Registration
+    class NameStep
+      include DfE::Wizard::Step
 
-    attribute :first_name, :string
-    attribute :last_name, :string
-    attribute :date_of_birth, :date
+      attribute :first_name, :string
+      attribute :last_name, :string
+
+      validates :first_name, :last_name, presence: true
+
+      def self.permitted_params
+        %i[first_name last_name]
+      end
+    end
+  end
+end
+
+# app/wizards/steps/registration/nationality_step.rb
+module Steps
+  module Registration
+    class NationalityStep
+      include DfE::Wizard::Step
+
+      NATIONALITIES = %w[british irish european other].freeze
+
+      attribute :nationality, :string
+
+      validates :nationality, presence: true, inclusion: { in: NATIONALITIES }
+
+      def self.permitted_params
+        %i[nationality]
+      end
+    end
+  end
+end
+
+# app/wizards/steps/registration/visa_step.rb
+module Steps
+  module Registration
+    class VisaStep
+      include DfE::Wizard::Step
+
+      attribute :visa_type, :string
+      attribute :visa_expiry, :date
+
+      validates :visa_type, :visa_expiry, presence: true
+
+      def self.permitted_params
+        %i[visa_type visa_expiry]
+      end
+    end
+  end
+end
+
+# app/wizards/steps/registration/email_step.rb
+module Steps
+  module Registration
+    class EmailStep
+      include DfE::Wizard::Step
+
+      attribute :email, :string
+
+      validates :email, presence: true, format: { with: URI::MailTo::EMAIL_REGEXP }
+
+      def self.permitted_params
+        %i[email]
+      end
+    end
+  end
+end
+
+# app/wizards/steps/registration/review_step.rb
+module Steps
+  module Registration
+    class ReviewStep
+      include DfE::Wizard::Step
+
+      def self.permitted_params
+        []
+      end
+    end
   end
 end
 ```
 
-And a simple state store:
+### Step 2: Create the State Store
+
 ```ruby
-class PersonalInformation
+# app/wizards/state_stores/registration_store.rb
+module StateStores
+  class RegistrationStore
+    include DfE::Wizard::StateStore
+
+    # Branching predicate - decides if visa step is shown
+    def needs_visa?
+      !%w[british irish].include?(nationality)
+    end
+
+    # Helper methods
+    def full_name
+      "#{first_name} #{last_name}"
+    end
+  end
+end
+```
+
+### Step 3: Create the Wizard
+
+```ruby
+# app/wizards/registration_wizard.rb
+class RegistrationWizard
+  include DfE::Wizard
+
+  def steps_processor
+    DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+      # Register all steps
+      graph.add_node :name, Steps::Registration::NameStep
+      graph.add_node :nationality, Steps::Registration::NationalityStep
+      graph.add_node :visa, Steps::Registration::VisaStep
+      graph.add_node :email, Steps::Registration::EmailStep
+      graph.add_node :review, Steps::Registration::ReviewStep
+
+      # Set starting step
+      graph.root :name
+
+      # Define flow
+      graph.add_edge from: :name, to: :nationality
+
+      # Conditional: non-UK nationals go to visa, UK nationals skip to email
+      graph.add_conditional_edge(
+        from: :nationality,
+        when: :needs_visa?,
+        then: :visa,
+        else: :email
+      )
+
+      graph.add_edge from: :visa, to: :email
+      graph.add_edge from: :email, to: :review
+    end
+  end
+
+  def route_strategy
+    DfE::Wizard::RouteStrategy::NamedRoutes.new(
+      wizard: self,
+      namespace: 'registration'
+    )
+  end
+end
+```
+
+### Step 4: Create the Controller
+
+```ruby
+# app/controllers/registration_controller.rb
+class RegistrationController < ApplicationController
+  before_action :set_wizard
+
+  def show
+    @step = @wizard.current_step
+  end
+
+  def update
+    if @wizard.save_current_step
+      redirect_to @wizard.next_step_path
+    else
+      @step = @wizard.current_step
+      render :show
+    end
+  end
+
+  private
+
+  def set_wizard
+    state_store = StateStores::RegistrationStore.new(
+      repository: DfE::Wizard::Repository::Session.new(
+        session:,
+        key: :registration
+      )
+    )
+
+    @wizard = RegistrationWizard.new(
+      current_step: params[:step]&.to_sym || :name,
+      current_step_params: params,
+      state_store:
+    )
+  end
+end
+```
+
+### Step 5: Create Routes
+
+```ruby
+# config/routes.rb
+Rails.application.routes.draw do
+  get 'registration/:step', to: 'registration#show', as: :registration
+  patch 'registration/:step', to: 'registration#update'
+end
+```
+
+### Step 6: Create the Views
+
+Use a shared layout and step-specific form partials:
+
+```erb
+<!-- app/views/registration/new.html.erb -->
+<%= govuk_back_link href: @wizard.previous_step_path || root_path %>
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l"><%= yield(:page_title) %></h1>
+
+    <%= form_with model: @wizard.current_step,
+          url: @wizard.current_step_path,
+          scope: @wizard.current_step_name do |form| %>
+
+      <%= form.govuk_error_summary %>
+      <%= render "registration/#{@wizard.current_step_name}/form", form: %>
+      <%= form.govuk_submit 'Continue' %>
+    <% end %>
+  </div>
+</div>
+```
+
+```erb
+<!-- app/views/registration/name/_form.html.erb -->
+<% content_for :page_title, 'What is your name?' %>
+
+<%= form.govuk_text_field :first_name %>
+<%= form.govuk_text_field :last_name %>
+```
+
+```erb
+<!-- app/views/registration/nationality/_form.html.erb -->
+<% content_for :page_title, 'What is your nationality?' %>
+
+<%= form.govuk_collection_radio_buttons :nationality,
+    Steps::Registration::NationalityStep::NATIONALITIES,
+    :to_s, :humanize %>
+```
+
+```erb
+<!-- app/views/registration/visa/_form.html.erb -->
+<% content_for :page_title, 'Visa details' %>
+
+<%= form.govuk_text_field :visa_type %>
+<%= form.govuk_date_field :visa_expiry %>
+```
+
+---
+
+## Navigation
+
+### Step Navigation Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `current_step_name` | Symbol | Current step ID (`:email`) |
+| `current_step` | Step object | Hydrated step with data |
+| `next_step` | Symbol or nil | Next step ID |
+| `previous_step` | Symbol or nil | Previous step ID |
+| `root_step` | Symbol | First step ID |
+
+### Path Navigation Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `current_step_path` | String | URL for current step |
+| `next_step_path` | String or nil | URL for next step |
+| `previous_step_path` | String or nil | URL for previous step |
+
+### Flow Analysis Methods
+
+The wizard tracks three different "paths":
+
+```ruby
+# Given a wizard where user filled name and email, but email is invalid:
+
+wizard.flow_path
+# => [:name, :email, :review]
+# All steps the user COULD visit based on their answers
+
+wizard.saved_path
+# => [:name, :email]
+# Steps that have ANY data saved
+
+wizard.valid_path
+# => [:name]
+# Steps that have VALID data (stops at first invalid)
+
+wizard.valid_path_to?(:review)
+# => false (email is invalid, can't reach review)
+
+wizard.in_flow?(:review)
+# => true (review is reachable based on answers)
+```
+
+### Understanding the Three Paths
+
+| Path | Question it answers |
+|------|---------------------|
+| `flow_path` | "What steps would the user visit?" |
+| `saved_path` | "What steps have data?" |
+| `valid_path` | "What steps are complete and valid?" |
+
+Use cases:
+
+```ruby
+# Progress indicator
+completed = wizard.valid_path.length
+total = wizard.flow_path.length
+progress = (completed.to_f / total * 100).round
+
+# Guard against URL manipulation
+before_action :validate_step_access
+
+def validate_step_access
+  unless wizard.valid_path_to?(params[:step].to_sym)
+    redirect_to wizard.current_step_path
+  end
+end
+```
+
+---
+
+## Conditional Branching
+
+Most wizards need different paths based on user input.
+
+### Simple Conditional (Yes/No)
+
+```ruby
+def steps_processor
+  DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+    graph.add_node :nationality, Steps::Nationality
+    graph.add_node :visa, Steps::Visa
+    graph.add_node :review, Steps::Review
+
+    graph.root :nationality
+
+    # If needs_visa? is true  → go to :visa
+    # If needs_visa? is false → go to :review
+    graph.add_conditional_edge(
+      from: :nationality,
+      when: :needs_visa?,
+      then: :visa,
+      else: :review
+    )
+
+    graph.add_edge from: :visa, to: :review
+  end
+end
+```
+
+The predicate `needs_visa?` is defined in your **State Store**:
+
+```ruby
+class RegistrationStore
   include DfE::Wizard::StateStore
 
-  def full_name
-    "#{first_name} #{last_name}" # first_name and last_name is available from the steps
-  end
-
-  def date_of_birth?
-    date_of_birth.present? # date_of_birth too
+  def needs_visa?
+    !%w[british irish].include?(nationality)
   end
 end
 ```
 
-The attributes `:first_name, :last_name, :date_of_birth` are available in state store:
+### Multiple Conditions (3+ paths)
 
 ```ruby
-state_store = PersonalInformation.new(
-  # memory is default but not recommended in production environment.
-  # See repositories section below.
-  repository: DfE::Wizard::Repository::InMemory.new,
+graph.add_multiple_conditional_edges(
+  from: :visa_type,
+  branches: [
+    { when: :student_visa?, then: :student_details },
+    { when: :work_visa?, then: :employer_details },
+    { when: :family_visa?, then: :family_details }
+  ],
+  default: :other_visa
 )
-
-# Dynamic attribute access (uses method_missing)
-state_store.write(first_name: "John")
-state_store.first_name # => "John"
-
-# Read all state from previous answers
-state_store.read
-# => { first_name: "John", email: "john@example.com", confirmed: true }
-
-# Write (merges with existing)
-state_store.write(email: "jane@example.com")
-# State is now: { first_name: "John", email: "jane@example.com", confirmed: true }
-
-# Check attribute exists
-state_store.respond_to?(:first_name)  # => true
-
-# Clear all
-state_store.clear
 ```
----
 
-### Repository
+- Evaluated **in order** - first match wins
+- Always provide a `default`
 
-The **Repository** is the persistence layer. It stores wizard state and provides a standard interface for reading/writing data.
+### Custom Branching
 
-The repositories provided in the gem allow transient data or permanent data depending which
-one you use. Use wisely!
-
-#### Repository Pattern
-
-All repositories inherit from `DfE::Wizard::Repository::Base` and implement:
+For complex logic that doesn't fit the DSL:
 
 ```ruby
-class CustomRepository < DfE::Wizard::Repository::Base
-  def read_data
-    # Return flat hash from storage
-  end
+graph.add_custom_branching_edge(
+  from: :eligibility_check,
+  conditional: :determine_route,
+  potential_transitions: [
+    { label: 'Eligible', nodes: [:application] },
+    { label: 'Not eligible', nodes: [:rejection] },
+    { label: 'Needs review', nodes: [:manual_review] }
+  ]
+)
+```
 
-  def write_data(hash)
-    # Persist flat hash to storage
+The method returns a step symbol directly:
+
+```ruby
+# In your wizard (for custom branching only)
+def determine_route
+  result = EligibilityService.check(state_store.read)
+
+  case result.status
+  when :eligible then :application
+  when :ineligible then :rejection
+  else :manual_review
   end
 end
 ```
 
-#### Available Repositories
+### Dynamic Root Step
 
-| Repository      | Storage               | Use Case                        | Persistence   |
-|-----------------|-----------------------|---------------------------------|---------------|
-| **InMemory**    | Ruby hash             | Testing, single-request wizards | None          |
-| **Session**     | HTTP session          | Simple wizards                  | Rails session |
-| **Cache**       | Rails.cache           | Fast, transient state           | Cache TTL     |
-| **Redis**       | Redis server          | Production, multi-process       | Custom TTL    |
-| **Model**       | Database (a table)    | Persistent model on every step  | Indefinite    |
-| **WizardState** | Database (JSONB/JSON) | Persistent wizards state        | Indefinite    |
-
-Observation: **The gem doesn't manage the data on any of the above**. This is reponsibility of the developer
-implementing the wizard like handling Session cookie overflow (or move to active record sessions),
-cache expiration, cache size, redis eviction policy, wizard state data being clear every day, etc).
-
-For wizard state you need to create the table yourself. Create a database migration for
-persistent state (if using WizardState repository):
+Start at different steps based on conditions:
 
 ```ruby
-# db/migrate/xxxxx_create_wizard_states.rb
-# Postgres example:
-create_table :wizard_states do |t|
-  t.jsonb :state, default: {}, null: false
-  t.string :key, null: false
-  t.string :state_key
-  t.boolean :encrypted, default: false
-  t.timestamps
+graph.conditional_root(potential_root: %i[returning_user new_user]) do |state_store|
+  state_store.has_account? ? :returning_user : :new_user
+end
+```
+
+### Skip Steps
+
+Skip a step based on conditions (step stays in graph but is jumped over):
+
+```ruby
+graph.add_node :school_selection, Steps::SchoolSelection, skip_when: :single_school?
+```
+
+```ruby
+# In state store
+def single_school?
+  available_schools.count == 1
+end
+```
+
+### Performance: Cache API Calls in Predicates
+
+**Important**: Predicates may be called multiple times per request. Methods like `flow_path`, `previous_step`, and `valid_path` traverse the graph and evaluate predicates along the way.
+
+If your predicate calls an external API, **cache the result**:
+
+```ruby
+# BAD - API called multiple times per request
+def eligible?
+  EligibilityService.check(trn).eligible?  # Called 3+ times!
 end
 
-add_index :wizard_states, [:key, :state_key], unique: true
+# GOOD - Cache the result
+def eligible?
+  @eligible ||= EligibilityService.check(trn).eligible?
+end
+
+# GOOD - Cache the whole response if you need multiple values
+def eligibility_result
+  @eligibility_result ||= EligibilityService.check(trn)
+end
+
+def eligible?
+  eligibility_result.eligible?
+end
+
+def eligibility_reason
+  eligibility_result.reason
+end
 ```
 
-#### Using Repositories
-
-```ruby
-# In-Memory (testing)
-repository = DfE::Wizard::Repository::InMemory.new
-repository.write({ name: "John" })
-repository.read  # => { name: "John" }
-
-# Session (simple web forms)
-repository = DfE::Wizard::Repository::Session.new(session: session, key: :my_wizard)
-repository = DfE::Wizard::Repository::Session.new(
-  session: session,
-  key: :my_wizard,
-  state_key: '123...' # multiple instance of a wizard in different tabs for example
-)
-# Data stored in Rails session automatically
-
-# Database (persistent)
-model = WizardState.find_or_create_by(key: :application, state_key: 'some-important-value')
-repository = DfE::Wizard::Repository::WizardState.new(model:)
-repository.write({ name: "John" })
-repository.read  # => { name: "John" }
-model.reload.state # => { name: "John" }
-
-# Redis (distributed)
-repository = DfE::Wizard::Repository::Redis.new(redis: Redis.new, expiration: 24.hours)
-
-# Cache
-repository = DfE::Wizard::Repository::Cache.new(cache: Rails.cache, expiration: 24.hours)
-
-```
-Choose wisely! Or create your own if you need more custom storage.
-
-#### Encryption
-
-* The gem only calls two methods for encryption and it doesn't handle encryption for you.
-* You can pass any object that responds to #encrypt_and_sign and #decrypt_and_verify.
-* ActiveSupport::MessageEncryptor can be used but advance cases you need to write your own encryptor!
-* All repositories accepts `encrypted: true` and ` encryptor:
-    ActiveSupport::MessageEncryptor.new(some_key)` for example.
-
-```ruby
-# With Encryption
-repository = DfE::Wizard::Repository::WizardState.new(
-  model:,
-  encrypted: true,
-  encryptor: ActiveSupport::MessageEncryptor.new(some_key)
-)
-```
-
-#### Repository Data Flow
-
-```
-┌────────────────────────────────────────────┐
-│  Flat Hash (Internal Representation)       │
-│  { first_name: "John", email: "j@x.com" } │
-└───────────────────┬──────────────────────┘
-                    │
-     ┌──────────────┴──────────────┐
-     │                             │
-     │  (Encryption if enabled)    │
-     │  encrypt_hash()             │
-     │                             │
-     └──────────────┬──────────────┘
-                    │
-     ┌──────────────▼──────────────┐
-     │   Storage Backend           │
-     │   - Database JSONB          │
-     │   - Redis                   │
-     │   - Session                 │
-     │   - Cache                   │
-     └────────────────────────────┘
-```
+This applies to any expensive operation: database queries, API calls, or complex calculations.
 
 ---
 
-### Step Operators (Optional)
+## Check Your Answers
 
-**Step Operators** allow you to attach custom operations to specific steps (validation,
-persistence, deletions, API calls, email, in service notifications, etc.).
+The gem provides `ReviewPresenter` to build "Check your answers" pages.
 
-#### Default Pipeline
-
-**By default, the wizard runs two operations per step**: Validate and Persist.
-
-You can see each implementation on the gem:
-
-* [Validate](lib/dfe/wizard/operations/validate.rb) operation
-* [Persist](lib/dfe/wizard/operations/persist.rb) operation
-
-```
-Step Submission
-    │
-    ▼
-[Validate] ──→ Check validation rules on the Step object
-    │
-    ├─ INVALID ──→ Return to form with errors
-    │
-    └─ VALID ──→
-                │
-                ▼
-            [Persist] ──→ Save to state store
-                │
-                ▼
-            Navigation (next/previous)
-```
-
-#### Custom Operations
+### Creating a Review Presenter
 
 ```ruby
-# Define a custom operation
+# app/presenters/registration_review.rb
+class RegistrationReview
+  include DfE::Wizard::ReviewPresenter
+
+  def personal_details
+    [
+      row_for(:name, :first_name),
+      row_for(:name, :last_name),
+      row_for(:email, :email)
+    ]
+  end
+
+  def visa_details
+    [
+      row_for(:nationality, :nationality),
+      row_for(:visa, :visa_type, label: 'Type of visa')
+    ]
+  end
+
+  # Override to format specific values
+  def format_value(attribute, value)
+    case attribute
+    when :date_of_birth
+      value&.strftime('%d %B %Y')
+    else
+      value
+    end
+  end
+end
+```
+
+### Using the Presenter
+
+In your controller:
+
+```ruby
+def show
+  if @wizard.current_step_name == :review
+    @review = RegistrationReview.new(@wizard)
+  end
+  @step = @wizard.current_step
+end
+```
+
+In your view:
+
+```erb
+<h1>Check your answers</h1>
+
+<h2>Personal details</h2>
+<dl class="govuk-summary-list">
+  <% @review.personal_details.each do |row| %>
+    <div class="govuk-summary-list__row">
+      <dt class="govuk-summary-list__key"><%= row.label %></dt>
+      <dd class="govuk-summary-list__value"><%= row.formatted_value %></dd>
+      <dd class="govuk-summary-list__actions">
+        <%= link_to 'Change', row.change_path %>
+      </dd>
+    </div>
+  <% end %>
+</dl>
+```
+
+### Row Object
+
+Each row provides:
+
+| Method | Description |
+|--------|-------------|
+| `label` | Human-readable label (from I18n or custom) |
+| `value` | Raw value |
+| `formatted_value` | Formatted via `format_value` |
+| `change_path` | URL with `return_to_review` param |
+| `step_id` | The step ID |
+| `attribute` | The attribute name |
+
+### Return to Review Flow
+
+When users click "Change", they go to the step with `?return_to_review=step_id`. After saving, they return to the review page.
+
+Implement this with callbacks:
+
+```ruby
+def steps_processor
+  DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+    # ... steps ...
+
+    graph.before_next_step(:handle_return_to_review)
+    graph.before_previous_step(:handle_back_to_review)
+  end
+end
+
+def handle_return_to_review
+  return unless current_step_params[:return_to_review].present?
+  return unless valid_path_to?(:review)
+
+  :review
+end
+
+def handle_back_to_review
+  return unless current_step_params[:return_to_review].to_s == current_step_name.to_s
+  return unless valid_path_to?(:review)
+
+  :review
+end
+```
+
+---
+
+## Optional Features
+
+### Route Strategy
+
+Route strategies translate step symbols (`:name`, `:email`) into URLs (`/registration/name`). The wizard uses this for `next_step_path`, `previous_step_path`, and `current_step_path`.
+
+You must implement `route_strategy` in your wizard. Three strategies are available:
+
+**NamedRoutes** (recommended for simple wizards):
+
+Uses Rails named routes. The `namespace` becomes the route helper prefix.
+
+```ruby
+def route_strategy
+  DfE::Wizard::RouteStrategy::NamedRoutes.new(
+    wizard: self,
+    namespace: 'registration'
+  )
+end
+
+# Uses: registration_path(:name) → /registration/name
+# Uses: registration_path(:email) → /registration/email
+```
+
+Requires matching routes:
+
+```ruby
+# config/routes.rb
+get 'registration/:step', to: 'registration#show', as: :registration
+patch 'registration/:step', to: 'registration#update'
+```
+
+**ConfigurableRoutes** (for complex URL patterns):
+
+```ruby
+def route_strategy
+  DfE::Wizard::RouteStrategy::ConfigurableRoutes.new(
+    wizard: self,
+    namespace: 'courses'
+  ) do |config|
+    config.default_path_arguments = {
+      provider_code: state_store.provider_code,
+      course_code: state_store.course_code
+    }
+
+    config.map_step :review, to: ->(wizard, opts, helpers) {
+      helpers.course_review_path(**opts)
+    }
+  end
+end
+```
+
+**DynamicRoutes** (for multi-instance wizards):
+
+```ruby
+def route_strategy
+  DfE::Wizard::RouteStrategy::DynamicRoutes.new(
+    state_store: state_store,
+    path_builder: ->(step_id, state_store, helpers, opts) {
+      helpers.wizard_step_path(
+        state_key: state_store.state_key,
+        step: step_id,
+        **opts
+      )
+    }
+  )
+end
+```
+
+### Step Operators
+
+Customise what happens when a step is saved. By default, each step runs: `Validate → Persist`.
+
+```ruby
+def steps_operator
+  DfE::Wizard::StepsOperator::Builder.draw(wizard: self, callable: state_store) do |b|
+    # use: replaces the entire pipeline
+    b.on_step(:payment, use: [Validate, ProcessPayment, Persist])
+
+    # add: appends to the default pipeline (Validate → Persist → YourOperator)
+    b.on_step(:notification, add: [SendConfirmationEmail])
+
+    # use: [] skips all operations (useful for review steps)
+    b.on_step(:review, use: [])
+  end
+end
+```
+
+**`use:` - Replace the pipeline**
+
+Completely replaces the default Validate → Persist with your operators:
+
+```ruby
+# Only validate, don't persist (dry run)
+b.on_step(:preview, use: [Validate])
+
+# Custom order: validate, process payment, then persist
+b.on_step(:payment, use: [Validate, ProcessPayment, Persist])
+
+# Skip everything (review pages that don't need saving)
+b.on_step(:check_answers, use: [])
+```
+
+**`add:` - Extend the pipeline**
+
+Adds operators after the default Validate → Persist:
+
+```ruby
+# Validate → Persist → SendConfirmationEmail
+b.on_step(:final_step, add: [SendConfirmationEmail])
+
+# Validate → Persist → NotifySlack → UpdateAnalytics
+b.on_step(:submission, add: [NotifySlack, UpdateAnalytics])
+```
+
+**Custom operation class:**
+
+```ruby
 class ProcessPayment
-  def initialize(repository:, step:)
+  def initialize(repository:, step:, callable:)
     @repository = repository
     @step = step
+    @callable = callable  # Your state store
   end
 
   def execute
-    # Your logic here
-    result = PaymentGateway.charge(@step.amount)
+    result = PaymentGateway.charge(
+      amount: @step.amount,
+      email: @callable.email
+    )
 
     if result.success?
       { success: true, transaction_id: result.id }
     else
-      { success: false, errors: { amount: result.error } }
-    end
-  end
-end
-
-# Configure in wizard
-class PaymentWizard
-  include DfE::Wizard
-
-  def steps_operator
-    DfE::Wizard::StepsOperator::Builder.draw(wizard: self, callable: state_store) do |b|
-      b.on_step(:remove_recipient, use: [RemoveRecipient])
-
-      # use: option replace default pipeline for :payment step
-      b.on_step(:payment, use: [Validate, ProcessPayment, Persist])
-
-      # Add extra operation to default pipeline (default is validate and persist)
-      b.on_step(:notification, add: [SendEmail])
-
-      # Skip all operations for :review
-      b.on_step(:review, use: [])
+      { success: false, errors: { payment: [result.error] } }
     end
   end
 end
 ```
 
-#### Step Operator API
+Operations must return a hash with `:success` key. If `success: false`, include `:errors` to display validation messages.
+
+### Logger (Recommended)
+
+Enable detailed logging for debugging navigation and branching decisions:
 
 ```ruby
-# Save current step with configured operations
-wizard.current_step_name = :remove_recipient
-# Run only RemoveRecipient which probably will delete data instead of saving
-wizard.save_current_step
-
-# Save current step with configured operations
-wizard.current_step_name = :payment
-# Run Validate, ProcessPayment, Persist
-wizard.save_current_step  # Runs operations defined on #steps_operator, returns true/false
-
-wizard.current_step_name = :notification
-# Run Validate, Persist, SendEmail
-wizard.save_current_step
-
-wizard.current_step_name = :review
-# Don't do anything
-wizard.save_current_step
-```
-
-**If you need more customization**, you can also create your own methods on wizard and
-manipulate step operations at your will:
-
-```ruby
-class MyWizard
-  def my_custom_save
-    operations = steps_operator.operations_for(current_step_name)
-
-    operations.each do |operation_class|
-      # ... do what your service needs
-    end
-  end
+def logger
+  DfE::Wizard::Logging::Logger.new(Rails.logger) if Rails.env.development?
 end
 ```
 
----
+Logs include step transitions, predicate evaluations, and path calculations - invaluable for debugging complex flows.
 
-### Routing (Optional)
-
-**Routing** strategies determine how step IDs map to URL paths. Routing is optional
-
-the gem provides path resolver to the step identifiers.
-
-Rxample in controller:
+Exclude noisy categories if needed:
 
 ```ruby
-  wizard.current_step_path # get current step and return url
-  wizard.next_step_path # get next step and return url
-  wizard.previous_step_path # get previous step and return url or nil if no previous step
+DfE::Wizard::Logging::Logger.new(Rails.logger).exclude(%i[routing validation])
 ```
 
-It is optional but if you don't use you will have to map the identifiers yourself:
+### Inspect
+
+Debug wizard state in development:
 
 ```ruby
-  next_step = wizard.next_step # => :name_and_date_of_birth
-  resolve_step(next_step) # your own method
-```
-
-In case you opt-in to use the gem provides three different strategies:
-
-```ruby
-# Named routes strategy
-strategy = NamedRoutes.new(wizard: self, namespace: 'personal-information')
-strategy.resolve(step_id: :review, options: {})
-# => "/personal-information/review"
-
-# Dynamic routes strategy
-RouteStrategy::DynamicRoutes.new(
-  state_store:,
-  path_builder: lambda { |step_id, state_store, url_helpers, opts|
-    url_helpers.my_custom_wizard_path(
-      state_key: state_store.state_key,
-      step: step_id,
-      some_attribute: state_store.some_attribute,
-      **opts,
-    )
-  },
-)
-
-# Configurable routes
-route_strategy = DfE::Wizard::RouteStrategy::ConfigurableRoutes.new(
-  wizard: self,
-  namespace: 'a_levels_requirements',
-) do |config|
-  # assuming the wizard needs this default arguments
-  config.default_path_arguments = {
-    recruitment_cycle_year: state_store.recruitment_cycle_year,
-    provider_code: state_store.provider_code,
-    code: state_store.course_code,
-  }
-
-  # we need to do something special for the step :course_edit for example but the others
-  # follow the named conventions
-  config.map_step :course_edit, to: lambda { |_wizard, options, helpers|
-      helpers.recruitment_cycle_provider_course_path(**options)
-    }
-  end
+def inspect
+  DfE::Wizard::Tooling::Inspect.new(wizard: self) if Rails.env.development?
 end
-
-# Use in wizard
-class PersonalInformationWizard
-  include DfE::Wizard
-
-  def route_strategy
-    NamedRoutes.new(wizard: self, namespace: 'personal-information')
-  end
-end
-
-# Access in controller
-wizard.current_step_path      # => "/personal-information/email"
-wizard.next_step_path         # => "/personal-information/phone"
-wizard.previous_step_path     # => "/personal-information/name"
 ```
 
----
-
-### Logging (Optional)
-
-**Logging** captures all major wizard events for debugging and auditing.
-
 ```ruby
-# Enable detailed logging
-class MyWizard
-  include DfE::Wizard
-
-  def logger
-    DfE::Wizard::Logger.new(logger: Rails.logger) if Rails.env.local?
-  end
-end
-
-# Log events captured:
-# - Step navigation (next/previous)
-# - Validations (pass/fail with errors)
-# - State changes (read/write)
-# - Operations execution
-# - Parameter extraction
-# - Flow resolution
-
-```
-
-Warning: the logger might be a little noisy. You can exclude categories.
-
-```ruby
-# If you think is too much noise you can exclude:
- DfE::Wizard::Logger.new(logger: Rails.logger).exclude(%i[routing validation callbacks])
-# See DfE::Wizard::Logger::CATEGORIES for all categories
-```
-
----
-
-### Inspect (Optional)
-
-**Inspect** methods provide debugging helpers for visualizing wizard state.
-
-**Use inspection only for development environment as it can show sensitive data!**.
-
-```ruby
-class PersonalInfoWizard
-  include DfE::Wizard
-
-  def inspect
-    DfE::Wizard::Inspect.new(wizard: self) if Rails.env.local?
-  end
-end
-
-# Inspect complete state
-wizard.inspect
-# =>
-# ┌─ Wizard: PersonalInfoWizard
+puts wizard.inspect
+# ┌─ Wizard: RegistrationWizard
 # ├─ Current Step: :email
-# ├─ Flow Path: [:name, :email, :phone, :review]
-# ├─ Saved Steps: [:name, :email]
-# ├─ Valid Steps: [:name]
-# ├─ State:
-# │  ├─ name: { first_name: "John", last_name: "Doe" }
-# │  └─ email: { email: "john@example.com" }
-# └─ Orphaned: []
+# ├─ Flow Path: [:name, :email, :review]
+# ├─ Saved Steps: [:name]
+# └─ State: { first_name: "Sarah", last_name: "Smith" }
 ```
 
----
-
-## Quick Start
-
-### 1. Create Steps
-
-```ruby
-# app/steps/email_step.rb
-module Steps
-  class Email
-    include DfE::Wizard::Step
-
-    attribute :email, :string
-    attribute :confirmed, :boolean, default: false
-
-    validates :email, presence: true, format: { with: URI::MailTo::EMAIL_REGEXP }
-    validates :confirmed, acceptance: true
-
-    def self.permitted_params
-      %i[email confirmed]
-    end
-  end
-end
-```
-
-### 2. Create Wizard
-
-```ruby
-# app/wizards/application_wizard.rb
-class ApplicationWizard
-  include DfE::Wizard::Base
-
-  def steps_processor
-    DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
-      graph.add_node :name, Steps::Name
-      graph.add_node :email, Steps::Email
-      graph.add_node :review, Steps::Review
-      graph.add_node :confirmation, DfE::Wizard::Redirect # virtual step
-      graph.root :name
-
-      graph.add_edge from: :name, to: :email
-      graph.add_edge from: :email, to: :review
-      graph.add_edge from: :review, to: :confirmation
-    end
-  end
-end
-```
-
-### 3. Create Controller
-
-```ruby
-# app/controllers/wizard_steps_controller.rb
-class WizardStepsController < ApplicationController
-  def new
-    @wizard = ApplicationWizard.new
-    @wizard.current_step_name = params[:id]
-    @step = @wizard.current_step
-  end
-
-  def create
-    @wizard = ApplicationWizard.new(current_step: params[:id], current_step_params: params)
-
-    if @wizard.current_step_valid?
-      @wizard.save_current_step
-      redirect_to @wizard.next_step_path
-    else
-      render :show
-    end
-  end
-end
-```
-
-### 4. Create Views
-
-Here normally the gem doesn't dictate the views.
-
-You can pass #current_step as model and #current_step_path as the URL to be submitted,
-the scope #current_step_name so params are submitted correctly.
-
-```erb
-<!-- app/views/wizard_steps/show.html.erb -->
- <%= form_with model: @wizard.current_step,
-       url: @wizard.current_step_path,
-       scope: @wizard.current_step_name do |form| %>
-  <% end %>
-```
-
----
-
-## Usage Guide
-
-### Navigation
-
-```ruby
-wizard = ApplicationWizard.new
-
-# Current step
-wizard.current_step_name   # => :email
-wizard.current_step        # => <Steps::Email>
-wizard.current_step_path   # => "/wizard/email"
-
-# Forward/Back
-wizard.next_step           # => :review
-wizard.next_step_path      # => "/wizard/review"
-wizard.previous_step       # => :name
-wizard.previous_step_path  # => "/wizard/name"
-
-# Flow analysis
-wizard.flow_path           # => [:name, :email, :review]
-wizard.in_flow?(:phone)    # => true
-wizard.in_flow?(:foo)  # => false
-```
-
-### State Management
-
-```ruby
-wizard = ApplicationWizard.new
-
-# Read data
-wizard.data                # => { steps: { name: {...}, email: {...} } }
-wizard.step_data(:name)    # => { first_name: "John" }
-wizard.raw_data            # => unfiltered (includes unreachable steps)
-
-# Write data
-wizard.write_state(steps: { name: { first_name: "Jane" } })
-wizard.set_metadata(:user_id, 123)
-
-# Check saved progress
-wizard.saved?(:name)       # => true (has data)
-wizard.saved_path          # => [:name, :email] (completed steps)
-wizard.saved_steps         # => [<Step>, <Step>] (hydrated objects)
-
-# Completion
-wizard.mark_completed
-wizard.completed?          # => true
-wizard.completed_at        # => 2025-11-22 22:03:00 +0000
-```
-
-### Validation
-
-```ruby
-# Validate current step
-wizard.current_step_valid?    # => true/false
-
-# Validate specific step
-wizard.valid?(:name)          # => true/false
-
-# Get valid steps (safe path)
-wizard.valid_path             # => [:name] (stops at first invalid)
-wizard.valid_path_to?(:review) # => true (can reach review?)
-wizard.valid_path_to_current_step? # => true/false
-
-# Get validated step objects
-wizard.valid_steps            # => [<Step>, <Step>]
-```
-
-### Check Your Answers Pattern
-
-Perfect for review/edit flows.
-
-Callbacks override the #next_step and #previous_step. Use cases:
-
-- Run some logic before navigating to next step or previous step
-- Handle "Return to review" pattern
-- Modify wizard state on the fly
-- The callback return a step symbol or nil/false
-- If returns nil/false the callback will be skipped & next step will kick-in
-- If returns a Symbol the callback will be taken into account and next step or previous step will
-  not be invoked!
-
-```ruby
-class ApplicationWizard
-  include DfE::Wizard
-
-  def steps_processor
-    DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
-      graph.add_node(:name, Steps::Name)
-      graph.add_node(:email, Steps::Email)
-      graph.add_node(:review, Steps::Review)
-      graph.root :name
-
-      graph.add_edge(from: :name, to: :email)
-      graph.add_edge(from: :email, to: :review)
-
-      # Custom callbacks:
-      graph.before_next_step(:next_step_override)
-      graph.before_previous_step(:previous_step_override)
-    end
-  end
-
-  # ?return_to_review=name
-  # user click to change name
-  #
-  def next_step_override
-    target = @current_step_params[:return_to_review]
-
-    :check_answers if target.present? && valid_path_to?(:check_answers)
-  end
-
-  # ?return_to_review=name
-  # user click to change name
-  #
-  def previous_step_override
-    target = @current_step_params[:return_to_review]
-
-    :check_answers if current_step_name.to_s == target && valid_path_to?(:check_answers)
-  end
-end
-```
 ---
 
 ## Testing
 
-This gem also ships with a suite of RSpec matchers for testing wizards at a higher level,
-letting you assert flow (next_step, previous_step, branches),
-paths (flow_path, saved_path, valid_path), operations, and state store attributes
-using expressive, intention‑revealing specs.
-
-You can include the module:
+Include the RSpec matchers:
 
 ```ruby
+# spec/rails_helper.rb
 RSpec.configure do |config|
   config.include DfE::Wizard::Test::RSpecMatchers
 end
 ```
 
-Let's explore each matcher.
-
-### `have_next_step_path`
-
-Asserts that a wizard’s `next_step_path` equals the expected path.
+### Navigation Matchers
 
 ```ruby
-expect(wizard).to have_next_step_path("/wizard/email")
+# Next step
+expect(wizard).to have_next_step(:email)
+expect(wizard).to have_next_step(:review).from(:email)
+expect(wizard).to have_next_step(:visa).from(:nationality).when(nationality: 'canadian')
+
+# Previous step
+expect(wizard).to have_previous_step(:name)
+
+# Root step
+expect(wizard).to have_root_step(:name)
+
+# Branching
+expect(wizard).to branch_from(:nationality).to(:visa).when(nationality: 'canadian')
+expect(wizard).to branch_from(:nationality).to(:review).when(nationality: 'british')
 ```
 
-### `have_previous_step_path`
-
-Asserts that a wizard’s `previous_step_path` equals the expected path.
+### Path Matchers
 
 ```ruby
-expect(wizard).to have_previous_step_path("/wizard/name")
+expect(wizard).to have_flow_path([:name, :email, :review])
+expect(wizard).to have_saved_path([:name, :email])
+expect(wizard).to have_valid_path([:name])
 ```
 
-### `be_next_step_path`
-
-Asserts that a given path is the `next_step_path` for a specific wizard, using subject-first syntax.
-
-```ruby
-expect("/wizard/email").to be_next_step_path.in(wizard)
-```
-
-### `be_previous_step_path`
-
-Asserts that a given path is the `previous_step_path` for a specific wizard, using subject-first syntax.
-
-```ruby
-expect("/wizard/name").to be_previous_step_path.in(wizard)
-```
-
-### `resolve_step`
-
-Asserts that a given step ID resolves to a specific URL/path via the wizard’s route strategy.
-
-```ruby
-expect(wizard).to resolve_step(:nationality)
-  .to(url_helpers.personal_information_nationality_path)
-
-expect(wizard).to resolve_step(:review)
-  .to("/personal-information/review")
-```
-
-## Step symbol / navigation matchers
-
-### `have_root_step`
-
-Asserts that the wizard’s `steps_processor.root_step` equals the expected step, optionally after writing state to the state store.
-
-```ruby
-# Simple root
-expect(wizard).to have_root_step(:name_and_date_of_birth)
-
-# Conditional root based on state
-expect(wizard).to have_root_step(:add_a_level_to_list)
-  .when(a_level_subjects: [{ some_a_level: "A" }])
-
-expect(wizard).to have_root_step(:what_a_level_is_required)
-  .when(a_level_subjects: [])
-```
-
-### `have_next_step`
-
-Asserts that `wizard.next_step` equals the expected step, optionally from a specific starting step and/or with specific state.
-
-```ruby
-# From current step
-expect(wizard).to have_next_step(:nationality)
-
-# From a specific step
-expect(wizard).to have_next_step(:review).from(:nationality)
-
-# With params influencing branching
-expect(wizard).to have_next_step(:review)
-  .from(:nationality)
-  .when(nationality: "British")
-```
-
-### `be_next_step`
-
-Asserts that a given step symbol is the wizard’s `next_step`, using subject-first syntax.
-
-```ruby
-expect(:nationality).to be_next_step.in(wizard)
-```
-
-### `have_previous_step`
-
-Asserts that `wizard.previous_step` equals the expected step, optionally from a specific starting step and/or with specific state.
-
-```ruby
-# From current step
-expect(wizard).to have_previous_step(:name_and_date_of_birth)
-
-# From a specific step
-expect(wizard).to have_previous_step(:nationality)
-  .from(:right_to_work_or_study)
-
-# With branching params
-expect(wizard).to have_previous_step(:nationality)
-  .from(:right_to_work_or_study)
-  .when(nationality: "non-uk")
-```
-
-### `be_previous_step`
-
-Asserts that a given step symbol is the wizard’s `previous_step`, using subject-first syntax.
-
-```ruby
-expect(:nationality).to be_previous_step.in(wizard)
-```
-
-### `branch_from`
-
-Asserts that, from a given step and optional state, `wizard.next_step` is the expected target step (tests conditional branching).
-
-```ruby
-expect(wizard).to branch_from(:nationality)
-  .to(:review)
-  .when(nationality: "british")
-
-expect(wizard).to branch_from(:nationality)
-  .to(:right_to_work_or_study)
-  .when(nationality: "canadian")
-```
-
-### `be_at_step`
-
-Asserts that `wizard.current_step_name` equals the expected step.
-
-```ruby
-expect(wizard).to be_at_step(:nationality)
-```
-
-## Path collection matchers
-
-### `have_flow_path`
-
-Asserts that `wizard.flow_path` equals the expected sequence of steps.
-
-```ruby
-expect(wizard).to have_flow_path(
-  [:name_and_date_of_birth, :nationality, :review]
-)
-```
-
-### `have_saved_path`
-
-Asserts that `wizard.saved_path` equals the expected sequence of steps with saved data.
-
-```ruby
-expect(wizard).to have_saved_path(
-  [:name_and_date_of_birth, :nationality]
-)
-```
-
-### `have_valid_path`
-
-Asserts that `wizard.valid_path` equals the expected sequence of valid steps up to the stopping point.
-
-```ruby
-expect(wizard).to have_valid_path(
-  [:name_and_date_of_birth, :nationality, :right_to_work_or_study]
-)
-```
-
-## Step object collection matchers
-
-### `have_flow_steps`
-
-Asserts that `wizard.flow_steps` (hydrated step objects) match the expected list of step instances, in order.
-
-```ruby
-expect(wizard).to have_flow_steps([
-  Steps::NameAndDateOfBirth.new,
-  Steps::Nationality.new,
-  Steps::Review.new
-])
-```
-
-### `have_saved_steps`
-
-Asserts that `wizard.saved_steps` (steps with data) match the expected list of step instances, in order.
-
-```ruby
-expect(wizard).to have_saved_steps([
-  Steps::NameAndDateOfBirth.new,
-  Steps::Nationality.new
-])
-```
-
-### `have_valid_steps`
-
-Asserts that `wizard.valid_steps` (steps with valid data) match the expected list of step instances, in order.
-
-```ruby
-expect(wizard).to have_valid_steps([
-  Steps::NameAndDateOfBirth.new,
-  Steps::Nationality.new,
-  Steps::RightToWorkOrStudy.new
-])
-```
-
-## Validation matchers
-
-### `be_valid_to`
-
-Asserts that all steps leading to the target step form a valid path (`wizard.valid_path_to?(target_step)` is true).
+### Validation Matchers
 
 ```ruby
 expect(wizard).to be_valid_to(:review)
+expect(:email).to be_valid_step.in(wizard)
 ```
 
-### `be_valid_step`
-
-Asserts that a given step ID is valid in the context of a wizard (`wizard.valid?(step_id)`), using subject-first syntax.
+### State Store Matchers
 
 ```ruby
-expect(:nationality).to be_valid_step.in(wizard)
-```
-
-## State store / operator matchers
-
-### `have_step_attribute`
-
-Asserts that the state store has a given attribute key, optionally with a specific value.
-
-```ruby
-# Just presence
 expect(state_store).to have_step_attribute(:first_name)
-
-# Presence and value
-expect(state_store).to have_step_attribute(:nationality).with_value("british")
+expect(state_store).to have_step_attribute(:email).with_value('test@example.com')
 ```
 
-***
-
-### `have_step_operations`
-
-Asserts that the wizard’s `steps_operator` has the expected operation pipeline per step.
-
-```ruby
-expect(wizard).to have_step_operations(
-  payment: [Validate, ProcessPayment, Persist],
-  review:  []
-)
-```
 ---
 
-## Auto generated documentation
+## Auto-generated Documentation
 
-The gem can **generate documentation automatically** in Mermaid, GraphViz and Markdown for any
-wizard.
-
-### What gets generated
-
-For each wizard, the documentation generator produces:
-
-- **Mermaid** diagrams (suitable for Markdown / GitHub / docs sites)
-- **GraphViz** (DOT files)
-- **Markdown** summaries of steps, edges and branching metadata
-
-All of this is driven from the steps processor metadata (`graph.metadata`), so docs stay in sync
-with the actual flow structure.
-
-### How to generate docs
-
-Define a Rake task that loads your wizard classes and calls `wizard.documentation.generate_all(output_dir)` for each one:
+Generate Mermaid, GraphViz, and Markdown documentation from your wizard:
 
 ```ruby
 # lib/tasks/wizard_docs.rake
 namespace :wizard do
   namespace :docs do
-    # Generate documentation for all wizards
-    #
-    # Generates documentation (Mermaid, GraphViz, Markdown) for all wizard
-    # classes found in app/wizards, in all supported themes.
-    #
-    # @example Generate all wizard documentation
-    #   rake wizard:docs:generate
-    #
-    # @example Generate specific wizard
-    #   WIZARD=PersonalInformationWizard rake wizard:docs:generate
-    desc 'Generate documentation for all wizards'
     task generate: :environment do
-      # assuming your wizards live on app/wizards
-      #
-      Dir['app/wizards/**/*.rb'].each { |f| require File.expand_path(f) }
-
       output_dir = 'docs/wizards'
 
-      # you can hardcoded or make a way to discover all wizards.
-      # Here we hardcoded PersonalInformationWizard
-      [
-        PersonalInformationWizard,
-      ].each do |wizard_class|
+      [RegistrationWizard, ApplicationWizard].each do |wizard_class|
         wizard = wizard_class.new(state_store: OpenStruct.new)
-
-        # Using #generate_all but you can also generate individually.
-
-        # Generate Markdown
-        #   docs.generate(:markdown, 'docs/wizard.md')
-        #
-        # Generate Mermaid flowchart
-        #   docs.generate(:mermaid, 'docs/wizard.mmd')
-        #
-        # Generate Graphviz diagram
-        #   docs.generate(:graphviz, 'docs/wizard.dot')
-        #
         wizard.documentation.generate_all(output_dir)
-
         puts "Generated docs for #{wizard_class.name}"
       end
-
-      puts "All wizard docs written to #{File.expand_path(output_dir)}/"
     end
   end
 end
 ```
 
-In this example:
+Run with:
 
-- Each wizard is instantiated (here with a trivial `OpenStruct` state store) and asked to generate documentation into `docs/wizards`.
-- `generate_all` will emit the different formats (Mermaid, GraphViz, Markdown) using the internal metadata of the steps processor (steps, edges, branching, counts).
+```bash
+rake wizard:docs:generate
+```
 
 ---
 
-## Wizard examples
+## In Depth: Repositories
 
-* [Personal Information wizard](spec/rails-dummy/app/wizards/personal_information_wizard.rb) - (from Apply teacher training)
-* [Assign mentor](spec/rails-dummy/app/wizards/assign_mentor_wizard.rb) - (from Register early carreers teachers)
-* [A level wizard](spec/rails-dummy/app/wizards/a_levels_requirements_wizard.rb) - (from Publish teacher training)
-* [Register ECT wizard](spec/rails-dummy/app/wizards/register_ect_wizard.rb) - (from Register early carreers teachers)
+Repositories handle data persistence. All repositories implement the same interface:
 
+```ruby
+repository.read   # => Hash
+repository.write(hash)
+repository.clear
+```
 
-Auto generated documentation examples of these wizard can be seem [here](spec/rails-dummy/docs/wizards)
+### InMemory Repository
+
+Stores data in a Ruby hash. **Testing only** - data lost on each request.
+
+```ruby
+repository = DfE::Wizard::Repository::InMemory.new
+
+repository.write(first_name: 'Sarah')
+repository.read  # => { first_name: 'Sarah' }
+
+# Data is lost when the object is garbage collected
+```
+
+### Session Repository
+
+Stores data in Rails session. Good for simple wizards without sensitive data.
+
+```ruby
+repository = DfE::Wizard::Repository::Session.new(
+  session: session,
+  key: :registration_wizard
+)
+
+# Data stored at session[:registration_wizard]
+repository.write(first_name: 'Sarah')
+session[:registration_wizard]  # => { first_name: 'Sarah' }
+```
+
+### Cache Repository
+
+Stores data in Rails.cache. Good for distributed systems with expiring data.
+
+```ruby
+repository = DfE::Wizard::Repository::Cache.new(
+  cache: Rails.cache,
+  key: "wizard:#{current_user.id}:registration",
+  expires_in: 1.hour
+)
+
+# Data stored in cache with automatic expiration
+repository.write(first_name: 'Sarah')
+```
+
+### Redis Repository
+
+Stores data directly in Redis. Good for high-throughput systems.
+
+```ruby
+repository = DfE::Wizard::Repository::Redis.new(
+  redis: Redis.current,
+  key: "wizard:#{session.id}:registration",
+  expires_in: 24.hours
+)
+
+# Data stored as JSON in Redis
+repository.write(first_name: 'Sarah')
+Redis.current.get("wizard:#{session.id}:registration")
+# => '{"first_name":"Sarah"}'
+```
+
+### Model Repository
+
+Persists data directly to an ActiveRecord model. Each `write` calls `update!`.
+
+```ruby
+# Your model
+class Application < ApplicationRecord
+  # Must have columns matching step attributes
+  # e.g., first_name, last_name, email, etc.
+end
+
+application = Application.find_or_create_by(user: current_user)
+repository = DfE::Wizard::Repository::Model.new(model: application)
+
+# Each write updates the model
+repository.write(first_name: 'Sarah')
+application.reload.first_name  # => 'Sarah'
+```
+
+**Use when**: You want each step to immediately persist to your domain model.
+
+### WizardState Repository
+
+Stores all wizard data in a JSONB column. Good for complex wizards with many fields.
+
+**Migration:**
+
+```ruby
+class CreateWizardStates < ActiveRecord::Migration[7.1]
+  def change
+    create_table :wizard_states do |t|
+      t.string :key, null: false
+      t.string :user_id
+      t.jsonb :state, default: {}
+      t.timestamps
+    end
+
+    add_index :wizard_states, [:key, :user_id], unique: true
+  end
+end
+```
+
+**Model:**
+
+```ruby
+class WizardState < ApplicationRecord
+  validates :key, presence: true
+end
+```
+
+**Usage:**
+
+```ruby
+model = WizardState.find_or_create_by(
+  key: 'registration',
+  user_id: current_user&.id
+)
+repository = DfE::Wizard::Repository::WizardState.new(model: model)
+
+# All data stored in the JSONB 'state' column
+repository.write(first_name: 'Sarah', email: 'sarah@example.com')
+model.reload.state  # => { "first_name" => "Sarah", "email" => "sarah@example.com" }
+```
+
+### Encryption
+
+Some repositories support encryption for sensitive data.
+
+```ruby
+repository = DfE::Wizard::Repository::Session.new(
+  session: session,
+  key: :secure_wizard,
+  encrypt: true,
+  secret_key: Rails.application.credentials.wizard_encryption_key
+)
+
+# Data is encrypted before storage
+repository.write(national_insurance: 'AB123456C')
+session[:secure_wizard]  # => encrypted string
+```
+
+**Repositories supporting encryption:**
+- Session
+- Cache
+- Redis
+- WizardState (uses ActiveRecord encryption)
+
+For WizardState, use Rails encrypted attributes:
+
+```ruby
+class WizardState < ApplicationRecord
+  encrypts :state
+end
+```
+
+### Choosing a Repository
+
+| Scenario | Recommended Repository |
+|----------|------------------------|
+| Testing | InMemory |
+| Simple wizard, no sensitive data | Session |
+| Distributed system, temporary data | Cache or Redis |
+| Persist to existing model | Model |
+| Complex wizard, many fields | WizardState |
+| Sensitive data | Any with encryption |
+
+---
+
+## In Depth: Steps
+
+Steps are ActiveModel objects representing individual screens in your wizard.
+
+### Step Attributes
+
+Use ActiveModel attributes with types:
+
+```ruby
+class PersonalDetails
+  include DfE::Wizard::Step
+
+  attribute :first_name, :string
+  attribute :last_name, :string
+  attribute :date_of_birth, :date
+  attribute :age, :integer
+  attribute :newsletter, :boolean, default: false
+  attribute :preferences, :json  # For complex data
+end
+```
+
+### Attribute Uniqueness
+
+**Important**: Step attribute names must be unique across the entire wizard.
+
+```ruby
+# BAD - 'email' is defined in two steps
+class ContactStep
+  attribute :email, :string
+end
+
+class NotificationStep
+  attribute :email, :string  # Conflict! Will overwrite ContactStep's email
+end
+
+# GOOD - unique attribute names
+class ContactStep
+  attribute :contact_email, :string
+end
+
+class NotificationStep
+  attribute :notification_email, :string
+end
+```
+
+This is because all attributes are stored in a flat hash in the repository.
+
+### Permitted Parameters
+
+Always define `permitted_params` to control which params are accepted:
+
+```ruby
+class AddressStep
+  include DfE::Wizard::Step
+
+  attribute :address_line_1, :string
+  attribute :address_line_2, :string
+  attribute :postcode, :string
+  attribute :country, :string
+
+  def self.permitted_params
+    %i[address_line_1 address_line_2 postcode country]
+  end
+end
+```
+
+### Nested Attributes
+
+For nested params (like GOV.UK date inputs):
+
+```ruby
+class DateOfBirthStep
+  include DfE::Wizard::Step
+
+  attribute :date_of_birth, :date
+
+  def self.permitted_params
+    [date_of_birth: %i[day month year]]
+  end
+end
+```
+
+### Custom Validations
+
+Steps use ActiveModel validations:
+
+```ruby
+class EligibilityStep
+  include DfE::Wizard::Step
+
+  attribute :age, :integer
+  attribute :country, :string
+
+  validates :age, numericality: { greater_than_or_equal_to: 18 }
+  validates :country, inclusion: { in: %w[england wales scotland] }
+
+  validate :must_be_eligible
+
+  private
+
+  def must_be_eligible
+    if age.present? && age < 21 && country == 'scotland'
+      errors.add(:base, 'Must be 21 or older in Scotland')
+    end
+  end
+end
+```
+
+### Accessing Other Step Data
+
+Steps can access data from other steps via the state store:
+
+```ruby
+class SummaryStep
+  include DfE::Wizard::Step
+
+  def full_name
+    "#{state_store.first_name} #{state_store.last_name}"
+  end
+
+  def formatted_address
+    [
+      state_store.address_line_1,
+      state_store.address_line_2,
+      state_store.postcode
+    ].compact.join(', ')
+  end
+end
+```
+
+---
+
+## In Depth: Conditional Edges
+
+The Graph processor supports several edge types for branching logic.
+
+### Simple Edge
+
+Unconditional transition from one step to another:
+
+```ruby
+graph.add_edge from: :name, to: :email
+```
+
+```
+  ┌──────┐      ┌───────┐
+  │ name │ ───▶ │ email │
+  └──────┘      └───────┘
+```
+
+### Conditional Edge
+
+Binary branching based on a predicate:
+
+```ruby
+graph.add_conditional_edge(
+  from: :nationality,
+  when: :needs_visa?,        # Method on state_store
+  then: :visa_details,       # If true
+  else: :employment,         # If false
+  label: 'Visa required?'    # Optional: for documentation
+)
+```
+
+```
+                    ┌───────────────┐
+              yes   │ visa_details  │
+           ┌──────▶ └───────────────┘
+  ┌─────────────┐
+  │ nationality │ ── needs_visa? ──┐
+  └─────────────┘                  │
+                    ┌───────────────┐
+              no    │  employment   │
+           └──────▶ └───────────────┘
+```
+
+**Predicates can be:**
+
+```ruby
+# Symbol - method on state_store
+when: :needs_visa?
+
+# Proc - inline logic
+when: -> { state_store.nationality != 'british' }
+```
+
+### Multiple Conditional Edge
+
+Three or more branches, evaluated in order:
+
+```ruby
+graph.add_multiple_conditional_edges(
+  from: :employment_status,
+  branches: [
+    { when: :employed?, then: :employer_details, label: 'Employed' },
+    { when: :self_employed?, then: :business_details, label: 'Self-employed' },
+    { when: :student?, then: :education_details, label: 'Student' }
+  ],
+  default: :other_status  # Required: fallback
+)
+```
+
+```
+                        ┌──────────────────┐
+              employed  │ employer_details │
+           ┌──────────▶ └──────────────────┘
+           │
+  ┌────────────────┐    ┌──────────────────┐
+  │employment_status│ ─▶│ business_details │ (self-employed)
+  └────────────────┘    └──────────────────┘
+           │
+           │            ┌──────────────────┐
+           └──────────▶ │ education_details│ (student)
+           │            └──────────────────┘
+           │
+           │            ┌──────────────────┐
+           └──(default)▶│   other_status   │
+                        └──────────────────┘
+```
+
+**Evaluation order matters** - first matching predicate wins:
+
+```ruby
+branches: [
+  { when: :high_priority?, then: :fast_track },   # Checked first
+  { when: :medium_priority?, then: :standard },   # Checked second
+  { when: :any_priority?, then: :slow_track }     # Checked last
+]
+```
+
+### Custom Branching Edge
+
+For complex logic that returns the next step directly:
+
+```ruby
+graph.add_custom_branching_edge(
+  from: :assessment,
+  conditional: :calculate_route,  # Method that returns step symbol
+  potential_transitions: [        # For documentation only
+    { label: 'Score > 80', nodes: [:fast_track] },
+    { label: 'Score 50-80', nodes: [:standard] },
+    { label: 'Score < 50', nodes: [:remedial] }
+  ]
+)
+```
+
+Define the method in your **wizard** (not state store):
+
+```ruby
+class ApplicationWizard
+  include DfE::Wizard
+
+  def calculate_route
+    score = AssessmentService.score(state_store.read)
+
+    case score
+    when 81..100 then :fast_track
+    when 50..80  then :standard
+    else :remedial
+    end
+  end
+end
+```
+
+### Dynamic Root
+
+Start the wizard at different steps based on conditions:
+
+```ruby
+# Using a block
+graph.conditional_root(potential_root: %i[new_user returning_user]) do |state_store|
+  state_store.existing_user? ? :returning_user : :new_user
+end
+
+# Using a method
+graph.conditional_root(potential_root: %i[new_user returning_user], method: :determine_start)
+```
+
+### Skip When
+
+Skip steps based on conditions. The step remains in the graph but is jumped over during navigation.
+
+```ruby
+graph.add_node :school_selection, SchoolSelection, skip_when: :only_one_school?
+
+# In state store
+def only_one_school?
+  available_schools.count == 1
+end
+```
+
+**Why use skip_when instead of conditional edges?**
+
+Without explicit skipping, a conditional edge on step A must decide not only whether to go to B, but also where to go after B if B is not needed, leading to logic like: "if X then go to B else go to C, but if Y also skip straight to D", which quickly gets messy as you add "next next next" possibilities.
+
+With skipping, conditional edges remain local: A still points to B, B still points to C, and only B knows when it should be removed from the path. This keeps branching logic simpler, more testable, and easier to extend over time.
+
+**Be careful with this feature, use it wisely!**
+
+### Before Callbacks
+
+Execute logic before navigation:
+
+```ruby
+graph.before_next_step(:handle_special_case)
+graph.before_previous_step(:handle_back_navigation)
+
+# In wizard - return step symbol to override, nil to continue
+def handle_special_case
+  return :review if returning_to_review?
+  nil  # Continue normal navigation
+end
+```
+
+---
+
+## In Depth: Route Strategies
+
+Route strategies translate step IDs to URLs.
+
+### NamedRoutes Strategy
+
+Uses Rails named routes. Simplest option.
+
+```ruby
+def route_strategy
+  DfE::Wizard::RouteStrategy::NamedRoutes.new(
+    wizard: self,
+    namespace: 'registration'
+  )
+end
+```
+
+**Required routes:**
+
+```ruby
+# config/routes.rb
+get 'registration/:step', to: 'registration#show', as: :registration
+patch 'registration/:step', to: 'registration#update'
+```
+
+**URL generation:**
+
+```ruby
+wizard.current_step_path  # => '/registration/name'
+wizard.next_step_path     # => '/registration/email'
+wizard.next_step_path(return_to_review: :name)  # => '/registration/email?return_to_review=name'
+```
+
+### ConfigurableRoutes Strategy
+
+For complex URL patterns or nested resources:
+
+```ruby
+def route_strategy
+  DfE::Wizard::RouteStrategy::ConfigurableRoutes.new(
+    wizard: self,
+    namespace: 'applications'
+  ) do |config|
+    # Default arguments for all paths
+    config.default_path_arguments = {
+      application_id: state_store.application_id
+    }
+
+    # Custom path for specific steps
+    config.map_step :review, to: ->(wizard, opts, helpers) {
+      helpers.application_review_path(
+        application_id: wizard.state_store.application_id,
+        **opts
+      )
+    }
+
+    config.map_step :submit, to: ->(wizard, opts, helpers) {
+      helpers.submit_application_path(
+        application_id: wizard.state_store.application_id
+      )
+    }
+  end
+end
+```
+
+### DynamicRoutes Strategy
+
+For multi-instance wizards or fully dynamic URLs:
+
+```ruby
+def route_strategy
+  DfE::Wizard::RouteStrategy::DynamicRoutes.new(
+    state_store: state_store,
+    path_builder: ->(step_id, state_store, helpers, opts) {
+      helpers.wizard_path(
+        wizard_type: 'registration',
+        instance_id: state_store.instance_id,
+        step: step_id,
+        **opts
+      )
+    }
+  )
+end
+```
+
+---
+
+## Advanced: Custom Implementations
+
+### Custom Repository
+
+Create repositories for other storage backends:
+
+```ruby
+class DfE::Wizard::Repository::DynamoDB
+  def initialize(table_name:, key:)
+    @client = Aws::DynamoDB::Client.new
+    @table_name = table_name
+    @key = key
+  end
+
+  def read
+    response = @client.get_item(
+      table_name: @table_name,
+      key: { 'id' => @key }
+    )
+    response.item&.dig('data') || {}
+  end
+
+  def write(data)
+    current = read
+    merged = current.merge(data.stringify_keys)
+
+    @client.put_item(
+      table_name: @table_name,
+      item: { 'id' => @key, 'data' => merged }
+    )
+  end
+
+  def clear
+    @client.delete_item(
+      table_name: @table_name,
+      key: { 'id' => @key }
+    )
+  end
+end
+```
+
+### Custom Step Operator
+
+Create operators for special processing:
+
+```ruby
+class SendNotification
+  def initialize(repository:, step:, callable:)
+    @repository = repository
+    @step = step
+    @callable = callable  # Your state store
+  end
+
+  def execute
+    NotificationMailer.step_completed(
+      email: @callable.email,
+      step: @step.class.name
+    ).deliver_later
+
+    { success: true }
+  end
+end
+
+# Usage
+def steps_operator
+  DfE::Wizard::StepsOperator::Builder.draw(wizard: self, callable: state_store) do |b|
+    b.on_step(:final_step, add: [SendNotification])
+  end
+end
+```
+
+### Custom State Store Transform
+
+Override how data is read/written:
+
+```ruby
+class MyStateStore
+  include DfE::Wizard::StateStore
+
+  # Transform data before writing to repository
+  def transform_write(data)
+    data.transform_keys(&:to_s)
+  end
+
+  # Transform data after reading from repository
+  def transform_read(data)
+    data.transform_keys(&:to_sym)
+  end
+end
+```
+
+---
+
+## Examples
+
+Working examples in this repository:
+
+- [Personal Information Wizard](spec/rails-dummy/app/wizards/personal_information_wizard.rb) - Conditional nationality flow
+- [Register ECT Wizard](spec/rails-dummy/app/wizards/register_ect_wizard.rb) - Complex branching with multiple conditions
+- [A-Levels Wizard](spec/rails-dummy/app/wizards/a_levels_requirements_wizard.rb) - Dynamic root, looping
+
+Generated documentation: [spec/rails-dummy/docs/wizards](spec/rails-dummy/docs/wizards)
 
 ---
 
@@ -1847,112 +1916,102 @@ Auto generated documentation examples of these wizard can be seem [here](spec/ra
 
 ### Wizard Methods
 
-#### Navigation
-- `current_step_name` - Current step symbol
-- `root_step` - First step
-- `next_step` - Next step symbol
-- `previous_step` - Previous step symbol
-- `current_step_path(options)` - URL path
-- `next_step_path(options)` - URL path
-- `previous_step_path(fallback:)` - URL path
-- `flow_path(target)` - Array of steps to target
-- `in_flow?(step_id)` - Check if step is reachable
+**Navigation:**
+- `current_step_name` → Symbol
+- `current_step` → Step object
+- `next_step` → Symbol or nil
+- `previous_step` → Symbol or nil
+- `root_step` → Symbol
+- `current_step_path(options = {})` → String
+- `next_step_path(options = {})` → String or nil
+- `previous_step_path(fallback: nil)` → String or nil
 
-#### Step Management
-- `current_step` - Instantiated step object
-- `step(step_id)` - Get hydrated step
-- `find_step(step_name)` - Get step class
-- `flow_steps` - All steps in flow as objects
-- `saved_steps` - Steps with data as objects
-- `valid_steps` - Valid steps as objects
-- `attribute_names` - All attributes from all steps
+**Flow Analysis:**
+- `flow_path(target = nil)` → Array of Symbols
+- `saved_path(target = nil)` → Array of Symbols
+- `valid_path(target = nil)` → Array of Symbols
+- `in_flow?(step_id)` → Boolean
+- `saved?(step_id)` → Boolean
+- `valid_path_to?(step_id)` → Boolean
 
-#### State Management
-- `data` - Filtered state (reachable steps only)
-- `raw_data` - Unfiltered state (all steps)
-- `step_data(step_id)` - Step data if reachable
-- `raw_step_data(step_id)` - Step data unfiltered
-- `write_state(updates)` - Merge data
-- `clear_state` - Delete all data
-- `mark_completed` - Set completion flag
-- `completed?` - Check if completed
-- `completed_at` - Get completion timestamp
-- `saved_path` - Steps with data
-- `saved?(step_id)` - Check if step has data
-- `orphaned_steps_data` - Data from unreachable steps
+**Step Hydration:**
+- `step(step_id)` → Step object
+- `flow_steps` → Array of Step objects
+- `saved_steps` → Array of Step objects
+- `valid_steps` → Array of Step objects
 
-#### Validation
-- `current_step_valid?` - Check current step
-- `valid?(step_id)` - Check specific step
-- `valid_path(target)` - Safe path to target
-- `valid_path_to?(target)` - Can reach target?
-- `valid_path_to_current_step?` - Can reach current?
-
-#### Check Your Answers
-- `handle_return_to_check_your_answers(target)` - Return to review
-- `handle_back_in_check_your_answers(target, origin)` - Navigate back
+**State:**
+- `save_current_step` → Boolean
+- `current_step_valid?` → Boolean
+- `state_store` → StateStore instance
 
 ### Step Methods
 
-- `valid?` - Check validation
-- `errors` - ActiveModel errors
-- `serializable_data` - Data for storage
-- `model_name` - Rails form helper support
-- `==(other)` - Value equality
-- `inspect` - Debug representation
+- `valid?` → Boolean
+- `errors` → ActiveModel::Errors
+- `serializable_data` → Hash
+- `self.permitted_params` → Array of Symbols
+
+### State Store Methods
+
+- `read` → Hash
+- `write(hash)` → void
+- `clear` → void
+- `[](key)` → value
 
 ### Repository Methods
 
-- `read` - Get all state (decrypted if encrypted)
-- `write(hash)` - Merge into state
-- `save(hash)` - Replace state
-- `clear` - Delete all
-- `execute_operation` - Run operation class
-- `encrypted?` - Check encryption status
+- `read` → Hash
+- `write(hash)` → void
+- `clear` → void
 
 ---
 
 ## Troubleshooting
 
-### Attribute Not Accessible
+### "Predicate method :xxx not found"
+
+Your branching predicate isn't defined on the state store:
 
 ```ruby
-state_store.undefined_attr  # => NoMethodError
-
-# Solution: Ensure attribute is in attribute_names
-state_store.attribute_names.include?(:undefined_attr)  # => false
-
-# Add to step class:
-attribute :undefined_attr, :string
+# In state store
+def needs_visa?
+  nationality != 'british'
+end
 ```
 
-### Data Not Persisting
+### Step attributes not accessible in state store
+
+The wizard must be initialised before accessing attributes:
 
 ```ruby
-state_store.write({ name: "John" })
-state_store.read[:name]  # => nil
+# Wrong - wizard not created yet
+state_store.first_name  # => NoMethodError
 
-# Solution: Check repository is configured correctly
-wizard.state_store.repository.class  # => InMemory (temporary!)
-
-# Use persistent repository:
-repository = DfE::Wizard::Repository::WizardState.new(model: model)
-repository = DfE::Wizard::Repository::Model.new(model: model)
-repository = DfE::Wizard::Repository::Redis.new(model: model)
+# Right - after wizard initialisation
+wizard = MyWizard.new(state_store: state_store, ...)
+state_store.first_name  # => "Sarah"
 ```
 
-### Validation Failing Unexpectedly
+### Data not persisting
+
+Check your repository:
 
 ```ruby
-wizard.current_step.valid?  # => false
-wizard.current_step.errors  # => { email: ["invalid format"] }
+wizard.state_store.repository.class
+# => DfE::Wizard::Repository::InMemory  # This won't persist!
 
-# Solution: Check permitted_params includes all attributes
-Steps::Email.permitted_params  # => [:email, :confirmed]
-wizard.current_step_params # => { } # checks what the current step params returns
+# Use Session or WizardState for persistence
+```
 
-# Check attributes have values
-wizard.current_step.email  # => nil
+### Validation failing unexpectedly
+
+Check permitted_params includes all fields:
+
+```ruby
+def self.permitted_params
+  %i[first_name last_name]  # Must include all validated fields
+end
 ```
 
 ---
@@ -1960,15 +2019,8 @@ wizard.current_step.email  # => nil
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/DFE-Digital/dfe-wizard/issues)
+- **Slack**: Find & Publish team in cross-gov UK Slack
 
 ## License
 
-MIT License — See LICENSE file for details
-
----
-
-## Contact
-
-Contact the Find & Publish teacher training team in cross gov UK slack for any questions,
-considerations, etc.
-
+MIT License - See LICENSE file
