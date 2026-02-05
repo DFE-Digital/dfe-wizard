@@ -10,9 +10,9 @@ A multi-step form framework for Ruby on Rails applications.
 
 1. [Introduction](#introduction)
 2. [Installation](#installation)
-3. [Core Concepts](#core-concepts)
-4. [Data Flow](#data-flow)
-5. [Getting Started](#getting-started)
+3. [Getting Started](#getting-started)
+4. [Core Concepts](#core-concepts)
+5. [Data Flow](#data-flow)
 6. [Navigation](#navigation)
 7. [Conditional Branching](#conditional-branching)
 8. [Check Your Answers](#check-your-answers)
@@ -100,259 +100,6 @@ Then run:
 ```bash
 bundle install
 ```
-
----
-
-## Core Concepts
-
-Before building a wizard, understand these five components:
-
-| Component | Purpose | You Create |
-|-----------|---------|------------|
-| **Repository** | Where data is stored (Session, Redis, DB) | Choose one |
-| **State Store** | Holds data + branching logic | Yes, one per wizard |
-| **Step** | One form screen with fields + validations | Yes, one per screen |
-| **Steps Processor** | Defines flow between steps | Yes, inside wizard |
-| **Wizard** | Orchestrates everything | Yes, one per wizard |
-
-### 1. Repository
-
-The Repository is the **storage backend**. It persists wizard data between HTTP requests.
-
-| Repository | Storage | Use Case |
-|------------|---------|----------|
-| `InMemory` | Ruby hash | Testing only |
-| `Session` | Rails session | Simple wizards |
-| `Cache` | Rails.cache | Fast, temporary |
-| `Redis` | Redis server | Production, distributed |
-| `Model` | ActiveRecord model | Save to model each step |
-| `WizardState` | Database (JSONB) | Persistent wizard state |
-
-See [In Depth: Repositories](#in-depth-repositories) for detailed examples and encryption.
-
-```ruby
-# Testing
-repository = DfE::Wizard::Repository::InMemory.new
-
-# Production - Session
-repository = DfE::Wizard::Repository::Session.new(
-  session: session,
-  key: :my_wizard
-)
-
-# Production - Database
-model = WizardState.find_or_create_by(key: :my_wizard, user_id: current_user.id)
-repository = DfE::Wizard::Repository::WizardState.new(model: model)
-```
-
-### 2. State Store
-
-The State Store is the **bridge between your wizard and the repository**. It:
-
-- Reads/writes data via the repository
-- Provides attribute access (`state_store.first_name`)
-- Contains **branching predicates** (methods that decide which path to take)
-
-```ruby
-module StateStores
-  class Registration
-    include DfE::Wizard::StateStore
-
-    # Branching predicates - these decide the flow
-    def needs_visa?
-      nationality != 'british'
-    end
-
-    def has_right_to_work?
-      right_to_work == 'yes'
-    end
-
-    # Helper methods
-    def full_name
-      "#{first_name} #{last_name}"
-    end
-  end
-end
-```
-
-**Important**: Step attributes (like `first_name`, `nationality`) are automatically available in the state store after the wizard initialises.
-
-### 3. Step
-
-A Step is a **form object representing one screen**. Each step has:
-
-- Attributes (form fields)
-- Validations
-- Permitted parameters
-
-```ruby
-module Steps
-  class PersonalDetails
-    include DfE::Wizard::Step
-
-    # Form fields
-    attribute :first_name, :string
-    attribute :last_name, :string
-    attribute :date_of_birth, :date
-
-    # Validations
-    validates :first_name, :last_name, presence: true
-    validates :date_of_birth, presence: true
-
-    # Strong parameters
-    def self.permitted_params
-      %i[first_name last_name date_of_birth]
-    end
-  end
-end
-```
-
-### 4. Steps Processor
-
-The Steps Processor **defines the flow** - which steps exist and how they connect.
-
-```ruby
-def steps_processor
-  DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
-    # Register all steps
-    graph.add_node :personal_details, Steps::PersonalDetails
-    graph.add_node :contact, Steps::Contact
-    graph.add_node :review, Steps::Review
-
-    # Set the starting step
-    graph.root :personal_details
-
-    # Define transitions
-    graph.add_edge from: :personal_details, to: :contact
-    graph.add_edge from: :contact, to: :review
-  end
-end
-```
-
-**Key point**: `predicate_caller: state_store` tells the graph where to find branching methods (like `needs_visa?`).
-
-### 5. Wizard
-
-The Wizard **orchestrates everything**. It must implement two methods:
-
-```ruby
-class RegistrationWizard
-  include DfE::Wizard
-
-  def steps_processor
-    # Define your flow (see above)
-  end
-
-  def route_strategy
-    # Define URL generation (see Optional Features)
-  end
-end
-```
-
----
-
-## Data Flow
-
-Understanding data flow is essential. Here's what happens during a wizard:
-
-### Write Flow (User submits a form)
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  1. HTTP Request                                                 │
-│     POST /wizard/personal_details                                │
-│     params: { personal_details: { first_name: "Sarah" } }        │
-└────────────────────────┬─────────────────────────────────────────┘
-                         │
-                         ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  2. Controller creates Wizard                                    │
-│                                                                  │
-│     @wizard = RegistrationWizard.new(                            │
-│       current_step: :personal_details,                           │
-│       current_step_params: params,                               │
-│       state_store: state_store                                   │
-│     )                                                            │
-└────────────────────────┬─────────────────────────────────────────┘
-                         │
-                         ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  3. Wizard extracts step params                                  │
-│                                                                  │
-│     Uses Step.permitted_params to filter:                        │
-│     { first_name: "Sarah" }                                      │
-└────────────────────────┬─────────────────────────────────────────┘
-                         │
-                         ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  4. Step validates                                               │
-│                                                                  │
-│     step = Steps::PersonalDetails.new(first_name: "Sarah")       │
-│     step.valid?  # runs ActiveModel validations                  │
-└────────────────────────┬─────────────────────────────────────────┘
-                         │
-              ┌──────────┴──────────┐
-              │                     │
-         Valid?                 Invalid?
-              │                     │
-              ▼                     ▼
-┌─────────────────────┐   ┌─────────────────────┐
-│  5a. Save to State  │   │  5b. Return Errors  │
-│                     │   │                     │
-│  state_store.write( │   │  step.errors        │
-│    first_name:      │   │  # => { last_name:  │
-│      "Sarah"        │   │  #   ["can't be     │
-│  )                  │   │  #    blank"] }     │
-└──────────┬──────────┘   └─────────────────────┘
-           │
-           ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  6. Repository persists                                          │
-│                                                                  │
-│     Session/Redis/Database stores:                               │
-│     { first_name: "Sarah", last_name: nil, ... }                 │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### Read Flow (Loading a step)
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  1. HTTP Request                                                 │
-│     GET /wizard/contact                                          │
-└────────────────────────┬─────────────────────────────────────────┘
-                         │
-                         ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  2. Repository reads persisted data                              │
-│                                                                  │
-│     { first_name: "Sarah", email: "sarah@example.com" }          │
-└────────────────────────┬─────────────────────────────────────────┘
-                         │
-                         ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  3. State Store provides data                                    │
-│                                                                  │
-│     state_store.first_name  # => "Sarah"                         │
-│     state_store.email       # => "sarah@example.com"             │
-└────────────────────────┬─────────────────────────────────────────┘
-                         │
-                         ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  4. Wizard hydrates Step                                         │
-│                                                                  │
-│     step = wizard.current_step                                   │
-│     # Step is pre-filled with saved data                         │
-│     step.email  # => "sarah@example.com"                         │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### Key Points
-
-1. **Data is stored flat** - All attributes from all steps go into one hash
-2. **Repository handles persistence** - You choose where (session, Redis, DB)
-3. **State Store adds behaviour** - Predicates, helpers, attribute access
-4. **Steps are form objects** - They validate but don't persist directly
 
 ---
 
@@ -623,6 +370,320 @@ Use a shared layout and step-specific form partials:
 
 ---
 
+## Core Concepts
+
+Before building a wizard, understand these five components:
+
+```
+| Component           | Purpose                                         | You Create                            |
+|---------------------|-------------------------------------------------|---------------------------------------|
+| **Repository**      | Where data is stored (Session, Redis, DB)       | Choose one per wizard or one per page |
+| **State Store**     | Holds data + branching logic                    | Yes, one per wizard                   |
+| **Step**            | One form screen with fields + validations       | Yes, one per page                     |
+| **Steps Processor** | Defines flow between steps                      | Yes, inside wizard                    |
+| **Wizard**          | Orchestrates everything                         | Yes, one per wizard                   |
+```
+
+### 1. Repository
+
+The Repository is the **storage backend**. It persists wizard data between HTTP requests.
+
+```
+| Repository    | Storage            | Use Case                |
+|---------------|--------------------|-------------------------|
+| `InMemory`    | Ruby hash          | Testing only            |
+| `Session`     | Rails session      | Simple wizards          |
+| `Cache`       | Rails.cache        | Fast, temporary         |
+| `Redis`       | Redis server       | Production, distributed |
+| `Model`       | ActiveRecord model | Save to model each step |
+| `WizardState` | Database (JSONB) | Persistent wizard state |
+```
+
+See [In Depth: Repositories](#in-depth-repositories) for detailed examples and encryption.
+
+```ruby
+# Testing
+repository = DfE::Wizard::Repository::InMemory.new
+
+# Production - Session
+repository = DfE::Wizard::Repository::Session.new(
+  session: session,
+  key: :my_wizard
+)
+
+# Production - Database
+model = WizardState.find_or_create_by(key: :my_wizard, user_id: current_user.id)
+repository = DfE::Wizard::Repository::WizardState.new(model: model)
+```
+
+### 2. State Store
+
+The State Store is the **bridge between your wizard and the repository**. It:
+
+- Reads/writes data via the repository
+- Provides attribute access (`state_store.first_name`)
+- Contains **branching predicates** (methods that decide which path to take)
+
+```ruby
+module StateStores
+  class Registration
+    include DfE::Wizard::StateStore
+
+    # Branching predicates - these decide the flow
+    def needs_visa?
+      nationality != 'british'
+    end
+
+    def has_right_to_work?
+      right_to_work == 'yes'
+    end
+
+    # Helper methods
+    def full_name
+      "#{first_name} #{last_name}"
+    end
+  end
+end
+```
+
+**Available methods:**
+
+```
+| Method        | Description                               |
+|---------------|-------------------------------------------|
+| `repository`  | Access the underlying repository          |
+| `read`        | Read all data from repository             |
+| `write(hash)` | Write data to repository                  |
+| `clear`       | Clear all data                            |
+| `[attribute]` | Dynamic accessors for all step attributes |
+```
+
+**Dynamic attribute accessors**: After wizard initialisation, all step attributes become methods on the state store. If your steps define `first_name`, `email`, and `nationality` attributes, you can call `state_store.first_name`, `state_store.email`, and `state_store.nationality`.
+
+### 3. Step
+
+A Step is a **form object representing one screen**. Each step has:
+
+- Attributes (form fields)
+- Validations
+- Permitted parameters
+
+```ruby
+module Steps
+  class PersonalDetails
+    include DfE::Wizard::Step
+
+    # Form fields
+    attribute :first_name, :string
+    attribute :last_name, :string
+    attribute :date_of_birth, :date
+
+    # Validations
+    validates :first_name, :last_name, presence: true
+    validates :date_of_birth, presence: true
+
+    # Strong parameters
+    def self.permitted_params
+      %i[first_name last_name date_of_birth]
+    end
+  end
+end
+```
+
+### 4. Steps Processor
+
+The Steps Processor **defines the flow** - which steps exist and how they connect.
+
+```ruby
+def steps_processor
+  DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+    # Register all steps
+    graph.add_node :personal_details, Steps::PersonalDetails
+    graph.add_node :contact, Steps::Contact
+    graph.add_node :nationality, Steps::Nationality
+    graph.add_node :visa, Steps::Visa
+    graph.add_node :review, Steps::Review
+
+    # Set the starting step
+    graph.root :personal_details
+
+    # Define transitions
+    graph.add_edge from: :personal_details, to: :contact
+    graph.add_edge from: :contact, to: :nationality
+
+    graph.add_conditional_edge(
+      from: :nationality,
+      when: :needs_visa?,
+      then: :visa,
+      else: :review
+    )
+
+    graph.add_edge from: :visa, to: :review
+  end
+end
+```
+
+**Key point**: `predicate_caller: state_store` tells the graph where to find branching methods (like `needs_visa?`).
+
+### 5. Wizard
+
+The Wizard **orchestrates everything**. It must implement some methods:
+
+```ruby
+class RegistrationWizard
+  include DfE::Wizard
+
+  def steps_processor
+    # Define your flow (see above)
+  end
+
+  def route_strategy
+    # Define URL generation (see Optional Features)
+  end
+
+  def steps_operator
+    # Define steps operatons on #save_current_step (see Optional Features)
+  end
+
+  def inspect
+    # Define inspector for development - useful for debug (see Optional Features)
+    DfE::Wizard::Tooling::Inspect.new(wizard: self) if Rails.env.development?
+  end
+
+  def logger
+    # Define logger for development - useful for debug (see Optional Features)
+    DfE::Wizard::Logging::Logger.new(Rails.logger) if Rails.env.development?
+  end
+end
+```
+
+**`inspect`** - Returns detailed debug output when you `puts wizard`:
+
+```
+#<RegistrationWizard:0x00007f8b1c0a0>
+┌─ STATE LAYERS ─────────────────────────────┐
+│ Current Step: :email
+│ Flow Path:    [:name, :nationality, :email, :review]
+│ Saved Path:   [:name, :nationality]
+│ Valid Path:   [:name, :nationality]
+└────────────────────────────────────────────┘
+┌─ VALIDATION ───────────────────────────────┐
+│ ✓ All steps valid
+└────────────────────────────────────────────┘
+┌─ STATE STORE ──────────────────────────────┐
+│ Raw Steps:
+│   name: { first_name: "Sarah", last_name: "Smith" }
+│   nationality: { nationality: "british" }
+└────────────────────────────────────────────┘
+```
+
+---
+
+## Data Flow
+
+Understanding data flow is essential. Here's what happens during a wizard:
+
+### Write Flow (User submits a form)
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  1. HTTP Request                                                 │
+│     POST /wizard/personal_details                                │
+│     params: { personal_details: { first_name: "Sarah" } }        │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  2. Controller creates Wizard                                    │
+│                                                                  │
+│     @wizard = RegistrationWizard.new(                            │
+│       current_step: :personal_details,                           │
+│       current_step_params: params,                               │
+│       state_store: state_store                                   │
+│     )                                                            │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  3. Wizard extracts step params                                  │
+│                                                                  │
+│     Uses Step.permitted_params to filter:                        │
+│     { first_name: "Sarah" }                                      │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  4. Step validates                                               │
+│                                                                  │
+│     step = Steps::PersonalDetails.new(first_name: "Sarah")       │
+│     step.valid?  # runs ActiveModel validations                  │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+              ┌──────────┴──────────┐
+              │                     │
+         Valid?                 Invalid?
+              │                     │
+              ▼                     ▼
+┌─────────────────────┐   ┌─────────────────────┐
+│  5a. Save to State  │   │  5b. Return Errors  │
+│                     │   │                     │
+│  state_store.write( │   │  step.errors        │
+│    first_name:      │   │  # => { last_name:  │
+│      "Sarah"        │   │  #   ["can't be     │
+│  )                  │   │  #    blank"] }     │
+└──────────┬──────────┘   └─────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  6. Repository persists                                          │
+│                                                                  │
+│     Session/Redis/Database stores:                               │
+│     { first_name: "Sarah", last_name: nil, ... }                 │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Read Flow (Loading a step)
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  1. HTTP Request                                                 │
+│     GET /wizard/contact                                          │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  2. Repository reads persisted data                              │
+│                                                                  │
+│     { first_name: "Sarah", email: "sarah@example.com" }          │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  3. State Store provides data                                    │
+│                                                                  │
+│     state_store.first_name  # => "Sarah"                         │
+│     state_store.email       # => "sarah@example.com"             │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  4. Wizard hydrates Step                                         │
+│                                                                  │
+│     step = wizard.current_step                                   │
+│     # Step is pre-filled with saved data                         │
+│     step.email  # => "sarah@example.com"                         │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Key Points
+
+1. **Data is stored flat** - All attributes from all steps go into one hash
+2. **Repository handles persistence** - You choose where (session, Redis, DB)
+3. **State Store adds behaviour** - Predicates, helpers, attribute access
+4. **Steps are form objects** - They validate but don't persist directly
+
+---
+
 ## Navigation
 
 ### Step Navigation Methods
@@ -642,6 +703,16 @@ Use a shared layout and step-specific form partials:
 | `current_step_path` | String | URL for current step |
 | `next_step_path` | String or nil | URL for next step |
 | `previous_step_path` | String or nil | URL for previous step |
+
+### Back Links
+
+Use `previous_step_path` for GOV.UK back links:
+
+```erb
+<%= govuk_back_link href: @wizard.previous_step_path(fallback: root_path) %>
+```
+
+The `fallback:` option is used on the first step when there is no previous step.
 
 ### Flow Analysis Methods
 
@@ -796,26 +867,11 @@ graph.conditional_root(potential_root: %i[returning_user new_user]) do |state_st
 end
 ```
 
-### Skip Steps
-
-Skip a step based on conditions (step stays in graph but is jumped over):
-
-```ruby
-graph.add_node :school_selection, Steps::SchoolSelection, skip_when: :single_school?
-```
-
-```ruby
-# In state store
-def single_school?
-  available_schools.count == 1
-end
-```
-
-### Performance: Cache API Calls in Predicates
+### Performance: Memoize Expensive Predicates
 
 **Important**: Predicates may be called multiple times per request. Methods like `flow_path`, `previous_step`, and `valid_path` traverse the graph and evaluate predicates along the way.
 
-If your predicate calls an external API, **cache the result**:
+If your predicate calls an external API, **memoize the result**:
 
 ```ruby
 # BAD - API called multiple times per request
@@ -823,12 +879,12 @@ def eligible?
   EligibilityService.check(trn).eligible?  # Called 3+ times!
 end
 
-# GOOD - Cache the result
+# GOOD - Memoize the result
 def eligible?
   @eligible ||= EligibilityService.check(trn).eligible?
 end
 
-# GOOD - Cache the whole response if you need multiple values
+# GOOD - Memoize the whole response if you need multiple values
 def eligibility_result
   @eligibility_result ||= EligibilityService.check(trn)
 end
@@ -1362,45 +1418,115 @@ model.reload.state  # => { "first_name" => "Sarah", "email" => "sarah@example.co
 
 ### Encryption
 
-Some repositories support encryption for sensitive data.
+All repositories that inherit from `Base` support encryption for sensitive data. Pass `encrypted: true` and an `encryptor:` object that responds to `encrypt_and_sign` and `decrypt_and_verify` (like `ActiveSupport::MessageEncryptor`).
 
 ```ruby
+# Create an encryptor
+key = Rails.application.credentials.wizard_encryption_key
+encryptor = ActiveSupport::MessageEncryptor.new(key)
+
+# Use with any repository
 repository = DfE::Wizard::Repository::Session.new(
   session: session,
   key: :secure_wizard,
-  encrypt: true,
-  secret_key: Rails.application.credentials.wizard_encryption_key
+  encrypted: true,
+  encryptor: encryptor
 )
 
 # Data is encrypted before storage
 repository.write(national_insurance: 'AB123456C')
-session[:secure_wizard]  # => encrypted string
+session[:secure_wizard]  # => { national_insurance: "encrypted_string..." }
 ```
 
-**Repositories supporting encryption:**
-- Session
-- Cache
-- Redis
-- WizardState (uses ActiveRecord encryption)
+### Multiple Wizard Instances (state_key)
 
-For WizardState, use Rails encrypted attributes:
+When users can have multiple instances of the same wizard running simultaneously (e.g., multiple browser tabs, or editing multiple applications), use `state_key` to isolate each instance's data.
+
+**The problem**: Without `state_key`, all tabs share the same data. User opens two tabs to create two different applications - data from one overwrites the other.
+
+**The solution**: Generate a unique `state_key` for each wizard instance and pass it through the URL.
 
 ```ruby
-class WizardState < ApplicationRecord
-  encrypts :state
+# Controller
+class ApplicationsController < ApplicationController
+  def new
+    # Generate a new state_key for a fresh wizard instance
+    redirect_to application_step_path(state_key: SecureRandom.uuid, step: :name)
+  end
+
+  def show
+    @wizard = build_wizard
+  end
+
+  def update
+    @wizard = build_wizard
+    if @wizard.save_current_step
+      redirect_to application_step_path(state_key: params[:state_key], step: @wizard.next_step)
+    else
+      render :show
+    end
+  end
+
+  private
+
+  def build_wizard
+    state_store = StateStores::ApplicationStore.new(
+      repository: DfE::Wizard::Repository::Session.new(
+        session: session,
+        key: :applications,
+        state_key: params[:state_key]  # Each instance gets its own namespace
+      )
+    )
+
+    ApplicationWizard.new(
+      current_step: params[:step].to_sym,
+      current_step_params: params,
+      state_store: state_store
+    )
+  end
 end
+```
+
+```ruby
+# Routes
+get 'applications/:state_key/:step', to: 'applications#show', as: :application_step
+patch 'applications/:state_key/:step', to: 'applications#update'
+```
+
+**How it works in Session:**
+
+```ruby
+# Without state_key - single flat hash
+session[:wizard_store] = { first_name: 'Sarah', ... }
+
+# With state_key - nested by instance
+session[:applications] = {
+  'abc-123' => { first_name: 'Sarah', ... },   # Tab 1
+  'def-456' => { first_name: 'James', ... }    # Tab 2
+}
+```
+
+**With Redis:**
+
+```ruby
+repository = DfE::Wizard::Repository::Redis.new(
+  redis: Redis.current,
+  key: "wizard:user:#{current_user.id}",
+  state_key: params[:state_key],
+  expiration: 24.hours
+)
 ```
 
 ### Choosing a Repository
 
-| Scenario | Recommended Repository |
-|----------|------------------------|
-| Testing | InMemory |
-| Simple wizard, no sensitive data | Session |
-| Distributed system, temporary data | Cache or Redis |
-| Persist to existing model | Model |
-| Complex wizard, many fields | WizardState |
-| Sensitive data | Any with encryption |
+| Scenario                             | Recommended Repository |
+|--------------------------------------|------------------------|
+| Testing                              | InMemory               |
+| Simple wizard, no sensitive data     | Session                |
+| Distributed system, temporary data   | Cache or Redis         |
+| Persist to existing model            | Model                  |
+| Complex wizard, many fields          | WizardState            |
+| Sensitive data                       | Any with encryption    |
 
 ---
 
@@ -1787,22 +1913,78 @@ end
 
 ### DynamicRoutes Strategy
 
-For multi-instance wizards or fully dynamic URLs:
+For multi-instance wizards where URLs need to include a unique identifier (like `state_key`). This is the recommended strategy when using `state_key` for multiple wizard instances.
+
+**Why use DynamicRoutes?**
+
+- URLs include the instance identifier: `/applications/abc-123/name`
+- Works seamlessly with `state_key` repository pattern
+- The `path_builder` lambda gives you full control over URL generation
+
+**The path_builder receives:**
+
+| Argument | Description |
+|----------|-------------|
+| `step_id` | The step symbol (`:name`, `:email`) |
+| `state_store` | Your state store instance (access `state_key` via repository) |
+| `helpers` | Rails URL helpers |
+| `opts` | Additional options passed to path methods |
+
+**Complete example with state_key:**
 
 ```ruby
-def route_strategy
-  DfE::Wizard::RouteStrategy::DynamicRoutes.new(
-    state_store: state_store,
-    path_builder: ->(step_id, state_store, helpers, opts) {
-      helpers.wizard_path(
-        wizard_type: 'registration',
-        instance_id: state_store.instance_id,
-        step: step_id,
-        **opts
-      )
-    }
+# Wizard
+class ApplicationWizard
+  include DfE::Wizard
+
+  def route_strategy
+    DfE::Wizard::RouteStrategy::DynamicRoutes.new(
+      state_store: state_store,
+      path_builder: ->(step_id, state_store, helpers, opts) {
+        helpers.application_step_path(
+          state_key: state_store.repository.state_key,
+          step: step_id,
+          **opts
+        )
+      }
+    )
+  end
+end
+```
+
+```ruby
+# Routes
+get 'applications/:state_key/:step', to: 'applications#show', as: :application_step
+patch 'applications/:state_key/:step', to: 'applications#update'
+```
+
+```ruby
+# Controller
+def build_wizard
+  repository = DfE::Wizard::Repository::Session.new(
+    session: session,
+    key: :applications,
+    state_key: params[:state_key]
+  )
+
+  state_store = StateStores::ApplicationStore.new(repository: repository)
+
+  ApplicationWizard.new(
+    current_step: params[:step].to_sym,
+    current_step_params: params,
+    state_store: state_store
   )
 end
+```
+
+Now `@wizard.next_step_path` automatically includes the `state_key`:
+
+```ruby
+@wizard.next_step_path
+# => "/applications/abc-123-def/email"
+
+@wizard.next_step_path(return_to_review: true)
+# => "/applications/abc-123-def/email?return_to_review=true"
 ```
 
 ---
@@ -1878,25 +2060,39 @@ def steps_operator
 end
 ```
 
-### Custom State Store Transform
+### Custom Repository Transform
 
-Override how data is read/written:
+Override `transform_for_read` and `transform_for_write` on your repository to control how data flows between the wizard and your data store. This is particularly useful for:
+
+- Mapping step attributes to different column names
+- Working around the step attribute uniqueness constraint
+- Adapting to existing database schemas
+
+**Example: Mapping prefixed attributes to a flat model**
+
+If you have two steps that both conceptually have an "email" field, you must use unique attribute names (`contact_email`, `billing_email`). But your model might just have `email` and `billing_email`:
 
 ```ruby
-class MyStateStore
-  include DfE::Wizard::StateStore
-
-  # Transform data before writing to repository
-  def transform_write(data)
-    data.transform_keys(&:to_s)
+class MyRepository < DfE::Wizard::Repository::Model
+  # Transform data when reading FROM data store (data store → wizard)
+  def transform_for_read(data)
+    data.merge(
+      'contact_email' => data['email']  # Map model's 'email' to step's 'contact_email'
+    )
   end
 
-  # Transform data after reading from repository
-  def transform_read(data)
-    data.transform_keys(&:to_sym)
+  # Transform data when writing TO data store (wizard → data store)
+  def transform_for_write(data)
+    transformed = data.dup
+    if transformed.key?('contact_email')
+      transformed['email'] = transformed.delete('contact_email')  # Map back
+    end
+    transformed
   end
 end
 ```
+
+This lets your steps use descriptive, unique attribute names while your database uses its existing schema.
 
 ---
 
