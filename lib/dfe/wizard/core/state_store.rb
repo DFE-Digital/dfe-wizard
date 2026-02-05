@@ -21,8 +21,8 @@ module DfE
 
         # Sets attribute names and generates explicit accessor methods.
         #
-        # Instead of relying on method_missing, this generates real methods
-        # for each attribute, making data flow explicit and easier to debug.
+        # Generates real methods for each attribute, making data flow
+        # explicit and easier to debug.
         #
         # @param names [Array<String, Symbol>] all steps attribute names
         # @return [void]
@@ -143,9 +143,9 @@ module DfE
 
         # Generate explicit accessor methods for all step attributes.
         #
-        # Instead of relying on method_missing, this generates real singleton
-        # methods for each attribute. This makes data flow explicit:
-        # - state_store.first_name calls a real method, not method_missing
+        # This generates real singleton methods for each attribute, making
+        # data flow explicit:
+        # - state_store.first_name calls a real method
         # - Easier to debug and trace in stack traces
         # - Better IDE support for autocompletion
         #
@@ -171,43 +171,11 @@ module DfE
           end
         end
 
-        # Fallback for attribute access when explicit methods haven't been generated.
-        #
-        # With explicit accessor generation (see {#define_attribute_accessors}),
-        # this method is rarely called. It exists as a fallback for:
-        # - Attributes accessed before attribute_names is set
-        # - Edge cases where generation was skipped
-        #
-        # @param method_name [Symbol] Name of missing method
-        # @param args [Array] Arguments passed to method
-        #
-        # @return [Object] Value from repository data for the attribute
-        #
-        # @raise [NoMethodError] If method name is not a known attribute
-        #
-        # @api private
-        def method_missing(method_name, *args)
-          if step_attribute?(method_name)
-            read[method_name]
-          else
-            super
-          end
-        end
-
-        # Check if an attribute name is a known step attribute
-        #
-        # Internal helper method used by both {#method_missing} and {#respond_to_missing?}
-        # to determine whether a method call should be routed to repository data.
-        #
-        # ## Logic
+        # Check if an attribute name is a known step attribute.
         #
         # Returns true only if:
         # 1. Attribute method generation is enabled via {#step_attributes_methods?}
         # 2. The attribute name exists in the `attribute_names` collection
-        #
-        # This two-part check allows:
-        # - Disabling all dynamic attribute access by overriding `step_attributes_methods?`
-        # - Maintaining custom methods that won't be affected by method_missing
         #
         # @param attribute_name [Symbol, String] Name to check
         #
@@ -221,52 +189,10 @@ module DfE
         #   state_store.step_attribute?(:email)         # => true
         #   state_store.step_attribute?(:undefined)     # => false
         #
-        # @example With generation disabled
-        #   state_store.attribute_names = [:first_name, :email]
-        #   # Override step_attributes_methods? to return false
-        #
-        #   state_store.step_attribute?(:first_name)    # => false (generation disabled)
-        #   state_store.step_attribute?(:email)         # => false (generation disabled)
-        #
-        # @note This method is called internally by {#method_missing} and {#respond_to_missing?}
-        #   and is rarely called directly by user code.
-        #
-        # @see #method_missing Which uses this to route attribute access
-        # @see #respond_to_missing? Which uses this for introspection
         # @see #step_attributes_methods? Which enables/disables attribute generation
         # @api public
         def step_attribute?(attribute_name)
           step_attributes_methods? && attribute_names.include?(attribute_name.to_s)
-        end
-
-        # Support respond_to? for dynamic attributes
-        #
-        # Enables proper introspection of dynamic attribute methods.
-        # When `respond_to?` is called with an attribute name, returns true
-        # if that attribute exists in `attribute_names`.
-        #
-        # This is necessary for Rails/Rack compatibility and proper
-        # duck-typing support.
-        #
-        # @param method_name [Symbol, String] Name to check
-        # @param include_private [Boolean] Include private methods (default: false)
-        #
-        # @return [Boolean] true if method_name is a known attribute or exists
-        #
-        # @example Checking for attributes
-        #   state_store.attribute_names = [:first_name, :email]
-        #
-        #   state_store.respond_to?(:first_name)   # => true
-        #   state_store.respond_to?(:email)        # => true
-        #   state_store.respond_to?(:undefined)    # => false
-        #
-        # @example Works with Rails parameter helpers
-        #   # Rails uses respond_to? internally
-        #   params.require(:state_store)   # Works with respond_to? support
-        #
-        # @api public
-        def respond_to_missing?(method_name, include_private = false)
-          step_attribute?(method_name) || super
         end
       end
     end

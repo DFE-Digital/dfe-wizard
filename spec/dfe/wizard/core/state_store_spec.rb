@@ -332,7 +332,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
     end
   end
 
-  describe '#method_missing and #respond_to_missing?' do
+  describe 'dynamic attribute accessors' do
     context 'with complete DBS check application' do
       before do
         repository.write({
@@ -370,7 +370,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
         state_store.attribute_names = wizard.attribute_names
       end
 
-      it 'responds to all step attributes via method_missing' do
+      it 'responds to all step attributes' do
         expect(state_store).to respond_to(:service_type)
         expect(state_store).to respond_to(:first_name)
         expect(state_store).to respond_to(:last_name)
@@ -379,27 +379,27 @@ RSpec.describe DfE::Wizard::Core::StateStore do
         expect(state_store).to respond_to(:passport_number)
       end
 
-      it 'returns correct values via method_missing' do
+      it 'returns correct values for attributes' do
         expect(state_store.service_type).to eq('basic')
         expect(state_store.first_name).to eq('Sarah')
         expect(state_store.last_name).to eq('Johnson')
         expect(state_store.email).to eq('sarah.johnson@example.com')
       end
 
-      it 'method_missing reads from current repository data' do
+      it 'reads from current repository data' do
         repository.write(repository.read.merge(first_name: 'Emma'))
 
         expect(state_store.first_name).to eq('Emma')
       end
 
-      it 'custom predicate methods work with method_missing attributes' do
+      it 'custom predicate methods work with generated attributes' do
         expect(state_store.has_previous_names?).to be true
         expect(state_store.full_name).to eq('Sarah Elizabeth Johnson')
         expect(state_store.age).to be_between(38, 40)
         expect(state_store.uk_resident?).to be true
       end
 
-      it 'does not override custom methods with method_missing' do
+      it 'does not override custom methods with generated accessors' do
         expect(state_store).to respond_to(:full_name)
         expect(state_store).to respond_to(:age)
         expect(state_store.full_name).to include('Sarah')
@@ -431,7 +431,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
         expect(state_store.has_previous_names?).to be false
       end
 
-      it 'previous_names_details attributes return nil via method_missing' do
+      it 'previous_names_details attributes return nil' do
         expect(state_store.previous_first_name).to be_nil
         expect(state_store.previous_last_name).to be_nil
       end
@@ -509,7 +509,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
         state_store.attribute_names = wizard.attribute_names
       end
 
-      it 'provides natural attribute access via method_missing' do
+      it 'provides natural attribute access' do
         expect(state_store.first_name).to eq('Emma')
         expect(state_store.email).to eq('emma.williams@example.com')
         expect(state_store.full_name).to eq('Emma Grace Williams')
@@ -530,7 +530,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
 
       let(:disabled_store) { disabled_store_class.new(repository: repository) }
 
-      it 'still responds to method_missing for attributes' do
+      it 'does not generate attribute accessors' do
         repository.write({ first_name: 'Test' })
         disabled_store.step_definitions = wizard.step_definitions
         disabled_store.attribute_names = wizard.attribute_names
@@ -562,7 +562,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
 
       let(:collision_store) { collision_store_class.new(repository: repository) }
 
-      it 'preserves existing custom method (method_missing not called)' do
+      it 'preserves existing custom method' do
         repository.write({ first_name: 'Sarah' })
         collision_store.step_definitions = wizard.step_definitions
         collision_store.attribute_names = wizard.attribute_names
