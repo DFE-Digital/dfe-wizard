@@ -109,24 +109,4 @@ class RegisterECTWizard
 
     :check_answers if current_step_name == target && valid_path_to?(:check_answers)
   end
-
-  def find_ect_transitions
-    return :trn_not_found unless state_store.in_trs?
-    return :national_insurance_number unless state_store.matches_trs_dob?
-    return :already_active_at_school if state_store.active_at_school?
-    return :induction_completed if state_store.induction_completed?
-    return :induction_exempt if state_store.induction_exempt?
-    return :induction_failed if state_store.induction_failed?
-    return :cannot_register_ect if state_store.prohibited_from_teaching?
-
-    :review_ect_details
-  end
-
-  def national_insurance_number_transitions
-    return :not_found unless state_store.in_trs?
-    return :induction_completed if state_store.induction_completed?
-    return :induction_exempt if state_store.induction_exempt?
-
-    :review_ect_details
-  end
 end

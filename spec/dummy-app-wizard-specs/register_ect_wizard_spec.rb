@@ -340,8 +340,8 @@ RSpec.describe RegisterECTWizard do
 
       before do
         state_store.write(trn: '1111111')
-        allow(wizard).to receive(:find_ect_transitions).and_return(:national_insurance_number)
-        allow(wizard).to receive(:national_insurance_number_transitions).and_return(:not_found)
+        allow(state_store).to receive(:find_ect_transitions).and_return(:national_insurance_number)
+        allow(state_store).to receive(:national_insurance_number_transitions).and_return(:not_found)
       end
 
       it { expect(wizard).to have_previous_step(:national_insurance_number) }

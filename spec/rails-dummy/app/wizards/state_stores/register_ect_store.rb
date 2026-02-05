@@ -57,6 +57,28 @@ module StateStores
       appropriate_body_name.presence || 'Not provided'
     end
 
+    # Custom branching: determines next step after find_ect
+    def find_ect_transitions
+      return :trn_not_found unless in_trs?
+      return :national_insurance_number unless matches_trs_dob?
+      return :already_active_at_school if active_at_school?
+      return :induction_completed if induction_completed?
+      return :induction_exempt if induction_exempt?
+      return :induction_failed if induction_failed?
+      return :cannot_register_ect if prohibited_from_teaching?
+
+      :review_ect_details
+    end
+
+    # Custom branching: determines next step after national_insurance_number
+    def national_insurance_number_transitions
+      return :not_found unless in_trs?
+      return :induction_completed if induction_completed?
+      return :induction_exempt if induction_exempt?
+
+      :review_ect_details
+    end
+
     private
 
     def trn

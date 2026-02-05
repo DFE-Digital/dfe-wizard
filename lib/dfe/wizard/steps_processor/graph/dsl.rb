@@ -203,31 +203,44 @@ module DfE
           # Add custom branching edge for arbitrary logic.
           #
           # Use this for complex transitions that don't fit the other patterns.
-          # The conditional should return the target node ID directly.
+          # The conditional should return the target step ID directly (not true/false).
+          #
+          # When using a Symbol, the method is called on the predicate_caller
+          # (typically state_store), consistent with other edge types.
           #
           # @param from [Symbol] Source node
-          # @param conditional [Symbol, Proc] Logic returning target node ID
+          # @param conditional [Symbol, Proc] Logic returning target step ID
           # @param potential_transitions [Array<Hash>] Documentation of possible paths
           #
-          # @example
+          # @example With a method on state_store
+          #   # In state_store:
+          #   def determine_payment_path
+          #     case payment_status
+          #     when 'approved' then :confirmation
+          #     when 'pending' then :payment_pending
+          #     else :retry_payment
+          #     end
+          #   end
+          #
+          #   # In graph definition:
           #   g.add_custom_branching_edge(
           #     from: :payment,
-          #     conditional: proc do |step|
-          #       case step.payment_status
-          #       when :approved then :confirmation
-          #       when :pending then :payment_pending
-          #       when :failed then :retry_payment
-          #       else :error
-          #       end
-          #     end,
+          #     conditional: :determine_payment_path,
           #     potential_transitions: [
           #       { label: "Payment approved", nodes: [:confirmation] },
           #       { label: "Payment pending", nodes: [:payment_pending] },
           #       { label: "Payment failed", nodes: [:retry_payment] }
           #     ]
           #   )
+          #
+          # @example With a proc
+          #   g.add_custom_branching_edge(
+          #     from: :payment,
+          #     conditional: proc { |step| step.payment_status == 'approved' ? :confirmation : :retry },
+          #     potential_transitions: [...]
+          #   )
           def add_custom_branching_edge(from:, conditional:, potential_transitions:)
-            predicate = build_predicate(conditional, caller: @wizard)
+            predicate = build_predicate(conditional)
 
             @registry.add_custom_branching_edge(
               from: from,

@@ -81,19 +81,6 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
       DfE::Wizard::Logger.new(Rails.logger)
     end
 
-    def determine_status_path(_step_obj)
-      case state_store.application_status
-      when :submitted
-        :review
-      when :approved
-        :issue_certificate
-      when :rejected
-        :rejection_notice
-      else
-        :pending_info
-      end
-    end
-
     def conditional_entry_point
       state_store.is_returning_user? ? :account_login : :organization_type
     end
@@ -139,6 +126,20 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
 
       def account_feature_flag_enabled?
         @account_feature_flag_enabled.present?
+      end
+
+      # Custom branching: determines next step based on application status
+      def determine_status_path
+        case application_status
+        when :submitted
+          :review
+        when :approved
+          :issue_certificate
+        when :rejected
+          :rejection_notice
+        else
+          :pending_info
+        end
       end
     end
   end
