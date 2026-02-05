@@ -1,14 +1,14 @@
 module DfE
   module Wizard
-    # Module for building Check Your Answers / Review presenters.
+    # Module for building Check Your Answers pages.
     #
     # Include this module in your own presenter class to get helper methods
-    # for building review pages. You control the structure, grouping, and
-    # formatting - the module provides the building blocks.
+    # for building check your answers pages. You control the structure, grouping,
+    # and formatting - the module provides the building blocks.
     #
-    # @example Create your own review presenter
-    #   class RegisterECTReview
-    #     include DfE::Wizard::ReviewPresenter
+    # @example Create your own check answers presenter
+    #   class RegisterECTCheckAnswers
+    #     include DfE::Wizard::CheckAnswersPresenter
     #
     #     def teacher_details
     #       [
@@ -37,17 +37,17 @@ module DfE
     #   end
     #
     # @example In controller
-    #   @review = RegisterECTReview.new(@wizard)
+    #   @check_answers = RegisterECTCheckAnswers.new(@wizard)
     #
     # @example In view
-    #   <% @review.teacher_details.each do |row| %>
+    #   <% @check_answers.teacher_details.each do |row| %>
     #     <dt><%= row.label %></dt>
     #     <dd><%= row.formatted_value %></dd>
     #     <dd><%= link_to "Change", row.change_path %></dd>
     #   <% end %>
     #
-    module ReviewPresenter
-      # Represents a single row in a review/check-your-answers page.
+    module CheckAnswersPresenter
+      # Represents a single row in a check your answers page.
       #
       # Provides access to raw and formatted values, labels from I18n,
       # and change paths for editing.
@@ -144,17 +144,33 @@ module DfE
         @wizard = wizard
       end
 
-      # Build a review row for a step attribute.
+      # Steps available for review. Override to customize.
+      #
+      # @return [Array<DfE::Wizard::Step>] steps to include in review
+      def reviewable_steps
+        wizard.flow_steps
+      end
+
+      # Find a step by ID from reviewable steps.
+      #
+      # @param step_id [Symbol] the step identifier
+      # @return [DfE::Wizard::Step, nil] the step or nil if not found
+      def find_reviewable_step(step_id)
+        reviewable_steps.find { |step| step.step_id == step_id }
+      end
+
+      # Build a row for a step attribute.
       #
       # Returns a Row object with access to the value, formatted value,
-      # label, and change path.
+      # label, and change path. Returns nil if the step is not in
+      # reviewable_steps or if the attribute doesn't exist on the step.
       #
       # @param step_id [Symbol] the step identifier
       # @param attribute [Symbol] the attribute name
       # @param label [String, nil] custom label (defaults to step's human_attribute_name)
       # @param change_step [Symbol, nil] override which step the change link goes to
       #
-      # @return [Row] row object
+      # @return [Row, nil] row object or nil if step/attribute not available
       #
       # @example Basic row
       #   row = row_for(:email_address, :email)
@@ -166,8 +182,11 @@ module DfE
       # @example With custom label
       #   row_for(:start_date, :start_date, label: "ECT start date")
       def row_for(step_id, attribute, label: nil, change_step: nil)
-        step = wizard.step(step_id)
-        raw_value = step&.public_send(attribute)
+        step = find_reviewable_step(step_id)
+        return nil unless step
+        return nil unless step.respond_to?(attribute)
+
+        raw_value = step.public_send(attribute)
 
         Row.new(
           step_id: step_id,
@@ -202,6 +221,9 @@ module DfE
 
       # Build multiple rows from a step's attributes.
       #
+      # Returns an empty array if the step is not in reviewable_steps.
+      # Filters out any nil rows (e.g., for non-existent attributes).
+      #
       # @param step_id [Symbol] the step identifier
       # @param attributes [Array<Symbol, Hash>] attribute names or hashes with options
       #
@@ -211,7 +233,10 @@ module DfE
       #   rows_for(:personal_details, [:first_name, :last_name, :email])
       #   rows_for(:personal_details, [:first_name, { attribute: :dob, label: "Date of birth" }])
       def rows_for(step_id, attributes)
-        attributes.map do |attr|
+        step = find_reviewable_step(step_id)
+        return [] unless step
+
+        attributes.filter_map do |attr|
           if attr.is_a?(Hash)
             row_for(step_id, attr[:attribute], **attr.except(:attribute))
           else

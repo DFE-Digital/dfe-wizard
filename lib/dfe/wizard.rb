@@ -109,9 +109,9 @@ module DfE
     end
     # @!endgroup
 
-    # Module for building Check Your Answers / Review presenters
+    # Module for building Check Your Answers pages
     # @api public
-    autoload :ReviewPresenter, 'dfe/wizard/review_presenter'
+    autoload :CheckAnswersPresenter, 'dfe/wizard/check_answers_presenter'
 
     # @!group Auto generate Documentation for any wizard
     module Documentation

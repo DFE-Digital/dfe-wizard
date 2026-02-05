@@ -1,4 +1,4 @@
-RSpec.describe DfE::Wizard::ReviewPresenter do
+RSpec.describe DfE::Wizard::CheckAnswersPresenter do
   let(:repository) { DfE::Wizard::Repository::InMemory.new }
   let(:state_store) { StateStores::RegisterECTStore.new(repository:) }
   let(:wizard) do
@@ -11,7 +11,7 @@ RSpec.describe DfE::Wizard::ReviewPresenter do
 
   let(:presenter_class) do
     Class.new do
-      include DfE::Wizard::ReviewPresenter
+      include DfE::Wizard::CheckAnswersPresenter
 
       def teacher_details
         [
@@ -54,11 +54,29 @@ RSpec.describe DfE::Wizard::ReviewPresenter do
     end
   end
 
+  describe '#reviewable_steps' do
+    it 'defaults to flow_steps' do
+      expect(presenter.reviewable_steps).to eq(wizard.flow_steps)
+    end
+  end
+
+  describe '#find_reviewable_step' do
+    it 'returns the step when found' do
+      step = presenter.find_reviewable_step(:email_address)
+      expect(step).to be_a(Steps::RegisterECT::EmailAddressStep)
+    end
+
+    it 'returns nil when step not in reviewable steps' do
+      state_store.write(training_programme: 'school_led')
+      expect(presenter.find_reviewable_step(:lead_provider)).to be_nil
+    end
+  end
+
   describe '#row_for' do
     let(:row) { presenter.row_for(:email_address, :email) }
 
     it 'returns a Row object' do
-      expect(row).to be_a(DfE::Wizard::ReviewPresenter::Row)
+      expect(row).to be_a(DfE::Wizard::CheckAnswersPresenter::Row)
     end
 
     it 'sets the step_id' do
@@ -101,10 +119,16 @@ RSpec.describe DfE::Wizard::ReviewPresenter do
       end
     end
 
-    context 'when step does not exist' do
-      it 'raises an error when step is not found' do
-        expect { presenter.row_for(:nonexistent_step, :some_attr) }
-          .to raise_error(NoMethodError)
+    context 'when step is not in reviewable_steps' do
+      it 'returns nil' do
+        state_store.write(training_programme: 'school_led')
+        expect(presenter.row_for(:lead_provider, :lead_provider_id)).to be_nil
+      end
+    end
+
+    context 'when attribute does not exist on step' do
+      it 'returns nil' do
+        expect(presenter.row_for(:email_address, :nonexistent_attribute)).to be_nil
       end
     end
   end
@@ -117,7 +141,7 @@ RSpec.describe DfE::Wizard::ReviewPresenter do
     context 'when overridden in presenter' do
       let(:presenter_class) do
         Class.new do
-          include DfE::Wizard::ReviewPresenter
+          include DfE::Wizard::CheckAnswersPresenter
 
           def format_value(attribute, value)
             case attribute
@@ -156,6 +180,13 @@ RSpec.describe DfE::Wizard::ReviewPresenter do
       expect(rows[0].label).to eq('Name') # From I18n
       expect(rows[1].label).to eq('Are details correct?')
     end
+
+    context 'when step is not in reviewable_steps' do
+      it 'returns empty array' do
+        state_store.write(training_programme: 'school_led')
+        expect(presenter.rows_for(:lead_provider, [:lead_provider_id])).to eq([])
+      end
+    end
   end
 
   describe '#change_path_for' do
@@ -183,7 +214,7 @@ RSpec.describe DfE::Wizard::ReviewPresenter do
     end
   end
 
-  describe DfE::Wizard::ReviewPresenter::Row do
+  describe DfE::Wizard::CheckAnswersPresenter::Row do
     let(:step) { wizard.step(:email_address) }
     let(:row) do
       described_class.new(
