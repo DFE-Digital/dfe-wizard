@@ -18,7 +18,7 @@ module DfE
       # Use Graph for multi-path workflows where step order isn't linear.
       #
       # @example Simple linear graph
-      #   Graph.draw(wizard) do |g|
+      #   Graph.draw(wizard, predicate_caller: state_store) do |g|
       #     g.add_node :step1, Step1
       #     g.add_node :step2, Step2
       #     g.root :step1
@@ -26,7 +26,7 @@ module DfE
       #   end
       #
       # @example With conditional branching
-      #   Graph.draw(wizard) do |g|
+      #   Graph.draw(wizard, predicate_caller: state_store) do |g|
       #     g.add_node :visa_type, VisaTypeStep
       #     g.add_node :student, StudentDetailsStep
       #     g.add_node :work, WorkDetailsStep
@@ -88,14 +88,14 @@ module DfE
         # @raise [ArgumentError] If no root defined
         #
         # @example Fixed root
-        #   Graph.draw(wizard) do |g|
+        #   Graph.draw(wizard, predicate_caller: state_store) do |g|
         #     g.add_node :start, StartStep
         #     g.root :start  # Always :start
         #   end
         #   graph.root_step  # => :start
         #
         # @example Dynamic root
-        #   Graph.draw(wizard) do |g|
+        #   Graph.draw(wizard, predicate_caller: state_store) do |g|
         #     g.add_node :simple_path, SimpleStep
         #     g.add_node :complex_path, ComplexStep
         #     g.conditional_root { |state| state.is_complex? ? :complex_path : :simple_path }
@@ -146,7 +146,7 @@ module DfE
         #   graph.previous_step(:step1)  # => nil (already at root)
         #
         # @example Prevent going back
-        #   Graph.draw(wizard) do |g|
+        #   Graph.draw(wizard, predicate_caller: state_store) do |g|
         #     g.before_previous_step { return nil if payment_locked? }
         #   end
         def previous_step(step = nil)
