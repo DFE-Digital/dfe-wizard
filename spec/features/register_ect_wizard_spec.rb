@@ -12,7 +12,7 @@ RSpec.feature 'Register ECT wizard', type: :feature do
       'Working pattern' => 'Full time',
       'Appropriate body' => 'Example Appropriate Body',
       'Training programme' => 'Provider led',
-      'Lead provider' => 'Teach first',
+      'Lead provider' => 'Teach First',
     )
     and_i_confirm_details
 

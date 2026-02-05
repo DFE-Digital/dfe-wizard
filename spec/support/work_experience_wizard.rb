@@ -98,7 +98,7 @@ class WorkExperienceWizard
   include DfE::Wizard
 
   def steps_processor
-    @steps_processor ||= DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+    @steps_processor ||= DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
       graph.add_node :work_title, Steps::WorkTitle
       graph.add_node :employer, Steps::Employer
       graph.add_node :start_date, Steps::StartDate

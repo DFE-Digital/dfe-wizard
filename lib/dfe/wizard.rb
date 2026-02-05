@@ -23,7 +23,7 @@ module DfE
   #     include DfE::Wizard
   #
   #     def steps_processor
-  #       DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+  #       DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
   #         graph.add_node :name, NameStep
   #         graph.add_node :email, EmailStep
   #         graph.add_node :review, ReviewStep
@@ -108,6 +108,10 @@ module DfE
       autoload :Step, 'dfe/wizard/core/step'
     end
     # @!endgroup
+
+    # Module for building Check Your Answers pages
+    # @api public
+    autoload :CheckAnswersPresenter, 'dfe/wizard/check_answers_presenter'
 
     # @!group Auto generate Documentation for any wizard
     module Documentation
@@ -325,7 +329,7 @@ module DfE
     #
     # @example
     #   def steps_processor
-    #     DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+    #     DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
     #       graph.add_node :step1, Step1
     #       graph.root :step1
     #     end

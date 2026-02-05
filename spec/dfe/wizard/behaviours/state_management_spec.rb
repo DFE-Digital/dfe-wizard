@@ -31,7 +31,7 @@ RSpec.describe DfE::Wizard::Behaviours::StateManagement do
       include DfE::Wizard
 
       def steps_processor
-        DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+        DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
           graph.add_node :personal_details, Steps::PersonalDetails
           graph.add_node :account_type, Steps::AccountType
           graph.add_node :company_details, Steps::CompanyDetails
@@ -85,10 +85,6 @@ RSpec.describe DfE::Wizard::Behaviours::StateManagement do
       def logger
         DfE::Wizard::Logger.new(nil)
       end
-
-      delegate :business?, :individual?,
-               :verification_email?, :verification_phone?, :verification_id?,
-               to: :state_store
     end
   end
 
@@ -794,7 +790,7 @@ RSpec.describe DfE::Wizard::Behaviours::StateManagement do
           include DfE::Wizard
 
           def steps_processor
-            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+            DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
               graph.add_node :step_one, Steps::PersonalDetails
               graph.add_node :step_two, Steps::AccountType
               graph.root :step_one
@@ -852,7 +848,7 @@ RSpec.describe DfE::Wizard::Behaviours::StateManagement do
           include DfE::Wizard
 
           def steps_processor
-            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+            DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
               graph.add_node :validate_step, Steps::PersonalDetails
               graph.add_node :payment_step, Steps::AccountType
               graph.add_node :review_step, Steps::CompanyDetails
@@ -924,7 +920,7 @@ RSpec.describe DfE::Wizard::Behaviours::StateManagement do
           include DfE::Wizard
 
           def steps_processor
-            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+            DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
               graph.add_node :configured_step, Steps::PersonalDetails
               graph.add_node :unconfigured_step, Steps::AccountType
               graph.root :configured_step
@@ -973,7 +969,7 @@ RSpec.describe DfE::Wizard::Behaviours::StateManagement do
           include DfE::Wizard
 
           def steps_processor
-            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+            DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
               graph.add_node :step_one, Steps::PersonalDetails
               graph.root :step_one
             end
@@ -1016,7 +1012,7 @@ RSpec.describe DfE::Wizard::Behaviours::StateManagement do
           include DfE::Wizard
 
           def steps_processor
-            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+            DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
               graph.add_node :step_one, Steps::PersonalDetails
               graph.root :step_one
             end

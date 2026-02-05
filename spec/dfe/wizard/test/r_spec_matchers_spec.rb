@@ -356,7 +356,7 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
         end
 
         def steps_processor
-          @steps_processor ||= DfE::Wizard::StepsProcessor::Graph.draw(self) do |g|
+          @steps_processor ||= DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |g|
             g.add_node :step_a, Class.new
             g.add_node :step_b, Class.new
             g.root :step_a
@@ -432,7 +432,7 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
           end
 
           def steps_processor
-            @steps_processor ||= DfE::Wizard::StepsProcessor::Graph.draw(self) do |g|
+            @steps_processor ||= DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |g|
               g.add_node :step_a, Class.new
               g.add_node :step_b, Class.new
               g.conditional_root(potential_root: [:step_b]) { :step_b }
@@ -471,7 +471,7 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
         end
 
         def steps_processor
-          @steps_processor ||= DfE::Wizard::StepsProcessor::Graph.draw(self) do |g|
+          @steps_processor ||= DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |g|
             g.add_node :entry, Class.new
             g.add_node :form, Class.new
             g.add_node :review, Class.new

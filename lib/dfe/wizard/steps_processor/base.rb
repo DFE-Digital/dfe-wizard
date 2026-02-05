@@ -27,7 +27,7 @@ module DfE
       #   end
       #
       # @example Using a processor
-      #   processor = Graph.draw(wizard, context: state_store) do |g|
+      #   processor = Graph.draw(wizard, predicate_caller: state_store) do |g|
       #     g.add_node :step1, StepOne
       #     g.add_node :step2, StepTwo
       #   end
@@ -493,7 +493,7 @@ module DfE
         # @raise [ArgumentError] If validation fails
         #
         # @example
-        #   processor = Graph.draw(wizard, context: state_store) do |g|
+        #   processor = Graph.draw(wizard, predicate_caller: state_store) do |g|
         #     g.add_node :step1, StepOne
         #     g.add_node :step2, StepTwo
         #     g.root :step1

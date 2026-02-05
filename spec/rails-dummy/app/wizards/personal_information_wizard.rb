@@ -1,12 +1,8 @@
 class PersonalInformationWizard
   include DfE::Wizard
 
-  delegate :needs_permission_to_work_or_study?,
-           :right_to_work_or_study?,
-           to: :state_store
-
   def steps_processor
-    DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+    DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
       graph.add_node :name_and_date_of_birth, Steps::NameAndDateOfBirth
       graph.add_node :nationality, Steps::Nationality
       graph.add_node :right_to_work_or_study, Steps::RightToWorkOrStudy

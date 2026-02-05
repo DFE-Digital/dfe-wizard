@@ -3,13 +3,8 @@ class ALevelsRequirementsWizard
 
   attr_reader :course
 
-  delegate :any_a_levels?,
-           :add_another_a_level?,
-           :has_remaining_a_levels?,
-           to: :state_store
-
   def steps_processor
-    DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+    DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
       graph.add_node :what_a_level_is_required, Steps::WhatALevelIsRequired
       graph.add_node :add_a_level_to_a_list, Steps::AddALevelToAList
       graph.add_node :remove_a_level_subject_confirmation, Steps::RemoveALevelSubjectConfirmation

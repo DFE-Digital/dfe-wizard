@@ -9,9 +9,10 @@ module DfE
         #
         # @api private
         class DSL
-          def initialize(registry, wizard)
+          def initialize(registry, wizard, predicate_caller:)
             @registry = registry
             @wizard = wizard
+            @predicate_caller = predicate_caller
           end
 
           # Add a step node to the graph.
@@ -202,28 +203,41 @@ module DfE
           # Add custom branching edge for arbitrary logic.
           #
           # Use this for complex transitions that don't fit the other patterns.
-          # The conditional should return the target node ID directly.
+          # The conditional should return the target step ID directly (not true/false).
+          #
+          # When using a Symbol, the method is called on the predicate_caller
+          # (typically state_store), consistent with other edge types.
           #
           # @param from [Symbol] Source node
-          # @param conditional [Symbol, Proc] Logic returning target node ID
+          # @param conditional [Symbol, Proc] Logic returning target step ID
           # @param potential_transitions [Array<Hash>] Documentation of possible paths
           #
-          # @example
+          # @example With a method on state_store
+          #   # In state_store:
+          #   def determine_payment_path
+          #     case payment_status
+          #     when 'approved' then :confirmation
+          #     when 'pending' then :payment_pending
+          #     else :retry_payment
+          #     end
+          #   end
+          #
+          #   # In graph definition:
           #   g.add_custom_branching_edge(
           #     from: :payment,
-          #     conditional: proc do |step|
-          #       case step.payment_status
-          #       when :approved then :confirmation
-          #       when :pending then :payment_pending
-          #       when :failed then :retry_payment
-          #       else :error
-          #       end
-          #     end,
+          #     conditional: :determine_payment_path,
           #     potential_transitions: [
           #       { label: "Payment approved", nodes: [:confirmation] },
           #       { label: "Payment pending", nodes: [:payment_pending] },
           #       { label: "Payment failed", nodes: [:retry_payment] }
           #     ]
+          #   )
+          #
+          # @example With a proc
+          #   g.add_custom_branching_edge(
+          #     from: :payment,
+          #     conditional: proc { |step| step.payment_status == 'approved' ? :confirmation : :retry },
+          #     potential_transitions: [...]
           #   )
           def add_custom_branching_edge(from:, conditional:, potential_transitions:)
             predicate = build_predicate(conditional)
@@ -285,19 +299,22 @@ module DfE
 
           private
 
-          def build_predicate(raw)
+          # Build a predicate callable.
+          #
+          # @param raw [Symbol, Proc] Method name or callable
+          # @param caller [Object] Object to call the method on (defaults to predicate_caller)
+          def build_predicate(raw, caller: @predicate_caller)
             if raw.is_a?(Symbol)
-              unless @wizard.respond_to?(raw, include_private: true)
-                raise ArgumentError, "Predicate method :#{raw} not found on #{@wizard.class.name}"
+              unless caller.respond_to?(raw, include_private: true)
+                raise ArgumentError, "Predicate method :#{raw} not found on #{caller.class.name}"
               end
 
-              method = @wizard.method(raw)
-              arity = method.arity
+              bound_method = caller.method(raw)
 
-              if arity.zero? || arity.negative?
-                proc { method.call }
+              if bound_method.arity.zero? || bound_method.arity.negative?
+                proc { bound_method.call }
               else
-                proc { |step| method.call(step) }
+                proc { |step| bound_method.call(step) }
               end
 
             elsif raw.respond_to?(:call)

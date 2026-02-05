@@ -144,7 +144,7 @@ RSpec.describe RegisterECTWizard do
       end
 
       it 'follows normal flow when CYA is unreachable' do
-        allow(wizard).to receive_messages(in_trs?: true, prohibited_from_teaching?: true)
+        allow(state_store).to receive_messages(in_trs?: true, prohibited_from_teaching?: true)
         expect(wizard).to have_next_step(:cannot_register_ect)
       end
 
@@ -246,7 +246,7 @@ RSpec.describe RegisterECTWizard do
       let(:current_step) { :cannot_register_ect }
 
       before do
-        allow(wizard).to receive_messages(in_trs?: true, prohibited_from_teaching?: true)
+        allow(state_store).to receive_messages(in_trs?: true, prohibited_from_teaching?: true)
       end
 
       it 'returns empty path when target is blocked' do
@@ -329,7 +329,7 @@ RSpec.describe RegisterECTWizard do
       let(:current_step) { :cannot_register_ect }
 
       before do
-        allow(wizard).to receive_messages(in_trs?: true, prohibited_from_teaching?: true)
+        allow(state_store).to receive_messages(in_trs?: true, prohibited_from_teaching?: true)
       end
 
       it { expect(wizard).to have_previous_step(:find_ect) }
@@ -340,8 +340,8 @@ RSpec.describe RegisterECTWizard do
 
       before do
         state_store.write(trn: '1111111')
-        allow(wizard).to receive(:find_ect_transitions).and_return(:national_insurance_number)
-        allow(wizard).to receive(:national_insurance_number_transitions).and_return(:not_found)
+        allow(state_store).to receive(:find_ect_transitions).and_return(:national_insurance_number)
+        allow(state_store).to receive(:national_insurance_number_transitions).and_return(:not_found)
       end
 
       it { expect(wizard).to have_previous_step(:national_insurance_number) }

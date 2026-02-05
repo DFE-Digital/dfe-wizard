@@ -10,20 +10,13 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
   class WasteExemptionWizard
     include DfE::Wizard
 
-    delegate :is_upper_tier_waste?,
-             :is_listed_activity?,
-             :is_non_listed_activity?,
-             :is_exempt_activity?,
-             :account_feature_flag_enabled?,
-             to: :state_store
-
     def initialize
       @state_store = WasteStateStore.new
       @current_step_name = :organization_type
     end
 
     def steps_processor
-      DfE::Wizard::StepsProcessor::Graph.draw(self) do |g|
+      DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |g|
         # Nodes
         g.add_node :organization_type, Steps::OrganizationType, label: 'Organization Type'
         g.add_node :account_login, Steps::AccountLogin, label: 'Account Login'
@@ -88,19 +81,6 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
       DfE::Wizard::Logger.new(Rails.logger)
     end
 
-    def determine_status_path(_step_obj)
-      case state_store.application_status
-      when :submitted
-        :review
-      when :approved
-        :issue_certificate
-      when :rejected
-        :rejection_notice
-      else
-        :pending_info
-      end
-    end
-
     def conditional_entry_point
       state_store.is_returning_user? ? :account_login : :organization_type
     end
@@ -147,6 +127,20 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
       def account_feature_flag_enabled?
         @account_feature_flag_enabled.present?
       end
+
+      # Custom branching: determines next step based on application status
+      def determine_status_path
+        case application_status
+        when :submitted
+          :review
+        when :approved
+          :issue_certificate
+        when :rejected
+          :rejection_notice
+        else
+          :pending_info
+        end
+      end
     end
   end
 
@@ -187,8 +181,14 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
     context 'when not passing potential root' do
       before do
         class GraphWithoutPotentialRoot
+          include DfE::Wizard
+
+          def initialize
+            @state_store = Object.new
+          end
+
           def steps_processor
-            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+            DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
               graph.add_node :first_page, Object
               graph.add_node :second_page, Object
 
@@ -271,10 +271,8 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
         class GraphWithSkippedSteps
           include DfE::Wizard
 
-          delegate :user_not_permitted?, :single_provider?, to: :state_store
-
           def steps_processor
-            DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+            DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
               graph.add_node :first_page, Object
               graph.add_node :second_page, Object, skip_when: :user_not_permitted?
               graph.add_node :third_page, Object, skip_when: :single_provider?
@@ -406,6 +404,14 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
     context 'unreachable step' do
       it 'returns empty array' do
         expect(graph.path_traversal(:nonexistent)).to eq([])
+      end
+    end
+
+    context 'unreachable due to cycle' do
+      it 'returns empty array when target is blocked by a cycle' do
+        # issue_certificate is only reachable if review transitions to it
+        # but in this test setup, review doesn't transition there
+        expect(graph.path_traversal(:issue_certificate)).to eq([])
       end
     end
   end
@@ -629,6 +635,130 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Waste Exemption Wizard Graph
                              rejection_notice
                            ])
       end
+    end
+  end
+end
+
+RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Circular Graph Detection' do
+  # This wizard intentionally has circular edges to test infinite loop prevention
+  module CircularSteps
+    class StepA
+      include DfE::Wizard::Step
+      attribute :go_to_c, :boolean, default: false
+    end
+
+    class StepB
+      include DfE::Wizard::Step
+    end
+
+    class StepC
+      include DfE::Wizard::Step
+    end
+  end
+
+  class CircularStateStore
+    include DfE::Wizard::StateStore
+
+    def should_go_to_c?
+      read[:go_to_c] == true
+    end
+  end
+
+  class CircularWizard
+    include DfE::Wizard
+
+    def initialize
+      @state_store = CircularStateStore.new
+      @current_step_name = :step_a
+    end
+
+    def steps_processor
+      DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |g|
+        g.add_node :step_a, CircularSteps::StepA
+        g.add_node :step_b, CircularSteps::StepB
+        g.add_node :step_c, CircularSteps::StepC
+
+        g.root :step_a
+
+        # Circular: A -> B -> C -> A (when condition is met)
+        g.add_edge from: :step_a, to: :step_b
+        g.add_conditional_edge(
+          from: :step_b,
+          when: :should_go_to_c?,
+          then: :step_c,
+          else: :step_a, # This creates a cycle back to A
+        )
+        g.add_edge from: :step_c, to: :step_a # This also creates a cycle
+      end
+    end
+
+    def logger
+      nil
+    end
+
+    def route_strategy
+      nil
+    end
+  end
+
+  let(:wizard) { CircularWizard.new }
+  let(:graph) { wizard.steps_processor }
+
+  describe '#path_traversal with circular edges' do
+    context 'when graph has cycles' do
+      before do
+        wizard.state_store.write(go_to_c: false)
+      end
+
+      it 'returns empty array when target is unreachable due to cycle' do
+        # step_c is unreachable when go_to_c is false (B goes back to A)
+        # The visited set prevents infinite loops
+        expect(graph.path_traversal(:step_c)).to eq([])
+      end
+
+      it 'finds path when target is reachable before cycle' do
+        path = graph.path_traversal(:step_b)
+        expect(path).to eq(%i[step_a step_b])
+      end
+    end
+
+    context 'when following the cycle path' do
+      before do
+        wizard.state_store.write(go_to_c: true)
+      end
+
+      it 'returns empty array for nonexistent step even with cycles' do
+        # A -> B -> C -> A (cycle)
+        # visited set stops traversal when it revisits A
+        expect(graph.path_traversal(:nonexistent)).to eq([])
+      end
+
+      it 'finds path to step_c through the conditional' do
+        path = graph.path_traversal(:step_c)
+        expect(path).to eq(%i[step_a step_b step_c])
+      end
+    end
+  end
+
+  describe '#next_step with circular edges' do
+    it 'returns the next step even in circular graph' do
+      expect(graph.next_step(:step_a)).to eq(:step_b)
+    end
+
+    it 'follows conditional back to start without issues' do
+      wizard.state_store.write(go_to_c: false)
+      expect(graph.next_step(:step_b)).to eq(:step_a)
+    end
+  end
+
+  describe 'max_depth uses step count' do
+    it 'limits traversal to number of steps in graph' do
+      # The circular wizard has 3 steps, so max_depth should be 3
+      expect(graph.step_definitions.size).to eq(3)
+
+      # Even with cycles, traversal is bounded by step count
+      path = graph.path_traversal(:step_b)
+      expect(path.length).to be <= 3
     end
   end
 end

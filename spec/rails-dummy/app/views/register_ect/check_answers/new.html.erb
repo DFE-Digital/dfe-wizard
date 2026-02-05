@@ -1,4 +1,4 @@
-<%= govuk_back_link href: @wizard.previous_step_path || register_ect_find_ect_path %>
+<%= govuk_back_link href: @wizard.previous_step_path(fallback: register_ect_find_ect_path) %>
 
 <div class="govuk-grid-row">
   <div class="govuk-grid-column-two-thirds">
@@ -6,61 +6,33 @@
 
     <h2 class="govuk-heading-m">Teacher details</h2>
 
-    <% teacher_details_reviewable_attributes = %w[correct_full_name trn email start_date working_pattern] %>
-
     <%= govuk_summary_list do |summary_list| %>
-      <% @wizard.flow_steps.each do |step| %>
-        <% step.attributes.each do |attribute_name, attribute_value| %>
-          <% next unless attribute_name.in?(teacher_details_reviewable_attributes) %>
-          <%= summary_list.with_row do |row| %>
-            <%= row.with_key { step.class.human_attribute_name(attribute_name) } %>
-
-            <% if attribute_name == "working_pattern" %>
-              <%= row.with_value { attribute_value.humanize } %>
-            <% else %>
-              <%= row.with_value { attribute_value.is_a?(Date) ? attribute_value.to_fs(:govuk_date) : attribute_value.to_s } %>
-            <% end %>
-            <%= row.with_action(
-                  text: "Change",
-                  href: @wizard.resolve_step_path(step.step_id, return_to_review: step.step_id),
-                  visually_hidden_text: attribute_name
-                ) %>
-          <% end %>
+      <% @review.teacher_details.each do |row| %>
+        <%= summary_list.with_row do |r| %>
+          <%= r.with_key { row.label } %>
+          <%= r.with_value { row.formatted_value } %>
+          <%= r.with_action(
+                text: "Change",
+                href: row.change_path,
+                visually_hidden_text: row.label.downcase
+              ) %>
         <% end %>
       <% end %>
     <% end %>
 
     <h2 class="govuk-heading-m">Programme details</h2>
 
-    <% programme_details_reviewable_attributes = %w[lead_provider_id training_programme] %>
-
     <%= govuk_summary_list do |summary_list| %>
-      <% @wizard.flow_steps.each do |step| %>
-        <% step.attributes.each do |attribute_name, attribute_value| %>
-          <% next unless attribute_name.in?(programme_details_reviewable_attributes) %>
-          <%= summary_list.with_row do |row| %>
-            <%= row.with_key { step.class.human_attribute_name(attribute_name) } %>
-            <%= row.with_value { attribute_value.humanize } %>
-            <%= row.with_action(
-                  text: "Change",
-                  href: @wizard.resolve_step_path(step.step_id, return_to_review: step.step_id),
-                  visually_hidden_text: attribute_name
-                ) %>
-          <% end %>
+      <% @review.programme_details.each do |row| %>
+        <%= summary_list.with_row do |r| %>
+          <%= r.with_key { row.label } %>
+          <%= r.with_value { row.formatted_value } %>
+          <%= r.with_action(
+                text: "Change",
+                href: row.change_path,
+                visually_hidden_text: row.label.downcase
+              ) %>
         <% end %>
-      <% end %>
-
-      <%= summary_list.with_row do |row| %>
-        <%= row.with_key { "Appropriate body" } %>
-        <%= row.with_value { @wizard.state_store.appropriate_body_text } %>
-        <%= row.with_action(
-              text: "Change",
-              href: @wizard.resolve_step_path(
-                @wizard.state_store.school_independent? ? :independent_school_appropriate_body : :state_school_appropriate_body,
-                return_to_review: @wizard.state_store.school_independent? ? :independent_school_appropriate_body : :state_school_appropriate_body
-              ),
-              visually_hidden_text: "appropriate body"
-            ) %>
       <% end %>
     <% end %>
 

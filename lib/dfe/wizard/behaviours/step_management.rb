@@ -287,8 +287,8 @@ module DfE
         # Return all attribute names from all step classes
         #
         # Flattens the step definitions to extract every attribute defined across
-        # all steps in the wizard. Used by StateStore's method_missing to determine
-        # which method calls should access repository data.
+        # all steps in the wizard. Used by StateStore to generate accessor methods
+        # for each attribute.
         #
         # Attributes are collected from each step class via its `attribute_names`
         # class method. Steps without attributes contribute nothing to this list.
@@ -311,11 +311,11 @@ module DfE
         #   wizard.attribute_names.include?("undefined")   # => false
         #
         # @note Attribute names are collected lazily during wizard initialization.
-        #       This allows StateStore to build method_missing handlers only for
+        #       This allows StateStore to generate accessor methods only for
         #       attributes actually defined in step classes.
         #
         # @see #step_definitions For step class objects themselves
-        # @see StateStore#method_missing Which uses this list to route method calls
+        # @see StateStore#define_attribute_accessors Which generates methods from this list
         # @api public
         def attribute_names
           step_definitions.flat_map do |_step_id, step_class|

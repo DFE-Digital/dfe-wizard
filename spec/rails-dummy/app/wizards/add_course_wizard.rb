@@ -1,22 +1,8 @@
 class AddCourseWizard
   include DfE::Wizard
 
-  delegate :further_education?,
-           :applications_open_feature_flag_inactive?,
-           :design_technology?,
-           :modern_languages?,
-           :physics?,
-           :teacher_degree_apprenticeship?,
-           :single_accredited_provider_or_self_accredited?,
-           :fee_based?,
-           :can_sponsor_student_visa?,
-           :can_sponsor_skilled_worker_visa?,
-           :no_visa_sponsorship?,
-           :visa_deadline_required?,
-           to: :state_store
-
   def steps_processor
-    @steps_processor ||= DfE::Wizard::StepsProcessor::Graph.draw(self) do |graph|
+    @steps_processor ||= DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
       graph.add_node(:level, Steps::Courses::Level)
       graph.add_node(:subjects, Steps::Courses::Subjects)
 
