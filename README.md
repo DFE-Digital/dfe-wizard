@@ -325,7 +325,7 @@ Use a shared layout and step-specific form partials:
 
 ```erb
 <!-- app/views/registration/new.html.erb -->
-<%= govuk_back_link href: @wizard.previous_step_path || root_path %>
+<%= govuk_link_to 'Back', @wizard.previous_step_path(fallback: root_path) %>
 
 <div class="govuk-grid-row">
   <div class="govuk-grid-column-two-thirds">
