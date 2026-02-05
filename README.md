@@ -2215,7 +2215,6 @@ end
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/DFE-Digital/dfe-wizard/issues)
-- **Slack**: Find & Publish team in cross-gov UK Slack
 
 ## License
 
