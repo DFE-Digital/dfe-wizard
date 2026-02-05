@@ -1805,7 +1805,7 @@ graph.conditional_root(potential_root: %i[new_user returning_user]) do |state_st
 end
 
 # Using a method
-graph.conditional_root(potential_root: %i[new_user returning_user], method: :determine_start)
+graph.conditional_root(:determine_start, potential_root: %i[new_user returning_user])
 ```
 
 ### Skip When
