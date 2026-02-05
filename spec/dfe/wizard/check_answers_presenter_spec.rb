@@ -173,9 +173,9 @@ RSpec.describe DfE::Wizard::CheckAnswersPresenter do
 
     it 'accepts hash options for attributes' do
       rows = presenter.rows_for(:review_ect_details, [
-        :correct_full_name,
-        { attribute: :details_correct, label: 'Are details correct?' },
-      ])
+                                  :correct_full_name,
+                                  { attribute: :details_correct, label: 'Are details correct?' },
+                                ])
 
       expect(rows[0].label).to eq('Name') # From I18n
       expect(rows[1].label).to eq('Are details correct?')

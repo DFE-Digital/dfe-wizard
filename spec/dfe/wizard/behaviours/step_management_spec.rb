@@ -68,7 +68,6 @@ RSpec.describe DfE::Wizard::Behaviours::StepManagement do
       def logger
         DfE::Wizard::Logger.new(Rails.logger)
       end
-
     end
   end
 

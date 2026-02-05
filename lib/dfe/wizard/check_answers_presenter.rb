@@ -105,7 +105,7 @@ module DfE
         def label
           return custom_label if custom_label
 
-          if step&.class&.respond_to?(:human_attribute_name)
+          if step&.class.respond_to?(:human_attribute_name)
             step.class.human_attribute_name(attribute)
           else
             attribute.to_s.humanize
@@ -215,7 +215,7 @@ module DfE
       #     else value
       #     end
       #   end
-      def format_value(attribute, value)
+      def format_value(_attribute, value)
         value
       end
 

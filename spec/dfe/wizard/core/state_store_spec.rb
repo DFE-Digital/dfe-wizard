@@ -46,7 +46,6 @@ RSpec.describe DfE::Wizard::Core::StateStore do
       def logger
         @logger ||= DfE::Wizard::Logger.new(Rails.logger)
       end
-
     end
   end
 

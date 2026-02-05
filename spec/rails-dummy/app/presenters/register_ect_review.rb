@@ -47,12 +47,12 @@ class RegisterECTReview
     )
   end
 
-  def lead_provider_name(id)
+  def lead_provider_name(provider_id)
     providers = {
       'teach_first' => 'Teach First',
       'ambition' => 'Ambition Institute',
       'edt' => 'Education Development Trust',
     }
-    providers[id] || id&.humanize
+    providers[provider_id] || provider_id&.humanize
   end
 end

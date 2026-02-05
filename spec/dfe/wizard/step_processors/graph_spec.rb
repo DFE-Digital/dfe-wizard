@@ -685,9 +685,9 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Circular Graph Detection' do
           from: :step_b,
           when: :should_go_to_c?,
           then: :step_c,
-          else: :step_a,  # This creates a cycle back to A
+          else: :step_a, # This creates a cycle back to A
         )
-        g.add_edge from: :step_c, to: :step_a  # This also creates a cycle
+        g.add_edge from: :step_c, to: :step_a # This also creates a cycle
       end
     end
 
