@@ -14,14 +14,16 @@ jobs:
       fail-fast: false
       matrix:
         # An explicit list rather than a cross product: Rails 7.1 does not
-        # support Ruby 3.4, and Rails 8.0 requires Ruby >= 3.2. Keep this in
-        # step with the dependency range in dfe-wizard.gemspec.
+        # support Ruby 3.4, and Rails 8.0 requires Ruby >= 3.2. The first and
+        # last rows pin the floor and ceiling of the range dfe-wizard.gemspec
+        # advertises — keep the two in step.
         include:
           - { ruby: '3.2', rails: '7.1' }
           - { ruby: '3.2', rails: '7.2' }
           - { ruby: '3.3', rails: '7.2' }
           - { ruby: '3.3', rails: '8.0' }
           - { ruby: '3.4', rails: '8.0' }
+          - { ruby: '3.4', rails: '8.1' }
 
     services:
       postgres:
