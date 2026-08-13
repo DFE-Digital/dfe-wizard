@@ -395,7 +395,11 @@ RSpec.describe DfE::Wizard::Core::StateStore do
       it 'custom predicate methods work with generated attributes' do
         expect(state_store.has_previous_names?).to be true
         expect(state_store.full_name).to eq('Sarah Elizabeth Johnson')
-        expect(state_store.age).to be_between(38, 40)
+        # Derived from the 1985-03-15 fixture rather than hardcoded, so this
+        # does not rot each time the calendar passes the birthday. The one-year
+        # window absorbs both the birthday boundary and `age`'s 365.25 rounding.
+        expected_age = Date.today.year - 1985
+        expect(state_store.age).to be_between(expected_age - 1, expected_age)
         expect(state_store.uk_resident?).to be true
       end
 
@@ -608,6 +612,7 @@ RSpec.describe DfE::Wizard::Core::StateStore do
 
     class TestStep
       include DfE::Wizard::Step
+
       attribute :name
     end
 

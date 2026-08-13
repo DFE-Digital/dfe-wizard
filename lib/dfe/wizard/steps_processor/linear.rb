@@ -275,9 +275,7 @@ module DfE
         #
         # @return [Hash{Symbol => String}] { step_id => display_label }
         def build_steps_metadata
-          @steps_array.each_with_object({}) do |step_id, hash|
-            hash[step_id] = @step_labels[step_id]
-          end
+          @steps_array.to_h { |step_id| [step_id, @step_labels[step_id]] }
         end
 
         # Build transitions metadata for Mermaid/GraphViz.

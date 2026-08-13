@@ -76,6 +76,13 @@ Naming/MethodParameterName:
 Naming/MemoizedInstanceVariableName:
   Enabled: false
 
+# Command methods here return a success boolean, following the ActiveRecord
+# convention (`save` returns true/false and is not named `save?`). Renaming
+# them would suggest they are side-effect-free queries, and `save_current_step`
+# is public API.
+Naming/PredicateMethod:
+  Enabled: false
+
 Naming/AccessorMethodName:
   Enabled: true
 

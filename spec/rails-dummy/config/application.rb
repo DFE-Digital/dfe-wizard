@@ -22,8 +22,11 @@ require 'govuk_design_system_formbuilder'
 
 module RailsDummy
   class Application < Rails::Application
-    # Initialize configuration defaults for originally generated Rails version.
-    config.load_defaults 7.2
+    # Track the Rails under test rather than the originally generated version,
+    # so each row of the CI matrix exercises that version's own framework
+    # defaults. `load_defaults` rejects a version newer than the running Rails,
+    # so this cannot be hardcoded while RAILS_VERSION varies.
+    config.load_defaults Rails::VERSION::STRING.to_f
 
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.

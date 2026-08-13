@@ -1,0 +1,63 @@
+name: Test
+
+# Reusable: called by main.yml (push/PR) and release.yml (tag). It owns no
+# triggers of its own so a push never runs the matrix twice.
+on:
+  workflow_call:
+
+jobs:
+  rspec:
+    name: Ruby ${{ matrix.ruby }} / Rails ${{ matrix.rails }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # An explicit list rather than a cross product: Rails 7.1 does not
+        # support Ruby 3.4, and Rails 8.0 requires Ruby >= 3.2. Keep this in
+        # step with the dependency range in dfe-wizard.gemspec.
+        include:
+          - { ruby: '3.2', rails: '7.1' }
+          - { ruby: '3.2', rails: '7.2' }
+          - { ruby: '3.3', rails: '7.2' }
+          - { ruby: '3.3', rails: '8.0' }
+          - { ruby: '3.4', rails: '8.0' }
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dfe_wizard_test
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/dfe_wizard_test
+      # Read by both Gemfile and spec/rails-dummy/Gemfile.
+      RAILS_VERSION: ${{ matrix.rails }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+          # RAILS_VERSION changes the resolution without changing the Gemfile,
+          # so matrix entries would otherwise share one poisoned cache.
+          cache-version: ${{ matrix.ruby }}-${{ matrix.rails }}
+
+      - name: Prepare DB
+        run: |
+          cd spec/rails-dummy && bundle && bundle exec rails db:create db:schema:load RAILS_ENV=test
+
+      - name: Run the specs
+        run: bundle exec rspec -f doc
