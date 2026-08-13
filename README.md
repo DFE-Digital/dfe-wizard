@@ -1,8 +1,20 @@
 # DfE::Wizard
 
+[![Ruby](https://github.com/DFE-Digital/dfe-wizard/actions/workflows/main.yml/badge.svg)](https://github.com/DFE-Digital/dfe-wizard/actions/workflows/main.yml)
+
 A multi-step form framework for Ruby on Rails applications.
 
 **Version**: 1.0.0.beta
+
+### Requirements
+
+| | Supported |
+|---|---|
+| Ruby | 3.2, 3.3, 3.4 |
+| Rails | 7.1, 7.2, 8.0, 8.1 |
+
+Every combination above is exercised by CI. See [RELEASING.md](RELEASING.md)
+for how to add a version.
 
 ---
 
@@ -89,7 +101,8 @@ Use DfE::Wizard when you need:
 
 ## Installation
 
-Add to your Gemfile:
+This gem is distributed via GitHub tags, not RubyGems. Pin to a tag in your
+Gemfile:
 
 ```ruby
 gem 'dfe-wizard', require: 'dfe/wizard', github: 'DFE-Digital/dfe-wizard', tag: 'v1.0.0.beta'
@@ -100,6 +113,12 @@ Then run:
 ```bash
 bundle install
 ```
+
+Bundler resolves the tag to a commit SHA and records both in your
+`Gemfile.lock`, so builds stay reproducible. Released tags are never moved.
+
+To track unreleased work instead, swap `tag:` for `branch: 'main'` — but pin to
+a tag for anything you deploy.
 
 ---
 
@@ -2215,6 +2234,20 @@ end
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/DFE-Digital/dfe-wizard/issues)
+
+## Contributing
+
+```bash
+git clone git@github.com:DFE-Digital/dfe-wizard.git
+cd dfe-wizard
+bundle install
+(cd spec/rails-dummy && bundle install && bundle exec rails db:create db:schema:load RAILS_ENV=test)
+bundle exec rake            # rspec + rubocop
+```
+
+The suite runs against a Rails dummy app in `spec/rails-dummy` and needs
+PostgreSQL. Set `RAILS_VERSION` to develop against a different Rails — see
+[RELEASING.md](RELEASING.md), which also covers how releases are cut.
 
 ## License
 
