@@ -4,7 +4,7 @@
 
 A multi-step form framework for Ruby on Rails applications.
 
-**Version**: 1.0.0.beta
+**Version**: 1.0.0
 
 ### Requirements
 
@@ -105,7 +105,7 @@ This gem is distributed via GitHub tags, not RubyGems. Pin to a tag in your
 Gemfile:
 
 ```ruby
-gem 'dfe-wizard', require: 'dfe/wizard', github: 'DFE-Digital/dfe-wizard', tag: 'v1.0.0.beta'
+gem 'dfe-wizard', require: 'dfe/wizard', github: 'DFE-Digital/dfe-wizard', tag: 'v1.0.0'
 ```
 
 Then run:
