@@ -644,6 +644,7 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'Circular Graph Detection' do
   module CircularSteps
     class StepA
       include DfE::Wizard::Step
+
       attribute :go_to_c, :boolean, default: false
     end
 

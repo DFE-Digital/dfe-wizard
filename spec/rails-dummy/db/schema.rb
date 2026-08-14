@@ -10,7 +10,10 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_12_06_173343) do
+# Stamped at the floor of the supported Rails range rather than the version
+# that generated it: newer Rails loads an older-stamped schema, but not the
+# reverse, and the CI matrix runs this against Rails 7.1 upwards.
+ActiveRecord::Schema[7.1].define(version: 2025_12_06_173343) do
   # These are extensions that must be enabled in order to support this database
   enable_extension 'plpgsql'
 

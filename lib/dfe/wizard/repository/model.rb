@@ -32,9 +32,7 @@ module DfE
         end
 
         def read_data
-          readable_attributes.each_with_object({}) do |attr, hash|
-            hash[attr] = @record.public_send(attr)
-          end
+          readable_attributes.to_h { |attr| [attr, @record.public_send(attr)] }
         end
 
         def write_data(hash)

@@ -315,7 +315,7 @@ module DfE
             <<~MSG
               Expected to branch from #{from_step.inspect} to: #{@to_step.inspect}
               Got: #{wizard.next_step.inspect}
-              #{@params ? "With params: #{@params.inspect}" : ''}
+              #{"With params: #{@params.inspect}" if @params}
 
               #{state_store_data(wizard)}
               #{wizard_inspect(wizard)}

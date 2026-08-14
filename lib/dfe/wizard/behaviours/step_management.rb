@@ -36,7 +36,7 @@ module DfE
             klass = find_step(current_step_name)
             params = fetch_step_attributes
 
-            klass.new(**params.symbolize_keys.merge(wizard: self, step_id: current_step_name))
+            klass.new(**params.symbolize_keys, wizard: self, step_id: current_step_name)
           end
         end
 
@@ -70,7 +70,7 @@ module DfE
 
           log_step_hydration(step_id:, attributes: merged_data)
 
-          step_class.new(**merged_data.symbolize_keys.merge(wizard: self, step_id: step_id))
+          step_class.new(**merged_data.symbolize_keys, wizard: self, step_id: step_id)
         end
 
         # Find the step class for a given step ID

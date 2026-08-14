@@ -1,5 +1,9 @@
 source 'https://rubygems.org'
 
+# Kept in step with the parent Gemfile so the dummy app and the gem's own dev
+# dependencies resolve to the same Rails. CI sets this per matrix entry.
+rails_version = ENV.fetch('RAILS_VERSION', '7.2')
+
 gem 'cssbundling-rails', '~> 1.4'
 gem 'dfe-wizard', path: '../../'
 gem 'govuk-components'
@@ -8,7 +12,7 @@ gem 'jsbundling-rails', '~> 1.3'
 gem 'pg', '~> 1.6', '>= 1.6.2'
 gem 'propshaft'
 gem 'puma', '>= 5.0'
-gem 'rails'
+gem 'rails', "~> #{rails_version}.0"
 gem 'sqlite3'
 gem 'tzinfo-data', platforms: %i[windows jruby]
 
@@ -20,7 +24,7 @@ group :development, :test do
   gem 'faker'
   gem 'foreman'
   gem 'pry'
-  gem 'railties'
+  gem 'railties', "~> #{rails_version}.0"
   gem 'rake', '~> 13.0'
   gem 'rspec', '~> 3.0'
   gem 'rspec-rails'
