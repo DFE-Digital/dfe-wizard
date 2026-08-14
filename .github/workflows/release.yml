@@ -1,0 +1,94 @@
+name: Release
+
+# The annotated tag is the release: consumers install with
+# `github: 'DFE-Digital/dfe-wizard', tag: 'vX.Y.Z'`. This workflow turns that
+# tag into a GitHub Release. Nothing is pushed to RubyGems. See RELEASING.md.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  guard:
+    name: Tag matches gem version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+
+      - name: Compare tag against Dfe::Wizard::VERSION
+        id: check
+        run: |
+          version="$(ruby -Ilib -e 'require "dfe/wizard/version"; print Dfe::Wizard::VERSION')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match Dfe::Wizard::VERSION ($version). The version lives in lib/dfe/wizard/version.rb and README.md — see RELEASING.md."
+            exit 1
+          fi
+          echo "Tag $GITHUB_REF_NAME matches version $version."
+
+  test:
+    name: Test
+    needs: guard
+    uses: ./.github/workflows/test.yml
+
+  release:
+    name: Publish GitHub Release
+    needs: [guard, test]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+
+      # An audit/air-gap artefact. The normal install path is Bundler + git,
+      # which never touches this file.
+      - name: Build gem
+        run: gem build dfe-wizard.gemspec
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          awk -v header="## [$VERSION]" '
+            index($0, header) == 1 { found = 1; next }
+            found && /^## \[/       { exit }
+            found                   { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "::error::No '## [$VERSION]' section found in CHANGELOG.md."
+            exit 1
+          fi
+          cat RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # RubyGems prerelease versions carry a letter in the suffix
+          # (1.1.0.beta, 1.1.0.rc1); plain releases never do.
+          prerelease=""
+          case "$VERSION" in
+            *[a-zA-Z]*) prerelease="--prerelease" ;;
+          esac
+
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md \
+            --verify-tag \
+            $prerelease \
+            "dfe-wizard-$VERSION.gem"
