@@ -1,4 +1,4 @@
-## [1.0.0] - 2026-08-13
+## [1.0.0] - 2026-08-20
 
 First stable release. The API is now frozen — subsequent breaking changes will
 require a major version.
