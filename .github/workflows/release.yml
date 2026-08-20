@@ -25,14 +25,14 @@ jobs:
         with:
           ruby-version: .ruby-version
 
-      - name: Compare tag against Dfe::Wizard::VERSION
+      - name: Compare tag against DfE::Wizard::VERSION
         id: check
         run: |
-          version="$(ruby -Ilib -e 'require "dfe/wizard/version"; print Dfe::Wizard::VERSION')"
+          version="$(ruby -Ilib -e 'require "dfe/wizard/version"; print DfE::Wizard::VERSION')"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
           if [ "$GITHUB_REF_NAME" != "v$version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match Dfe::Wizard::VERSION ($version). The version lives in lib/dfe/wizard/version.rb and README.md — see RELEASING.md."
+            echo "::error::Tag $GITHUB_REF_NAME does not match DfE::Wizard::VERSION ($version). The version lives in lib/dfe/wizard/version.rb and README.md — see RELEASING.md."
             exit 1
           fi
           echo "Tag $GITHUB_REF_NAME matches version $version."

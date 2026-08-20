@@ -1,6 +1,8 @@
 require 'active_support/all'
 require 'active_model'
 
+require 'dfe/wizard/version'
+
 module DfE
   # Multi-step form wizard framework using graph-based navigation
   #
@@ -228,11 +230,6 @@ module DfE
     module Test
       autoload :RSpecMatchers, 'dfe/wizard/test/r_spec_matchers'
     end
-
-    # @!endgroup
-    # @!group Supporting Classes
-
-    autoload :Version, 'dfe/wizard/version'
 
     # @!endgroup
     # @!group Main API

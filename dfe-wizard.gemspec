@@ -4,7 +4,7 @@ require_relative 'lib/dfe/wizard/version'
 
 Gem::Specification.new do |spec|
   spec.name = 'dfe-wizard'
-  spec.version = Dfe::Wizard::VERSION
+  spec.version = DfE::Wizard::VERSION
   spec.authors = ["Tomas D'Stefano"]
   spec.email = ['tomas_stefano@successoft.com']
 

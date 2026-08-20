@@ -39,6 +39,10 @@ Both affect code written against `1.0.0.beta`. Nothing changes for users of
   version range for the first time, so incompatibilities surface during
   `bundle install` rather than at runtime.
 - MIT licence, now also declared in the gemspec.
+- `DfE::Wizard::VERSION` is available after `require 'dfe/wizard'`. It was
+  previously declared as an autoload pointing at a file that defines
+  `Dfe::Wizard::VERSION` (lowercase `e`), so neither spelling resolved from the
+  loaded library. The lowercase constant is retained as an alias.
 
 ### Fixed
 

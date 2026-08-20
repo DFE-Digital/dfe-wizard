@@ -71,8 +71,15 @@ a direct `gem push` fails rather than publishing under whoever is logged in.
    ```
 
    ```bash
-   bundle install && bundle exec ruby -e "require 'dfe/wizard'; puts Dfe::Wizard::VERSION"
+   bundle install
+   bundle exec ruby -e "require 'dfe/wizard'; puts DfE::Wizard::VERSION"
+   grep -A4 '^GIT' Gemfile.lock
    ```
+
+   Expect the version you just tagged, and a `GIT` stanza recording both
+   `tag:` and the resolved `revision:`. Note the namespace is `DfE` — the
+   lowercase `Dfe::Wizard::VERSION` spelling still resolves, but only after an
+   explicit `require 'dfe/wizard/version'`.
 
 ## Tag convention
 
