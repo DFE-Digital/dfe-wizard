@@ -586,6 +586,18 @@ RSpec.describe DfE::Wizard::Behaviours::StateManagement do
         email: 'john@example.com',
       )
     end
+
+    context 'with Session repository' do
+      let(:repository) do
+        DfE::Wizard::Repository::Session.new(session: session)
+      end
+
+      let(:session) { {} }
+
+      it 'sets completed flag' do
+        expect { wizard.mark_completed }.to change { wizard.completed? }.from(false).to(true)
+      end
+    end
   end
 
   describe '#completed?' do
@@ -744,6 +756,35 @@ RSpec.describe DfE::Wizard::Behaviours::StateManagement do
         email: 'john@example.com',
       )
       expect(wizard.raw_data[:user_id]).to eq(999)
+    end
+  end
+
+  describe 'nested/flat state round-trip' do
+    before do
+      repository.write({
+                         name: 'John',
+                         email: 'john@example.com',
+                         user_id: 123,
+                       })
+    end
+
+    it 'writes nested data back without duplicating attributes' do
+      snapshot = wizard.data
+      snapshot[:steps][:personal_details][:name] = 'Jane'
+
+      wizard.write_state(snapshot)
+
+      expect(repository.read).to eq(
+        name: 'Jane',
+        email: 'john@example.com',
+        user_id: 123,
+      )
+    end
+
+    it 'returns step ids that can be fed back into #step' do
+      step_id = wizard.raw_data[:steps].keys.first
+
+      expect(wizard.step(step_id)).to be_instance_of(Steps::PersonalDetails)
     end
   end
 

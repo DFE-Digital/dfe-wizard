@@ -615,10 +615,10 @@ module DfE
 
             if step_id
               steps[step_id] ||= {}
-              steps[step_id][key] = value
+              steps[step_id][key.to_sym] = value
             else
               # Not a step attribute, must be metadata
-              metadata[key] = value
+              metadata[key.to_sym] = value
             end
           end
 
