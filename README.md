@@ -923,14 +923,14 @@ This applies to any expensive operation: database queries, API calls, or complex
 
 ## Check Your Answers
 
-The gem provides `ReviewPresenter` to build "Check your answers" pages.
+The gem provides `CheckYourAnswers` to build "Check your answers" pages.
 
 ### Creating a Review Presenter
 
 ```ruby
 # app/presenters/registration_review.rb
 class RegistrationReview
-  include DfE::Wizard::ReviewPresenter
+  include DfE::Wizard::CheckYourAnswers
 
   def personal_details
     [
