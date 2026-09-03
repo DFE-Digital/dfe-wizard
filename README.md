@@ -923,14 +923,14 @@ This applies to any expensive operation: database queries, API calls, or complex
 
 ## Check Your Answers
 
-The gem provides `ReviewPresenter` to build "Check your answers" pages.
+The gem provides `CheckYourAnswers` to build "Check your answers" pages.
 
 ### Creating a Review Presenter
 
 ```ruby
 # app/presenters/registration_review.rb
 class RegistrationReview
-  include DfE::Wizard::ReviewPresenter
+  include DfE::Wizard::CheckYourAnswers
 
   def personal_details
     [
@@ -1021,14 +1021,14 @@ def steps_processor
 end
 
 def handle_return_to_review
-  return unless current_step_params[:return_to_review].present?
+  return unless @current_step_params[:return_to_review].present?
   return unless valid_path_to?(:review)
 
   :review
 end
 
 def handle_back_to_review
-  return unless current_step_params[:return_to_review].to_s == current_step_name.to_s
+  return unless @current_step_params[:return_to_review].to_s == current_step_name.to_s
   return unless valid_path_to?(:review)
 
   :review
@@ -1278,12 +1278,18 @@ Generate Mermaid, GraphViz, and Markdown documentation from your wizard:
 
 ```ruby
 # lib/tasks/wizard_docs.rake
+
+require "ostruct"
+require "dfe/wizard/documentation/formatters/mermaid_formatter"
+require "dfe/wizard/documentation/formatters/graphviz_formatter"
+
 namespace :wizard do
   namespace :docs do
     task generate: :environment do
       output_dir = 'docs/wizards'
+      wizards = [RegistrationWizard, ApplicationWizard]
 
-      [RegistrationWizard, ApplicationWizard].each do |wizard_class|
+      wizards.each do |wizard_class|
         wizard = wizard_class.new(state_store: OpenStruct.new)
         wizard.documentation.generate_all(output_dir)
         puts "Generated docs for #{wizard_class.name}"
