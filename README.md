@@ -1021,14 +1021,14 @@ def steps_processor
 end
 
 def handle_return_to_review
-  return unless current_step_params[:return_to_review].present?
+  return unless @current_step_params[:return_to_review].present?
   return unless valid_path_to?(:review)
 
   :review
 end
 
 def handle_back_to_review
-  return unless current_step_params[:return_to_review].to_s == current_step_name.to_s
+  return unless @current_step_params[:return_to_review].to_s == current_step_name.to_s
   return unless valid_path_to?(:review)
 
   :review
