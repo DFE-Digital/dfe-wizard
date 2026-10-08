@@ -27,17 +27,18 @@ for how to add a version.
 5. [Data Flow](#data-flow)
 6. [Navigation](#navigation)
 7. [Conditional Branching](#conditional-branching)
-8. [Check Your Answers](#check-your-answers)
-9. [Step Operators](#step-operators)
-10. [Testing](#testing)
-11. [Auto-generated Documentation](#auto-generated-documentation)
-12. [In Depth: Repositories](#in-depth-repositories)
-13. [In Depth: Steps](#in-depth-steps)
-14. [In Depth: Conditional Edges](#in-depth-conditional-edges)
-15. [In Depth: Route Strategies](#in-depth-route-strategies)
-16. [Advanced: Custom Implementations](#advanced-custom-implementations)
-17. [Examples](#examples)
-18. [Troubleshooting](#troubleshooting)
+8. [Sub-wizards](#sub-wizards)
+9. [Check Your Answers](#check-your-answers)
+10. [Step Operators](#step-operators)
+11. [Testing](#testing)
+12. [Auto-generated Documentation](#auto-generated-documentation)
+13. [In Depth: Repositories](#in-depth-repositories)
+14. [In Depth: Steps](#in-depth-steps)
+15. [In Depth: Conditional Edges](#in-depth-conditional-edges)
+16. [In Depth: Route Strategies](#in-depth-route-strategies)
+17. [Advanced: Custom Implementations](#advanced-custom-implementations)
+18. [Examples](#examples)
+19. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -947,6 +948,92 @@ Ruby `if` around `add_node` or `add_edge`, or in the value given to `root`.
 
 ---
 
+## Sub-wizards
+
+A sub-wizard names a group of steps in a Graph wizard. The steps stay
+ordinary nodes: `flow_path`, `full_path`, `find_step` and every other method
+see them as before. Change journeys (a later release) show a sub-wizard as
+one unit. Sub-wizards need `StepsProcessor::Graph`.
+
+### Explicit form
+
+The steps and their edges are already in the parent graph:
+
+```ruby
+graph.add_sub_wizard :visa, steps: %i[visa_sponsorship skilled_worker_visa
+                                      visa_sponsorship_application_deadline_required
+                                      visa_sponsorship_application_deadline_at]
+```
+
+### Class form
+
+The class draws its own nodes and edges into the parent graph. It names no
+parent step: `exit_to:` sends its open exits (a step with no edge, a
+multiple conditional edge with no `default:`, a nil `then:` or `else:`) to
+one parent node.
+
+```ruby
+graph.add_sub_wizard :visa, CourseWizard::VisaSubWizard, exit_to: :start_date
+
+class CourseWizard::VisaSubWizard
+  extend DfE::Wizard::SubWizard
+
+  uses :visa_sponsorship_required?, :provider
+
+  def self.draw(graph)
+    graph.add_node :visa_sponsorship, Steps::VisaSponsorship
+    graph.add_node :visa_sponsorship_application_deadline_required, Steps::DeadlineRequired
+    graph.add_multiple_conditional_edges(
+      from: :visa_sponsorship,
+      branches: [{ when: :visa_sponsorship_required?, then: :visa_sponsorship_application_deadline_required }],
+    )
+  end
+end
+```
+
+Parent edges name the sub-wizard's real first steps
+(`then: :visa_sponsorship`), as for any node.
+
+A class reads context (provider, cycle, database) only through the state
+store, and lists the store methods it calls with `uses`. Its `draw` gets a
+restricted graph:
+- every predicate (`when:`, `conditional:`, `skip_when:`) is a Symbol listed
+  in `uses`; a lambda raises;
+- edges start only at nodes the class added, and its node ids are new;
+- `root`, `conditional_root`, the callbacks and `add_sub_wizard` raise.
+
+Steps added by a class should read context through `wizard.state_store`
+too. The wizard sets `state_store.wizard`, so a store method can read
+context lazily:
+
+```ruby
+class CourseWizardStore
+  include DfE::Wizard::StateStore
+
+  def provider
+    wizard.provider
+  end
+end
+```
+
+Store methods that read context must not memoise answers.
+
+### Rules
+
+The gem checks these when the graph is drawn, and raises
+`DfE::Wizard::InvalidGraph` (an `ArgumentError`):
+1. No path leaves a sub-wizard and comes back into it.
+2. A sub-wizard has one exit target.
+3. A step is in at most one sub-wizard.
+4. A sub-wizard id is not a node id, and every explicit step is a node.
+
+`steps_processor.sub_wizards` returns the sub-wizards by id, and
+`steps_processor.unit_for(step_id)` returns the step's unit: its sub-wizard,
+or a single-step unit for any other node. Other processors have no units:
+they return `{}` and nil.
+
+---
+
 ## Check Your Answers
 
 The gem provides `CheckYourAnswers` to build "Check your answers" pages.
@@ -1295,6 +1382,27 @@ expect(:email).to be_valid_step.in(wizard)
 expect(state_store).to have_step_attribute(:first_name)
 expect(state_store).to have_step_attribute(:email).with_value('test@example.com')
 ```
+
+### Sub-wizard harness
+
+`DfE::Wizard::Test::SubWizardHarness` runs one sub-wizard class on its own.
+The class exits to `:sub_wizard_exit`.
+
+```ruby
+harness = DfE::Wizard::Test::SubWizardHarness.new(
+  CourseWizard::VisaSubWizard,
+  root: :visa_sponsorship,
+  stubs: { visa_sponsorship_required?: ->(store) { store.read[:can_sponsor_student_visa] } },
+)
+
+expect(harness.wizard).to have_next_step(:sub_wizard_exit)
+  .from(:visa_sponsorship).when(can_sponsor_student_visa: false)
+```
+
+Pass `state_store:` to use the app's store instead of stubs. Without it,
+each method in `uses` returns its stub (a callable is called with the
+store) and raises when it has none. The harness wizard has only the gem's
+methods, so a step that calls an app wizard method raises `NoMethodError`.
 
 ---
 
