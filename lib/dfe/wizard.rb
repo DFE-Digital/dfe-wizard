@@ -266,7 +266,7 @@ module DfE
     def initialize(state_store:, current_step: nil, current_step_params: {})
       @current_step_name = current_step&.to_sym
       @current_step_params = current_step_params
-      @state_store = state_store
+      self.state_store = state_store
 
       after_initialize
     end
@@ -317,14 +317,25 @@ module DfE
 
     # Replace the state store
     #
-    # Clears the cached graph, because the graph binds Symbol predicates to
-    # the state store when it is drawn.
+    # Drops everything built for the old store: the cached graph (it binds
+    # Symbol predicates to the store when it is drawn), the default steps
+    # operator and the hydrated steps. Sets the store's wizard to this
+    # wizard, so store methods can read context (provider, cycle) through
+    # it. A store given after `new` gets its attribute readers, as
+    # `after_initialize` gives them to the first one. A store with no
+    # `wizard=` or `attribute_names=` writer is accepted as it is.
     #
     # @param store [DfE::Wizard::StateStore::Base]
     # @return [void]
     def state_store=(store)
+      replacing = !@state_store.nil?
       @cached_steps_processor = nil
+      @steps_operator = nil
+      @current_step = nil
+      @cached_steps = nil
       @state_store = store
+      store.wizard = self if store.respond_to?(:wizard=)
+      define_step_attributes_in_state_store if replacing && store.respond_to?(:attribute_names=)
     end
 
     # @!endgroup

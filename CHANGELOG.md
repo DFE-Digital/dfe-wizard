@@ -21,7 +21,12 @@
   `steps_processor` is unchanged. A draw block that chooses nodes, edges
   or the root with a Ruby `if` on answers must move that choice into a
   predicate, `skip_when` or `conditional_root`.
-- `state_store=` is now an explicit writer that clears the cached graph.
+- `state_store=` is now an explicit writer. It drops the cached graph, the
+  default steps operator and the hydrated steps, and gives a store set
+  after `new` its attribute readers.
+- **The wizard sets `state_store.wizard`** in `new` and in `state_store=`,
+  so state store methods can read context (for example the provider)
+  through the wizard. In 1.0 the attribute existed but was never set.
 - A test that stubs a Symbol predicate or a Symbol callback after the wizard
   is built no longer sees the stub, because the graph bound the method when
   it was drawn. Stub before building the wizard, or use a lambda predicate.

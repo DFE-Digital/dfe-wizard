@@ -192,6 +192,18 @@ RSpec.describe DfE::Wizard, 'graph cache' do
       expect(wizard.next_step).to eq(:visa)
       expect(DfE::Wizard::StepsProcessor::Graph).to have_received(:draw).twice
     end
+
+    it 'sets the new store up as new does, and drops what was built for the old one' do
+      wizard = build_wizard(current_step: :nationality)
+      old_operator = wizard.steps_operator
+
+      new_store = GraphCacheStateStore.new
+      new_store.write(nationality: 'other')
+      wizard.state_store = new_store
+
+      expect(new_store.nationality).to eq('other')
+      expect(wizard.steps_operator).not_to be(old_operator)
+    end
   end
 
   describe 'unflatten_state' do
