@@ -110,6 +110,29 @@ module DfE
           end
         end
 
+        # Steps from the root to the end of the wizard, over the current answers
+        #
+        # Unlike flow_path, it does not stop at the current step. It is
+        # computed on every call.
+        #
+        # Every edge is evaluated, including edges from steps with no answer.
+        # A predicate sees nil for a missing answer, so the walk takes the
+        # branch that nil gives (often the default). Steps off the route
+        # are never visited, so their blank answers do not matter. Call it
+        # once the user has been through a route, for example from check
+        # answers or during an edit. Even then, a changed answer can open
+        # steps that were never answered: the path runs through them on
+        # their nil branch, and follows the real answer on the next call
+        # after they are saved.
+        #
+        # @return [Array<Symbol>]
+        #
+        # @example
+        #   wizard.full_path  # => [:name, :nationality, :right_to_work, :review]
+        def full_path
+          cached_steps_processor.full_path
+        end
+
         # Check if step is in current flow
         #
         # @param step_id [Symbol] Step to check

@@ -236,6 +236,16 @@ module DfE
           raise NotImplementedError, 'Subclass must implement #path_traversal'
         end
 
+        # Steps from the root to the end, over the current answers.
+        #
+        # Only StepsProcessor::Graph implements this.
+        #
+        # @return [Array<Symbol>]
+        # @raise [NotImplementedError] For every processor except Graph
+        def full_path
+          raise NotImplementedError, 'full_path needs StepsProcessor::Graph'
+        end
+
         # Find and return the step class for a given step ID.
         #
         # Used by the wizard framework to:

@@ -1,5 +1,13 @@
 ## [Unreleased]
 
+### Added
+
+- **`wizard.full_path`** returns every step from the root to the end of the
+  graph over the current answers, without stopping at the current step. It
+  stops before a Redirect node, an id that is not a node, or a repeated step.
+  Needs `StepsProcessor::Graph`; other processors raise `NotImplementedError`.
+  `flow_path`, `path_traversal` and `dfs_path` are unchanged.
+
 ### Changed
 
 - **The graph is drawn once per wizard instance.** The gem now caches the

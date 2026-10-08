@@ -111,6 +111,7 @@ RSpec.describe DfE::Wizard, 'graph cache' do
       wizard.find_step(:visa)
       wizard.step_definitions
       wizard.raw_data
+      wizard.full_path
 
       expect(DfE::Wizard::StepsProcessor::Graph).to have_received(:draw).once
     end
