@@ -435,4 +435,157 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'sub-wizards' do
         .to raise_error(DfE::Wizard::InvalidGraph, 'sub-wizard :visa adds an edge from :funding, which it did not add')
     end
   end
+
+  describe 'draw-time checks' do
+    it 'passes the visa shape in both forms, with two entries from the parent' do
+      expect { explicit_visa_wizard.steps_processor }.not_to raise_error
+      expect { explicit_visa_wizard(exits: false, exit_to: :start_date).steps_processor }.not_to raise_error
+      expect { class_visa_wizard.steps_processor }.not_to raise_error
+    end
+
+    it 'runs once per draw: once per wizard instance' do
+      allow(DfE::Wizard::StepsProcessor::Graph::SubWizardChecks).to receive(:new).and_call_original
+
+      wizard = class_visa_wizard
+      wizard.find_step(:student)
+      wizard.flow_path
+      wizard.full_path
+      class_visa_wizard.full_path
+
+      expect(DfE::Wizard::StepsProcessor::Graph::SubWizardChecks).to have_received(:new).twice
+    end
+
+    describe 'rule 4: ids' do
+      it 'raises when a sub-wizard id is a node id' do
+        expect do
+          build_wizard do |g|
+            parent_nodes(g)
+            visa_nodes(g)
+            g.add_sub_wizard :funding, steps: %i[student]
+          end.steps_processor
+        end.to raise_error(DfE::Wizard::InvalidGraph, 'sub-wizard id :funding is also a node id; choose another id')
+      end
+
+      it 'raises when an explicit step is not a node' do
+        expect do
+          build_wizard do |g|
+            parent_nodes(g)
+            visa_nodes(g)
+            g.add_sub_wizard :visa, steps: %i[student nope]
+          end.steps_processor
+        end.to raise_error(DfE::Wizard::InvalidGraph, 'sub-wizard :visa lists :nope, which is not a node')
+      end
+    end
+
+    describe 'rule 3: one sub-wizard per step' do
+      it 'raises when a step is in two sub-wizards' do
+        expect do
+          build_wizard do |g|
+            parent_nodes(g)
+            visa_nodes(g)
+            visa_edges(g)
+            g.add_sub_wizard :student_visa, steps: %i[student deadline_required deadline_at]
+            g.add_sub_wizard :skilled_visa, steps: %i[skilled deadline_required]
+            parent_edges(g)
+          end.steps_processor
+        end.to raise_error(DfE::Wizard::InvalidGraph,
+                           ':deadline_required is in more than one sub-wizard (:student_visa, :skilled_visa)')
+      end
+    end
+
+    describe 'rule 2: one exit target' do
+      it 'raises when the steps exit to two targets' do
+        expect do
+          build_wizard do |g|
+            parent_nodes(g)
+            visa_nodes(g)
+            visa_edges(g, exits: false)
+            g.add_edge from: :student, to: :start_date
+            g.add_edge from: :skilled, to: :review
+            g.add_edge from: :deadline_required, to: :start_date
+            g.add_edge from: :deadline_at, to: :start_date
+            g.add_sub_wizard :visa, steps: visa_steps
+            parent_edges(g)
+          end.steps_processor
+        end.to raise_error(DfE::Wizard::InvalidGraph,
+                           'sub-wizard :visa exits to :start_date, :review; ' \
+                           'a sub-wizard has one exit target (see exit_to:)')
+      end
+
+      it 'raises when a class names a parent node other than exit_to' do
+        sub_wizard = Class.new do
+          extend DfE::Wizard::SubWizard
+
+          uses(*SubWizardSpecVisa.uses)
+
+          def self.draw(graph)
+            SubWizardSpecVisa.draw(graph)
+            graph.add_edge from: :deadline_at, to: :review
+          end
+        end
+
+        expect { class_visa_wizard(sub_wizard:).steps_processor }
+          .to raise_error(DfE::Wizard::InvalidGraph,
+                          'sub-wizard :visa exits to :start_date, :review; ' \
+                          'a sub-wizard has one exit target (see exit_to:)')
+      end
+
+      it 'passes a sub-wizard with no exit (the end of the wizard)' do
+        expect do
+          build_wizard do |g|
+            g.add_node :a, SubWizardSpecSteps::Start
+            g.add_node :b, SubWizardSpecSteps::Review
+            g.root :a
+            g.add_edge from: :a, to: :b
+            g.add_sub_wizard :tail, steps: %i[a b]
+          end.steps_processor
+        end.not_to raise_error
+      end
+    end
+
+    describe 'rule 1: contiguous' do
+      it 'raises when a path leaves the sub-wizard and comes back' do
+        expect do
+          build_wizard do |g|
+            g.add_node :a, SubWizardSpecSteps::Start
+            g.add_node :b, SubWizardSpecSteps::Funding
+            g.add_node :c, SubWizardSpecSteps::Review
+            g.root :a
+            g.add_edge from: :a, to: :b
+            g.add_edge from: :b, to: :c
+            g.add_sub_wizard :split, steps: %i[a c]
+          end.steps_processor
+        end.to raise_error(DfE::Wizard::InvalidGraph,
+                           'sub-wizard :split is not contiguous: a path leaves it, reaches :b and comes back to :c')
+      end
+
+      it 'raises for a loop from outside back into the sub-wizard' do
+        expect do
+          build_wizard do |g|
+            g.add_node :a, SubWizardSpecSteps::Funding
+            g.add_node :b, SubWizardSpecSteps::Review
+            g.root :a
+            g.add_edge from: :a, to: :b
+            g.add_conditional_edge from: :b, when: :salaried?, then: :a, else: nil
+            g.add_sub_wizard :loop, steps: [:a]
+          end.steps_processor
+        end.to raise_error(DfE::Wizard::InvalidGraph, /sub-wizard :loop is not contiguous/)
+      end
+
+      it "follows a custom edge's potential_transitions" do
+        expect do
+          build_wizard do |g|
+            g.add_node :a, SubWizardSpecSteps::Funding
+            g.add_node :b, SubWizardSpecSteps::Review
+            g.root :a
+            g.add_edge from: :a, to: :b
+            g.add_custom_branching_edge(
+              from: :b, conditional: -> {}, potential_transitions: [{ label: 'again', nodes: [:a] }],
+            )
+            g.add_sub_wizard :loop, steps: [:a]
+          end.steps_processor
+        end.to raise_error(DfE::Wizard::InvalidGraph, /sub-wizard :loop is not contiguous/)
+      end
+    end
+  end
 end

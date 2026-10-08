@@ -2,6 +2,7 @@ require_relative 'graph/dsl'
 require_relative 'graph/registry'
 require_relative 'graph/navigation_resolver'
 require_relative 'graph/sub_wizard_dsl'
+require_relative 'graph/sub_wizard_checks'
 
 module DfE
   module Wizard
@@ -47,6 +48,7 @@ module DfE
         #
         # @raise [ArgumentError] If no block given
         # @raise [ArgumentError] If root node not set
+        # @raise [DfE::Wizard::InvalidGraph] If a sub-wizard breaks a rule
         #
         # @example
         #   Graph.draw(wizard, predicate_caller: state_store) do |g|
@@ -65,6 +67,7 @@ module DfE
           end
 
           graph.registry.wire_sub_wizard_exits
+          SubWizardChecks.new(graph.registry).run!
           graph
         end
 

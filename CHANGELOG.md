@@ -18,6 +18,10 @@
   It gets a restricted graph: nodes and edges only, edges only from its own
   nodes, and every predicate a Symbol listed in `uses`. Both forms give the
   same unit, so a unit can move between them without other changes.
+- **Draw-time sub-wizard checks.** Each draw raises `InvalidGraph` when a
+  path leaves a sub-wizard and comes back, a sub-wizard exits to more than
+  one node, a step is in two sub-wizards, a sub-wizard id is a node id, or
+  an explicit step is not a node. Graphs with no sub-wizards skip them.
 - **`wizard.full_path`** returns every step from the root to the end of the
   graph over the current answers, without stopping at the current step. It
   stops before a Redirect node, an id that is not a node, or a repeated step.
