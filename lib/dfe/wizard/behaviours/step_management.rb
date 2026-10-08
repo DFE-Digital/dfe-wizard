@@ -18,7 +18,7 @@ module DfE
         end
 
         def root_step
-          steps_processor.root_step
+          cached_steps_processor.root_step
         end
 
         # Get the current step instance
@@ -82,7 +82,7 @@ module DfE
         # @example
         #   wizard.find_step(:email)  # => EmailStep
         def find_step(step_name)
-          steps_processor.find_step(step_name)
+          cached_steps_processor.find_step(step_name)
         end
 
         # Extracts permitted parameters for the current step.
@@ -281,7 +281,7 @@ module DfE
         # @see #attribute_names For flattened list of all attributes
         # @api public
         def step_definitions
-          steps_processor.step_definitions
+          cached_steps_processor.step_definitions
         end
 
         # Return all attribute names from all step classes

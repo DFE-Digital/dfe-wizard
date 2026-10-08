@@ -1,5 +1,19 @@
 ## [Unreleased]
 
+### Changed
+
+- **The graph is drawn once per wizard instance.** The gem now caches the
+  result of `steps_processor` and uses it at every internal call site.
+  `unflatten_state` builds its attribute-to-step map once per call. Check
+  answers on a 14-step wizard went from 303 draws to 1. The public
+  `steps_processor` is unchanged. A draw block that chooses nodes, edges
+  or the root with a Ruby `if` on answers must move that choice into a
+  predicate, `skip_when` or `conditional_root`.
+- `state_store=` is now an explicit writer that clears the cached graph.
+- A test that stubs a Symbol predicate or a Symbol callback after the wizard
+  is built no longer sees the stub, because the graph bound the method when
+  it was drawn. Stub before building the wizard, or use a lambda predicate.
+
 ### Fixed
 
 - **`Repository::Redis#write` now replaces an existing key.** In 1.0 a second

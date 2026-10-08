@@ -301,6 +301,21 @@ module DfE
           raise NotImplementedError, 'Subclass must implement #step_definitions'
         end
 
+        # The first step that declares each answer
+        #
+        # unflatten_state gives each stored answer to this step. Built once:
+        # the steps are fixed when the processor is built.
+        #
+        # @return [Hash{Symbol => Symbol}] step id by answer name
+        # @api private
+        def answer_owners
+          @answer_owners ||= step_definitions.each_with_object({}) do |(step_id, step_class), owners|
+            next unless step_class.respond_to?(:attribute_names)
+
+            step_class.attribute_names.each { |name| owners[name.to_sym] ||= step_id }
+          end.freeze
+        end
+
         # Generate and return comprehensive metadata for insight.
         #
         # This can be used for creating documentation in multiple formats:

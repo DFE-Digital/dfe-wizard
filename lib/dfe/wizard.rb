@@ -312,7 +312,19 @@ module DfE
 
     # The state store instance
     # @return [DfE::Wizard::StateStore::Base]
-    attr_accessor :state_store
+    attr_reader :state_store
+
+    # Replace the state store
+    #
+    # Clears the cached graph, because the graph binds Symbol predicates to
+    # the state store when it is drawn.
+    #
+    # @param store [DfE::Wizard::StateStore::Base]
+    # @return [void]
+    def state_store=(store)
+      @cached_steps_processor = nil
+      @state_store = store
+    end
 
     # @!endgroup
     # @!group Extension Points
@@ -350,5 +362,20 @@ module DfE
       raise NotImplementedError, 'Subclass must implement #route_strategy'
     end
     # @!endgroup
+
+    private
+
+    # The graph, drawn once per wizard instance
+    #
+    # Every gem call site uses this instead of `steps_processor`. A draw
+    # records structure and bindings only; predicates, roots, skip_when and
+    # callbacks run at navigation time, so the cached graph sees answers
+    # written in the same request. `state_store=` clears it.
+    #
+    # @return [DfE::Wizard::StepsProcessor::Base]
+    # @api private
+    def cached_steps_processor
+      @cached_steps_processor ||= steps_processor
+    end
   end
 end

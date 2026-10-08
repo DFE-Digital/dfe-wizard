@@ -20,7 +20,7 @@ module DfE
         # @example
         #   wizard.next_step  # => :email
         def next_step
-          steps_processor.next_step(current_step_name).tap do |next_step_id|
+          cached_steps_processor.next_step(current_step_name).tap do |next_step_id|
             log_next_step_transition(from: current_step_name, to: next_step_id)
           end
         end
@@ -32,7 +32,7 @@ module DfE
         # @example
         #   wizard.previous_step  # => :name
         def previous_step
-          steps_processor.previous_step(current_step_name).tap do |previous_step_id|
+          cached_steps_processor.previous_step(current_step_name).tap do |previous_step_id|
             log_previous_step_transition(current: current_step_name, previous: previous_step_id)
           end
         end
@@ -105,7 +105,7 @@ module DfE
         # @example Non-UK national
         #   wizard.flow_path  # => [:name, :nationality, :right_to_work, :immigration_status, :review]
         def flow_path(target = current_step_name)
-          steps_processor.path_traversal(target).tap do |path|
+          cached_steps_processor.path_traversal(target).tap do |path|
             log_flow_path_resolved(target:, path:)
           end
         end
