@@ -251,20 +251,44 @@ module DfE
 
           # Declare a sub-wizard: a named group of steps in this graph.
           #
+          # Two forms give the same unit:
+          # - explicit: `steps:` names steps that are already nodes, with their
+          #   edges in this graph;
+          # - class: an object that responds to `draw(graph)` (or a lambda)
+          #   adds its own nodes and edges. It gets a restricted graph: nodes
+          #   and edges only, and every predicate a Symbol listed in its
+          #   `uses` (see DfE::Wizard::SubWizard).
+          #
           # The steps stay ordinary nodes; every path API sees them as before.
-          # The sub-wizard is the unit that change journeys show.
           #
           # @param unit_id [Symbol] Sub-wizard id; never a node id
-          # @param steps [Array<Symbol>] The steps, already nodes of this graph
+          # @param sub_wizard [#draw, #call, nil] Class form object
+          # @param steps [Array<Symbol>, nil] Explicit form steps
           # @param exit_to [Symbol, nil] Node for the steps' open exits
           # @raise [DfE::Wizard::InvalidGraph]
           # @return [void]
           #
-          # @example
+          # @example Explicit form
           #   g.add_sub_wizard :visa, steps: %i[visa_sponsorship skilled_worker_visa]
-          def add_sub_wizard(unit_id, steps:, exit_to: nil)
+          #
+          # @example Class form
+          #   g.add_sub_wizard :visa, CourseWizard::VisaSubWizard, exit_to: :start_date
+          def add_sub_wizard(unit_id, sub_wizard = nil, steps: nil, exit_to: nil)
             check_sub_wizard_declaration!(unit_id, exit_to)
-            add_sub_wizard_unit(unit_id, explicit_sub_wizard_steps(unit_id, steps), exit_to:, uses: [], source: nil)
+            if sub_wizard && steps
+              raise InvalidGraph, "sub-wizard :#{unit_id} takes steps: or a sub-wizard object, not both"
+            end
+            unless sub_wizard || steps
+              raise InvalidGraph, "sub-wizard :#{unit_id} needs steps: or an object that responds to draw(graph)"
+            end
+
+            if steps
+              add_sub_wizard_unit(unit_id, explicit_sub_wizard_steps(unit_id, steps), exit_to:, uses: [], source: nil)
+            else
+              name = sub_wizard_name(unit_id, sub_wizard)
+              uses = sub_wizard_uses(name, sub_wizard)
+              add_sub_wizard_unit(unit_id, draw_sub_wizard(name, sub_wizard, uses), exit_to:, uses:, source: sub_wizard)
+            end
           end
 
           # Register callback before navigating to next step.
@@ -339,6 +363,36 @@ module DfE
             @registry.add_sub_wizard(
               Registry::Unit.new(id: unit_id, step_ids: step_ids.freeze, exit_to:, uses: uses.freeze, source:),
             )
+          end
+
+          def sub_wizard_name(unit_id, sub_wizard)
+            class_name = sub_wizard.name if sub_wizard.is_a?(Module)
+            class_name ? "sub-wizard :#{unit_id} (#{class_name})" : "sub-wizard :#{unit_id}"
+          end
+
+          def sub_wizard_uses(name, sub_wizard)
+            uses = sub_wizard.respond_to?(:uses) ? Array(sub_wizard.uses).map(&:to_sym) : []
+            missing = uses.reject { |method_name| @predicate_caller.respond_to?(method_name, true) }
+            return uses if missing.empty?
+
+            raise InvalidGraph,
+                  "#{name} uses #{missing.map(&:inspect).join(', ')}, which #{@predicate_caller.class} does not define"
+          end
+
+          def draw_sub_wizard(name, sub_wizard, uses)
+            drawer = if sub_wizard.respond_to?(:draw)
+                       sub_wizard.method(:draw)
+                     elsif sub_wizard.respond_to?(:call)
+                       sub_wizard
+                     else
+                       raise InvalidGraph, "#{name} must respond to draw(graph) or call(graph)"
+                     end
+
+            restricted = SubWizardDSL.new(self, @registry, name:, uses:)
+            drawer.call(restricted)
+            raise InvalidGraph, "#{name} drew no nodes" if restricted.added_node_ids.empty?
+
+            restricted.added_node_ids
           end
 
           # Build a predicate callable.

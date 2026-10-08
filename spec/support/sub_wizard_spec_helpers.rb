@@ -62,6 +62,33 @@ class SubWizardSpecStore
   end
 end
 
+# The visa steps as a class form sub-wizard, with no parent step ids.
+class SubWizardSpecVisa
+  extend DfE::Wizard::SubWizard
+
+  uses :student_visa?, :skilled_visa?, :deadline_required?
+
+  def self.draw(graph)
+    graph.add_node :student, SubWizardSpecSteps::Student
+    graph.add_node :skilled, SubWizardSpecSteps::Skilled
+    graph.add_node :deadline_required, SubWizardSpecSteps::DeadlineRequired
+    graph.add_node :deadline_at, SubWizardSpecSteps::DeadlineAt
+
+    graph.add_multiple_conditional_edges(
+      from: :student,
+      branches: [{ when: :student_visa?, then: :deadline_required }],
+    )
+    graph.add_multiple_conditional_edges(
+      from: :skilled,
+      branches: [{ when: :skilled_visa?, then: :deadline_required }],
+    )
+    graph.add_multiple_conditional_edges(
+      from: :deadline_required,
+      branches: [{ when: :deadline_required?, then: :deadline_at }],
+    )
+  end
+end
+
 module SubWizardSpecHelpers
   VISA_STEPS = %i[student skilled deadline_required deadline_at].freeze
 

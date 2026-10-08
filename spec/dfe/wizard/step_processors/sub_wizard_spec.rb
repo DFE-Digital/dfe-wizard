@@ -185,4 +185,254 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'sub-wizards' do
       expect { declare(:visa, steps: []) }.to raise_error(ArgumentError)
     end
   end
+
+  def class_visa_wizard(store: SubWizardSpecStore.new, sub_wizard: SubWizardSpecVisa)
+    build_wizard(store:) do |g|
+      parent_nodes(g)
+      g.add_sub_wizard :visa, sub_wizard, exit_to: :start_date
+      parent_edges(g)
+    end
+  end
+
+  # For a test class that does not draw the visa steps: the parent edges
+  # name :skilled and :student, so they are left out.
+  def custom_wizard(sub_wizard)
+    build_wizard do |g|
+      parent_nodes(g)
+      g.add_sub_wizard :visa, sub_wizard, exit_to: :start_date
+    end
+  end
+
+  describe 'the class form' do
+    it 'records the nodes the class drew, in draw order' do
+      unit = class_visa_wizard.steps_processor.sub_wizards.fetch(:visa)
+
+      expect(unit).to have_attributes(
+        id: :visa,
+        step_ids: visa_steps,
+        exit_to: :start_date,
+        uses: %i[student_visa? skilled_visa? deadline_required?],
+        source: SubWizardSpecVisa,
+      )
+    end
+
+    it 'gives the same paths as the explicit form' do
+      visa_answer_sets.each do |answers|
+        class_form = class_visa_wizard(store: SubWizardSpecStore.new.tap { |s| s.write(answers) })
+        explicit = plain_visa_wizard(store: SubWizardSpecStore.new.tap { |s| s.write(answers) })
+
+        expect(class_form.steps_processor.full_path).to eq(explicit.steps_processor.full_path), answers.inspect
+      end
+    end
+
+    it 'gives the same step definitions as the explicit form' do
+      expect(class_visa_wizard.steps_processor.step_definitions)
+        .to eq(plain_visa_wizard.steps_processor.step_definitions)
+    end
+
+    it 'accepts a lambda that draws' do
+      drawer = lambda do |graph|
+        graph.add_node :student, SubWizardSpecSteps::Student
+      end
+      wizard = build_wizard do |g|
+        parent_nodes(g)
+        g.add_sub_wizard :visa, drawer, exit_to: :start_date
+        g.add_edge from: :funding, to: :student
+        g.add_edge from: :start, to: :funding
+      end
+
+      expect(wizard.steps_processor.sub_wizards[:visa]).to have_attributes(step_ids: [:student], uses: [])
+      expect(wizard.steps_processor.next_step(:student)).to eq(:start_date)
+    end
+
+    it 'raises for an object that cannot draw' do
+      expect { custom_wizard(Object.new).steps_processor }
+        .to raise_error(DfE::Wizard::InvalidGraph, 'sub-wizard :visa must respond to draw(graph) or call(graph)')
+    end
+
+    it 'raises when the class draws no nodes' do
+      empty = Class.new do
+        def self.draw(_graph)
+          nil
+        end
+      end
+
+      expect { custom_wizard(empty).steps_processor }
+        .to raise_error(DfE::Wizard::InvalidGraph, 'sub-wizard :visa drew no nodes')
+    end
+
+    it 'raises when given both steps: and a class' do
+      expect do
+        build_wizard do |g|
+          parent_nodes(g)
+          g.add_sub_wizard :visa, SubWizardSpecVisa, steps: visa_steps
+        end.steps_processor
+      end.to raise_error(DfE::Wizard::InvalidGraph, 'sub-wizard :visa takes steps: or a sub-wizard object, not both')
+    end
+
+    it 'raises when given neither' do
+      expect do
+        build_wizard do |g|
+          parent_nodes(g)
+          g.add_sub_wizard :visa
+        end.steps_processor
+      end.to raise_error(DfE::Wizard::InvalidGraph,
+                         'sub-wizard :visa needs steps: or an object that responds to draw(graph)')
+    end
+  end
+
+  describe 'uses' do
+    it 'collects names across calls, once each' do
+      sub_wizard = Class.new do
+        extend DfE::Wizard::SubWizard
+
+        uses :student_visa?
+        uses :skilled_visa?, :student_visa?
+      end
+
+      expect(sub_wizard.uses).to eq(%i[student_visa? skilled_visa?])
+    end
+
+    it 'raises when the state store does not define a used method' do
+      sub_wizard = Class.new do
+        extend DfE::Wizard::SubWizard
+
+        uses(*SubWizardSpecVisa.uses, :provider)
+
+        def self.name
+          'MissingVisa'
+        end
+
+        def self.draw(graph)
+          SubWizardSpecVisa.draw(graph)
+        end
+      end
+
+      expect { custom_wizard(sub_wizard).steps_processor }
+        .to raise_error(DfE::Wizard::InvalidGraph,
+                        'sub-wizard :visa (MissingVisa) uses :provider, which SubWizardSpecStore does not define')
+    end
+  end
+
+  describe 'rule 7: predicates are Symbols listed in uses' do
+    def drawing(&body)
+      Class.new do
+        extend DfE::Wizard::SubWizard
+
+        uses :student_visa?
+
+        define_singleton_method(:name) { 'TestVisa' }
+        define_singleton_method(:draw) do |graph|
+          graph.add_node :student, SubWizardSpecSteps::Student
+          graph.add_node :deadline_required, SubWizardSpecSteps::DeadlineRequired
+          body.call(graph)
+        end
+      end
+    end
+
+    it 'accepts a listed Symbol' do
+      sub_wizard = drawing do |g|
+        g.add_conditional_edge from: :student, when: :student_visa?, then: :deadline_required, else: nil
+      end
+
+      expect { custom_wizard(sub_wizard).steps_processor }.not_to raise_error
+    end
+
+    it 'raises for a lambda on an edge' do
+      sub_wizard = drawing do |g|
+        g.add_conditional_edge from: :student, when: -> { true }, then: :deadline_required, else: nil
+      end
+
+      expect { custom_wizard(sub_wizard).steps_processor }
+        .to raise_error(DfE::Wizard::InvalidGraph,
+                        'sub-wizard :visa (TestVisa): the edge from :student uses a Proc; ' \
+                        'a sub-wizard predicate must be a Symbol listed in uses')
+    end
+
+    it 'raises for a Symbol not listed in uses' do
+      sub_wizard = drawing do |g|
+        g.add_multiple_conditional_edges(from: :student, branches: [{ when: :salaried?, then: :deadline_required }])
+      end
+
+      expect { custom_wizard(sub_wizard).steps_processor }
+        .to raise_error(DfE::Wizard::InvalidGraph,
+                        'sub-wizard :visa (TestVisa): a branch from :student uses :salaried?, ' \
+                        'which is not listed in uses')
+    end
+
+    it 'raises for a lambda skip_when' do
+      sub_wizard = drawing do |g|
+        g.add_node :deadline_at, SubWizardSpecSteps::DeadlineAt, skip_when: -> { true }
+      end
+
+      expect { custom_wizard(sub_wizard).steps_processor }
+        .to raise_error(DfE::Wizard::InvalidGraph, /skip_when on :deadline_at uses a Proc/)
+    end
+
+    it 'raises for a proc on a custom edge' do
+      sub_wizard = drawing do |g|
+        g.add_custom_branching_edge(from: :student, conditional: proc { :deadline_required }, potential_transitions: [])
+      end
+
+      expect { custom_wizard(sub_wizard).steps_processor }
+        .to raise_error(DfE::Wizard::InvalidGraph, /the custom edge from :student uses a Proc/)
+    end
+
+    it 'allows a class with no uses to add nodes and simple edges only' do
+      drawer = lambda do |graph|
+        graph.add_node :student, SubWizardSpecSteps::Student
+        graph.add_node :deadline_required, SubWizardSpecSteps::DeadlineRequired
+        graph.add_edge from: :student, to: :deadline_required
+        graph.add_conditional_edge from: :student, when: :student_visa?, then: :deadline_required, else: nil
+      end
+
+      expect { custom_wizard(drawer).steps_processor }
+        .to raise_error(DfE::Wizard::InvalidGraph, /uses :student_visa\?, which is not listed in uses/)
+    end
+  end
+
+  describe 'rule 5: nodes and edges only' do
+    %i[root conditional_root before_next_step before_previous_step].each do |method_name|
+      it "raises for #{method_name}" do
+        drawer = lambda do |graph|
+          graph.add_node :student, SubWizardSpecSteps::Student
+          graph.public_send(method_name, :student)
+        end
+
+        expect { custom_wizard(drawer).steps_processor }
+          .to raise_error(DfE::Wizard::InvalidGraph,
+                          "sub-wizard :visa calls #{method_name}; a sub-wizard adds nodes and edges only")
+      end
+    end
+
+    it 'raises for a nested sub-wizard' do
+      drawer = lambda do |graph|
+        graph.add_node :student, SubWizardSpecSteps::Student
+        graph.add_sub_wizard :inner, steps: [:student]
+      end
+
+      expect { custom_wizard(drawer).steps_processor }
+        .to raise_error(DfE::Wizard::InvalidGraph,
+                        'sub-wizard :visa declares a sub-wizard; sub-wizards are one level only')
+    end
+
+    it 'raises for a node id that is already a node, before replacing it' do
+      drawer = lambda do |graph|
+        graph.add_node :start_date, SubWizardSpecSteps::Student
+      end
+
+      expect { custom_wizard(drawer).steps_processor }
+        .to raise_error(DfE::Wizard::InvalidGraph, 'sub-wizard :visa adds :start_date, which is already a node')
+    end
+
+    it 'raises for an edge from a node the class did not add' do
+      drawer = lambda do |graph|
+        graph.add_node :student, SubWizardSpecSteps::Student
+        graph.add_edge from: :funding, to: :student
+      end
+
+      expect { custom_wizard(drawer).steps_processor }
+        .to raise_error(DfE::Wizard::InvalidGraph, 'sub-wizard :visa adds an edge from :funding, which it did not add')
+    end
+  end
 end

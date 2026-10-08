@@ -115,6 +115,7 @@ module DfE
     # Module for building Check Your Answers pages
     # @api public
     autoload :CheckAnswersPresenter, 'dfe/wizard/check_answers_presenter'
+    autoload :SubWizard, 'dfe/wizard/sub_wizard'
 
     # @!group Auto generate Documentation for any wizard
     module Documentation

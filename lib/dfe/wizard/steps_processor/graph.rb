@@ -1,6 +1,7 @@
 require_relative 'graph/dsl'
 require_relative 'graph/registry'
 require_relative 'graph/navigation_resolver'
+require_relative 'graph/sub_wizard_dsl'
 
 module DfE
   module Wizard

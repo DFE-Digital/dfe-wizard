@@ -12,6 +12,12 @@
   `default:`, a nil branch) to one node. `steps_processor.sub_wizards` and
   `steps_processor.unit_for(step_id)` return the units. Graph only: other
   processors return `{}` and nil.
+- **Sub-wizard classes: `graph.add_sub_wizard :id, SubWizardClass`.** The
+  class (`extend DfE::Wizard::SubWizard`) draws its own nodes and edges into
+  the parent graph and lists the state store methods it calls with `uses`.
+  It gets a restricted graph: nodes and edges only, edges only from its own
+  nodes, and every predicate a Symbol listed in `uses`. Both forms give the
+  same unit, so a unit can move between them without other changes.
 - **`wizard.full_path`** returns every step from the root to the end of the
   graph over the current answers, without stopping at the current step. It
   stops before a Redirect node, an id that is not a node, or a repeated step.
