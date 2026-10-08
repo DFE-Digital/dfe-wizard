@@ -294,6 +294,18 @@ RSpec.describe DfE::Wizard::StepsProcessor::Linear do
     end
   end
 
+  describe '#sub_wizards and #unit_for' do
+    let(:processor) { DfE::Wizard::StepsProcessor::Linear.new(HmrcSelfAssessmentWizard.new) }
+
+    it 'has no sub-wizards' do
+      expect(processor.sub_wizards).to eq({})
+    end
+
+    it 'has no units' do
+      expect(processor.unit_for(:personal_details)).to be_nil
+    end
+  end
+
   describe '#find_step' do
     let(:wizard) { HmrcSelfAssessmentWizard.new }
     let(:processor) do

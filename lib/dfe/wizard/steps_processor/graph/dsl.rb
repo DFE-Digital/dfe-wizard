@@ -249,6 +249,24 @@ module DfE
             )
           end
 
+          # Declare a sub-wizard: a named group of steps in this graph.
+          #
+          # The steps stay ordinary nodes; every path API sees them as before.
+          # The sub-wizard is the unit that change journeys show.
+          #
+          # @param unit_id [Symbol] Sub-wizard id; never a node id
+          # @param steps [Array<Symbol>] The steps, already nodes of this graph
+          # @param exit_to [Symbol, nil] Node for the steps' open exits
+          # @raise [DfE::Wizard::InvalidGraph]
+          # @return [void]
+          #
+          # @example
+          #   g.add_sub_wizard :visa, steps: %i[visa_sponsorship skilled_worker_visa]
+          def add_sub_wizard(unit_id, steps:, exit_to: nil)
+            check_sub_wizard_declaration!(unit_id, exit_to)
+            add_sub_wizard_unit(unit_id, explicit_sub_wizard_steps(unit_id, steps), exit_to:, uses: [], source: nil)
+          end
+
           # Register callback before navigating to next step.
           #
           # Block is called with no arguments. Returning a step ID overrides
@@ -298,6 +316,30 @@ module DfE
           end
 
           private
+
+          def check_sub_wizard_declaration!(unit_id, exit_to)
+            raise InvalidGraph, "sub-wizard id must be a Symbol, got #{unit_id.class}" unless unit_id.is_a?(Symbol)
+            raise InvalidGraph, "sub-wizard :#{unit_id} is declared twice" if @registry.sub_wizards.key?(unit_id)
+            return if exit_to.nil? || exit_to.is_a?(Symbol)
+
+            raise InvalidGraph, "sub-wizard :#{unit_id}: exit_to must be a Symbol, got #{exit_to.class}"
+          end
+
+          def explicit_sub_wizard_steps(unit_id, steps)
+            return steps.uniq if steps.is_a?(Array) && steps.any? && steps.all?(Symbol)
+
+            raise InvalidGraph, "sub-wizard :#{unit_id}: steps: must be a non-empty Array of Symbols"
+          end
+
+          def add_sub_wizard_unit(unit_id, step_ids, exit_to:, uses:, source:)
+            if exit_to && step_ids.include?(exit_to)
+              raise InvalidGraph, "sub-wizard :#{unit_id}: exit_to :#{exit_to} is one of its own steps"
+            end
+
+            @registry.add_sub_wizard(
+              Registry::Unit.new(id: unit_id, step_ids: step_ids.freeze, exit_to:, uses: uses.freeze, source:),
+            )
+          end
 
           # Build a predicate callable.
           #

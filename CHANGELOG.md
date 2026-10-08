@@ -6,6 +6,12 @@
   raises on purpose, so `rescue DfE::Wizard::Error` catches them all.
   **`DfE::Wizard::InvalidGraph`** (an `ArgumentError`) is raised when a
   graph breaks a sub-wizard rule.
+- **Sub-wizards: `graph.add_sub_wizard :id, steps: [...]`** names a group of
+  steps in a Graph wizard. The steps stay ordinary nodes, so every path API
+  is unchanged. `exit_to:` sends the steps' open exits (no edge, no
+  `default:`, a nil branch) to one node. `steps_processor.sub_wizards` and
+  `steps_processor.unit_for(step_id)` return the units. Graph only: other
+  processors return `{}` and nil.
 - **`wizard.full_path`** returns every step from the root to the end of the
   graph over the current answers, without stopping at the current step. It
   stops before a Redirect node, an id that is not a node, or a repeated step.
