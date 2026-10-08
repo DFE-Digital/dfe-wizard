@@ -231,6 +231,7 @@ module DfE
 
     module Test
       autoload :RSpecMatchers, 'dfe/wizard/test/r_spec_matchers'
+      autoload :SubWizardHarness, 'dfe/wizard/test/sub_wizard_harness'
     end
 
     # @!endgroup
