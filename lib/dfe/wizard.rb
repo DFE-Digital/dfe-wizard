@@ -2,6 +2,7 @@ require 'active_support/all'
 require 'active_model'
 
 require 'dfe/wizard/version'
+require 'dfe/wizard/errors'
 
 module DfE
   # Multi-step form wizard framework using graph-based navigation

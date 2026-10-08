@@ -2,6 +2,10 @@
 
 ### Added
 
+- **`DfE::Wizard::Error`** is a module included by every error the gem
+  raises on purpose, so `rescue DfE::Wizard::Error` catches them all.
+  **`DfE::Wizard::InvalidGraph`** (an `ArgumentError`) is raised when a
+  graph breaks a sub-wizard rule.
 - **`wizard.full_path`** returns every step from the root to the end of the
   graph over the current answers, without stopping at the current step. It
   stops before a Redirect node, an id that is not a node, or a repeated step.
