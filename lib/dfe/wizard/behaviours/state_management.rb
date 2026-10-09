@@ -611,6 +611,9 @@ module DfE
           owners = cached_steps_processor.answer_owners
 
           flat_hash.each do |key, value|
+            # The changeset's reserved key is never step data or metadata
+            next if key.to_sym == Changeset::KEY
+
             # Find which step owns this attribute
             step_id = owners[key.to_sym]
 

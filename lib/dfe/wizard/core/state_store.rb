@@ -43,10 +43,22 @@ module DfE
         # @example Initialize with session repository
         #   repository = DfE::Wizard::Repository::Session.new(session)
         #   state_store = StateStores::PersonalInformation.new(repository: repository)
-        def initialize(repository: ::DfE::Wizard::Repository::InMemory.new, attribute_names: [], step_definitions: [])
-          @repository = repository
+        def initialize(repository: nil, attribute_names: [], step_definitions: [])
+          @default_repository = repository.nil?
+          @repository = repository || ::DfE::Wizard::Repository::InMemory.new
           @attribute_names = attribute_names
           @step_definitions = step_definitions
+        end
+
+        # Whether the store was built without a repository
+        #
+        # Such a store uses a new InMemory repository, which loses
+        # everything between requests. Change journeys refuse it.
+        #
+        # @return [Boolean]
+        # @api private
+        def default_repository?
+          @default_repository == true
         end
 
         # Retrieve value by key
