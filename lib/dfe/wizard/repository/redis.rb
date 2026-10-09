@@ -148,6 +148,27 @@ module DfE
         end
 
         # @api public
+        # Remove only this state_key's state, keeping the others under the
+        # same key. Without a state_key, removes the key (as #delete_data).
+        # @return [void]
+        def delete_state
+          return delete_data unless @state_key
+
+          with_redis do |conn|
+            current_json = conn.get(@key)
+            next unless current_json
+
+            current_data = JSON.parse(current_json)
+            current_data.delete(@state_key)
+            if current_data.empty?
+              conn.del(@key)
+            else
+              persist_to_redis(JSON.generate(current_data))
+            end
+          end
+        end
+
+        # @api public
         # Prepare data before saving (stringify keys for JSON/Redis).
         # @param data [Hash]
         # @return [Hash] Same structure with string keys.

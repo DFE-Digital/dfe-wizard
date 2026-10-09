@@ -7,7 +7,9 @@ module DfE
     # A plain object over the wizard's state store. Its fields live under
     # one reserved top-level key, `_dfe_wizard`, written through
     # `state_store.write` like any answer. The answers stay where they are.
-    # In this release the only field is the change journey state.
+    # The fields are the change journey state and, for an edit of a saved
+    # record, the seed, the record's `updated_at`, the record identity and
+    # the caller URL.
     #
     # Building a changeset reads and writes nothing, so a wizard that does
     # not use change journeys is unaffected.
@@ -62,6 +64,89 @@ module DfE
         answer_names.reject { |name| before[name] == after[name] }
       end
 
+      # Seed the changeset with the answers of a saved record
+      #
+      # Runs once, on a new state_key: the metadata first (read back to
+      # check the repository kept it), then the answers.
+      #
+      # @param answers [Hash] answers in step attribute names
+      # @param updated_at [Time, nil] the record's updated_at
+      # @return [void]
+      # @raise [ArgumentError] for a repository that cannot hold a changeset,
+      #   or when the store already holds data
+      def seed!(answers, updated_at: nil)
+        check_repository!
+        unless state_store.read.empty?
+          raise ArgumentError, 'the changeset is not empty; seed! runs once, on a new state_key'
+        end
+
+        write_fields(edit: { seed: answers, updated_at: stamp(updated_at) })
+        state_store.write(answers)
+      end
+
+      # The seeded answers
+      #
+      # @return [Hash{Symbol => Object}] deep symbol keys; {} for a draft
+      def seed
+        edit_fields[:seed] || {}
+      end
+
+      # The record's updated_at when it was seeded
+      #
+      # @return [String, nil] iso8601(6), in UTC
+      def seed_updated_at
+        edit_fields[:updated_at]
+      end
+
+      # Whether the changeset holds an edit of a saved record
+      #
+      # @return [Boolean]
+      def edit?
+        !fields[:edit].nil?
+      end
+
+      # Answers on the path that differ from the seed
+      #
+      # Answers for steps that left the path are not included. Both sides
+      # are normalised.
+      #
+      # @return [Hash{Symbol => Object}] in attribute_names order
+      def diff
+        seeded = seed
+        normalise(@wizard.answers_on_path).reject { |name, value| seeded[name] == value }
+      end
+
+      # @return [Boolean]
+      def diff?
+        !diff.empty?
+      end
+
+      # Whether the record changed since it was seeded
+      #
+      # Compares updated_at only, in UTC to the microsecond. False when
+      # nothing is seeded, or when the record has no updated_at now and had
+      # none when it was seeded.
+      #
+      # @param record [#updated_at]
+      # @return [Boolean]
+      def stale?(record)
+        return false unless edit?
+
+        stamp(record.updated_at) != seed_updated_at
+      end
+
+      # Remove this changeset's answers and metadata
+      #
+      # Only this changeset's data: a Redis or Session repository with a
+      # state_key keeps its other states. A custom repository that keeps
+      # several state_keys under one key must make `delete_state` remove
+      # only its own.
+      #
+      # @return [void]
+      def discard!
+        state_store.repository.delete_state
+      end
+
       # The change journey state, or nil when there is none
       #
       # @return [Hash, nil]
@@ -86,6 +171,10 @@ module DfE
       def fields
         stored = stored_value(state_store.read)
         stored.is_a?(Hash) ? normalise(stored) : {}
+      end
+
+      def edit_fields
+        fields[:edit] || {}
       end
 
       # Writes nil first, so a deep-merging repository (InMemory) keeps
@@ -124,6 +213,10 @@ module DfE
 
       def answer_names
         @answer_names ||= @wizard.attribute_names.map(&:to_sym).uniq
+      end
+
+      def stamp(time)
+        time&.getutc&.iso8601(6)
       end
 
       def normalise(value)

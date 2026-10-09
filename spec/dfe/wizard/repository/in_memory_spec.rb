@@ -166,4 +166,13 @@ RSpec.describe DfE::Wizard::Repository::InMemory do
       expect(repo.read).to eq({ name: 'Jane' })
     end
   end
+
+  describe '#delete_data' do
+    it 'removes all data' do
+      repo.save({ name: 'John' })
+      repo.delete_data
+
+      expect(repo.read).to eq({})
+    end
+  end
 end

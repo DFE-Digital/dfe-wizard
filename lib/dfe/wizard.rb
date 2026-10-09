@@ -122,6 +122,7 @@ module DfE
     autoload :SubWizard, 'dfe/wizard/sub_wizard'
     autoload :Changeset, 'dfe/wizard/changeset'
     autoload :Journey, 'dfe/wizard/journey'
+    autoload :Mapper, 'dfe/wizard/mapper'
 
     # @!group Auto generate Documentation for any wizard
     module Documentation

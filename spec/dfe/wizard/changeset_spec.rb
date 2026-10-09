@@ -9,6 +9,18 @@ RSpec.describe DfE::Wizard::Changeset do
     end
   end
 
+  # A wizard with the visa edges, so full_path follows funding.
+  def wizard_with_path(repository)
+    build_wizard(store: SubWizardSpecStore.new(repository:)) do |g|
+      parent_nodes(g)
+      visa_nodes(g)
+      parent_edges(g)
+      visa_edges(g)
+    end
+  end
+
+  seeded_at = Time.utc(2026, 10, 9, 12, 0, 0, 123_456)
+
   repositories = {
     'InMemory' => -> { DfE::Wizard::Repository::InMemory.new },
     'Cache' => -> { DfE::Wizard::Repository::Cache.new(cache: ActiveSupport::Cache::MemoryStore.new, key: 'cs') },
@@ -56,6 +68,126 @@ RSpec.describe DfE::Wizard::Changeset do
 
         expect(wizard.changeset.answer_changes_since(snapshot)).to eq(%i[funding student_visa skilled_visa])
       end
+
+      it 'seeds the answers and the edit metadata' do
+        wizard.changeset.seed!({ funding: 'fee', student_visa: false }, updated_at: seeded_at)
+
+        expect(wizard.changeset.seed).to eq(funding: 'fee', student_visa: false)
+        expect(wizard.changeset.seed_updated_at).to eq('2026-10-09T12:00:00.123456Z')
+        expect(wizard.changeset.answers).to eq(funding: 'fee', student_visa: false)
+        expect(wizard.changeset).to be_edit
+      end
+
+      it 'finds no diff for seeded answers read back from storage' do
+        wizard.changeset.seed!({ funding: 'fee', student_visa: false })
+
+        expect(wizard.changeset.diff).to eq({})
+        expect(wizard.changeset).not_to be_diff
+      end
+
+      it 'discards its answers and metadata' do
+        wizard.changeset.seed!({ funding: 'fee' })
+        wizard.changeset.discard!
+
+        expect(wizard.state_store.read).to eq({})
+      end
+    end
+
+    context "diff on #{name}" do
+      let(:wizard) { wizard_with_path(build.call) }
+
+      it 'lists answers on the path that differ from the seed, leaving out answers off the path' do
+        wizard.changeset.seed!({ funding: 'fee', student_visa: false })
+        wizard.state_store.write(funding: 'salary', skilled_visa: true)
+
+        expect(wizard.changeset.diff).to eq(funding: 'salary', skilled_visa: true)
+        expect(wizard.changeset).to be_diff
+      end
+    end
+  end
+
+  describe '#seed!' do
+    it 'raises when the store holds data, before writing' do
+      wizard = wizard_on(DfE::Wizard::Repository::InMemory.new)
+      wizard.state_store.write(funding: 'fee')
+
+      expect { wizard.changeset.seed!({ funding: 'salary' }) }.to raise_error(ArgumentError, /not empty/)
+      expect(wizard.state_store.read).to eq(funding: 'fee')
+    end
+
+    it 'raises before writing to a Repository::Model' do
+      repository = DfE::Wizard::Repository::Model.new(record: Struct.new(:funding).new('fee'))
+      wizard = wizard_on(repository)
+      allow(repository).to receive_messages(read: {}, write: nil)
+
+      expect { wizard.changeset.seed!({ funding: 'fee' }) }
+        .to raise_error(ArgumentError, 'Repository::Model cannot hold a changeset')
+      expect(repository).not_to have_received(:write)
+    end
+  end
+
+  describe '#stale?' do
+    let(:wizard) { wizard_on(DfE::Wizard::Repository::InMemory.new) }
+    let(:record_at) { ->(time) { Struct.new(:updated_at).new(time) } }
+
+    it 'is false when nothing is seeded' do
+      expect(wizard.changeset.stale?(record_at.call(nil))).to be(false)
+    end
+
+    it 'is false when updated_at is the seeded one, to the microsecond' do
+      wizard.changeset.seed!({ funding: 'fee' }, updated_at: seeded_at)
+
+      expect(wizard.changeset.stale?(record_at.call(seeded_at))).to be(false)
+    end
+
+    it 'is true when updated_at moved' do
+      wizard.changeset.seed!({ funding: 'fee' }, updated_at: seeded_at)
+
+      expect(wizard.changeset.stale?(record_at.call(seeded_at + Rational(1, 1_000_000)))).to be(true)
+    end
+
+    it 'is true when updated_at is nil' do
+      wizard.changeset.seed!({ funding: 'fee' }, updated_at: seeded_at)
+
+      expect(wizard.changeset.stale?(record_at.call(nil))).to be(true)
+    end
+
+    it 'is false for a record with no updated_at, seeded or now' do
+      wizard.changeset.seed!({ funding: 'fee' }, updated_at: nil)
+
+      expect(wizard.changeset.stale?(record_at.call(nil))).to be(false)
+    end
+
+    it 'is false for the same updated_at in another zone' do
+      wizard.changeset.seed!({ funding: 'fee' }, updated_at: seeded_at.getlocal('+01:00'))
+
+      expect(wizard.changeset.stale?(record_at.call(seeded_at))).to be(false)
+    end
+  end
+
+  describe '#discard!' do
+    it 'keeps the other state_keys of a Session' do
+      session = {}
+      other = DfE::Wizard::Repository::Session.new(session:, state_key: 'k2')
+      other.write(funding: 'salary')
+      wizard = wizard_on(DfE::Wizard::Repository::Session.new(session:, state_key: 'k1'))
+      wizard.changeset.seed!({ funding: 'fee' })
+
+      wizard.changeset.discard!
+
+      expect(other.read[:funding]).to eq('salary')
+    end
+
+    it 'keeps the other state_keys of a Redis key' do
+      redis = MockRedis.new
+      other = DfE::Wizard::Repository::Redis.new(redis:, key: 'cs', state_key: 'k2')
+      other.write(funding: 'salary')
+      wizard = wizard_on(DfE::Wizard::Repository::Redis.new(redis:, key: 'cs', state_key: 'k1'))
+      wizard.changeset.seed!({ funding: 'fee' })
+
+      wizard.changeset.discard!
+
+      expect(other.read).to eq(funding: 'salary')
     end
   end
 

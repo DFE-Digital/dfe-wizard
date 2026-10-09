@@ -150,6 +150,17 @@ module DfE
           raise NotImplementedError, "#{self.class}#delete_data not implemented"
         end
 
+        # Delete only this wizard state's data
+        #
+        # Changeset#discard! calls it. The default is #delete_data. A
+        # repository that keeps several states under one key, and whose
+        # #delete_data removes them all, overrides it to remove only its own.
+        #
+        # @return [void]
+        def delete_state
+          delete_data
+        end
+
         # Merge new data with existing data (hook for subclasses)
         #
         # Override in subclasses for custom merge behavior.

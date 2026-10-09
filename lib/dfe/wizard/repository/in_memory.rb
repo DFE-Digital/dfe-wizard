@@ -95,17 +95,10 @@ module DfE
           operation_class.new(repository: self, step:).execute
         end
 
-        # Clear all stored data
-        #
-        # Removes everything from the repository. Useful for starting fresh
-        # or cleaning up after a wizard is completed.
+        # Remove all stored data (Base#clear calls this)
         #
         # @return [void]
-        #
-        # @example
-        #   repo.clear
-        #   repo.read  # => {}
-        def clear
+        def delete_data
           @data = {}
         end
       end

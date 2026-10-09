@@ -240,4 +240,34 @@ RSpec.describe DfE::Wizard::Repository::Redis do
       expect(repository.ttl).to be_nil
     end
   end
+  describe '#delete_state' do
+    it 'removes only its own state_key' do
+      mine = described_class.new(redis:, key: 'wizards', state_key: 'k1')
+      other = described_class.new(redis:, key: 'wizards', state_key: 'k2')
+      mine.write(name: 'a')
+      other.write(name: 'b')
+
+      mine.delete_state
+
+      expect(mine.read).to eq({})
+      expect(other.read).to eq(name: 'b')
+    end
+
+    it 'removes the key when its state was the last one' do
+      mine = described_class.new(redis:, key: 'wizards', state_key: 'k1')
+      mine.write(name: 'a')
+
+      mine.delete_state
+
+      expect(redis.get('wizards')).to be_nil
+    end
+
+    it 'removes the key without a state_key' do
+      repository.write(name: 'a')
+
+      repository.delete_state
+
+      expect(redis.get('wizard:user:123')).to be_nil
+    end
+  end
 end
