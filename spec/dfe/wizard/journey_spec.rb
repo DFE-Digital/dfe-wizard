@@ -108,6 +108,66 @@ RSpec.describe 'Change journeys' do
     end
   end
 
+  describe 'chaining' do
+    it 'queues a later unit whose depends_on names a changed answer' do
+      visit_step(:funding, return_to_review: :funding)
+
+      expect(submit_step(:funding, funding: 'salary')).to eq(:skilled)
+      expect(journey_state).to include(unit: 'visa', shown: ['funding'])
+      expect(submit_step(:skilled, skilled_visa: false)).to eq(:check_answers)
+    end
+
+    it 'does not queue a unit that does not depend on the change' do
+      visit_step(:start_date, return_to_review: :start_date)
+
+      expect(submit_step(:start_date)).to eq(:check_answers)
+    end
+
+    it 'does not queue a unit when the answer is changed back' do
+      visit_step(:funding, return_to_review: :funding)
+      submit_step(:funding, funding: 'salary')
+      back_from(:skilled)
+
+      expect(submit_step(:funding, funding: 'fee')).to eq(:check_answers)
+    end
+
+    context 'with two dependent units' do
+      let(:journey_wizard_class) { JourneySpecTwoUnitWizard }
+
+      it 'queues every later dependent unit, in path order' do
+        visit_step(:funding, return_to_review: :funding)
+
+        expect(submit_step(:funding, funding: 'salary')).to eq(:skilled)
+        expect(submit_step(:skilled, skilled_visa: false)).to eq(:start_date)
+        expect(submit_step(:start_date)).to eq(:check_answers)
+      end
+
+      it 'queues a unit again after Back into an earlier unit (decided 2026-10-06)' do
+        visit_step(:funding, return_to_review: :funding)
+        submit_step(:funding, funding: 'salary')
+        submit_step(:skilled, skilled_visa: false)
+
+        expect(back_from(:start_date)).to eq(:skilled)
+        expect(back_from(:skilled)).to eq(:funding)
+        expect(submit_step(:funding, funding: 'salary')).to eq(:skilled)
+        expect(journey_state).to include(unit: 'visa', shown: ['funding'])
+      end
+    end
+  end
+
+  describe 'Back into the unit of an entry step' do
+    let(:journey_wizard_class) { JourneySpecDeadlineWizard }
+
+    it 'stops at the entry step, then goes to check answers' do
+      journey_store.write(funding: 'salary', skilled_visa: true, deadline_required: true, student_visa: nil)
+      visit_step(:deadline_required, return_to_review: :deadline_required)
+
+      expect(submit_step(:deadline_required, deadline_required: false)).to eq(:start_date)
+      expect(back_from(:start_date)).to eq(:deadline_required)
+      expect(back_from(:deadline_required)).to eq(:check_answers)
+    end
+  end
+
   describe 'Back inside one unit' do
     before do
       journey_store.write(funding: 'salary', skilled_visa: false, student_visa: nil)
@@ -125,6 +185,34 @@ RSpec.describe 'Change journeys' do
 
     it 'uses 1.0 navigation for a step outside the journey' do
       expect(back_from(:funding)).to eq(:start)
+    end
+  end
+
+  describe 'Back across units' do
+    before do
+      visit_step(:funding, return_to_review: :funding)
+      submit_step(:funding, funding: 'salary')
+    end
+
+    it 'goes to the previous step of the unit on the path' do
+      submit_step(:skilled, skilled_visa: true)
+
+      expect(back_from(:deadline_required)).to eq(:skilled)
+    end
+
+    it 'goes from the first step of a unit to the last step of the unit shown before it' do
+      expect(back_from(:skilled)).to eq(:funding)
+    end
+
+    it 'goes from the first step of the first unit to check answers' do
+      expect(back_from(:funding)).to eq(:check_answers)
+    end
+
+    it 'makes a shown unit current again when the user saves it' do
+      back_from(:skilled)
+      submit_step(:funding, funding: 'salary')
+
+      expect(journey_state).to include(unit: 'visa', shown: ['funding'])
     end
   end
 

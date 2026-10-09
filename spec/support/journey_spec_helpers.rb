@@ -46,6 +46,13 @@ class JourneySpecWizard
   end
 end
 
+# start_date depends on deadline_required, so a deadline change queues it.
+class JourneySpecDeadlineWizard < JourneySpecWizard
+  def start_date_depends_on
+    %i[deadline_required]
+  end
+end
+
 # start_date also depends on funding, so a funding change queues two units.
 class JourneySpecTwoUnitWizard < JourneySpecWizard
   def start_date_depends_on

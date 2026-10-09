@@ -50,6 +50,12 @@
   on to check answers. A save on a step outside the journey uses 1.0
   navigation. During a journey, the wizard picks the next and previous step
   before any `before_next_step` or `before_previous_step` callback runs.
+- **Chaining.** When a unit in a change journey ends, the journey shows the
+  first later unit on the path whose `depends_on` names an answer that
+  changed since the journey started, then the next, and returns to check
+  answers when none is left. Back crosses into the unit shown before.
+  Saving a unit the user went Back into makes it current again, so a later
+  unit is asked again if its dependency still changed.
 - **`wizard.full_path`** returns every step from the root to the end of the
   graph over the current answers, without stopping at the current step. It
   stops before a Redirect node, an id that is not a node, or a repeated step.

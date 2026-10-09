@@ -53,23 +53,45 @@ module DfE
 
       # Called by save_current_step after the step's operations succeed
       #
-      # A save on a step outside the journey changes nothing; navigation is
-      # as in 1.0. A step of the entry step's unit before the entry step is
-      # outside the journey. A save on the unit's last journey step ends the
-      # journey.
+      # - A save on a step outside the journey changes nothing; navigation
+      #   is as in 1.0. A step of the entry step's unit before the entry
+      #   step is outside the journey.
+      # - A save in a unit already shown (the user went Back into it) makes
+      #   that unit current again, and forgets it and every later shown unit.
+      # - A save on the unit's last journey step ends the unit: the
+      #   next unit is the first later unit on the path, not yet shown, whose
+      #   depends_on names a changed answer. With none, the journey ends.
       #
       # @return [void]
       def after_save
         state = journey_state
         unit = current_unit
-        return unless state && unit && unit.id == state[:unit]
+        return unless state && unit
 
-        steps = journey_steps(@wizard.full_path, unit, state)
+        shown = state[:shown]
+        if shown.include?(unit.id)
+          shown = shown.take(shown.index(unit.id))
+        elsif unit.id != state[:unit]
+          return
+        end
+
+        path = @wizard.full_path
+        steps = journey_steps(path, unit, state)
         return unless steps.include?(current_step_name)
-        return if later_step(steps)
 
-        changeset.journey = nil
-        @finished = true
+        if later_step(steps)
+          changeset.journey = state.merge(unit: unit.id, shown:)
+          return
+        end
+
+        shown += [unit.id]
+        next_unit = queued_units(path, unit, shown, changeset.answer_changes_since(state[:snapshot])).first
+        if next_unit
+          changeset.journey = state.merge(unit: next_unit.id, shown:)
+        else
+          changeset.journey = nil
+          @finished = true
+        end
       end
 
       # The step after the current one in the journey
@@ -179,6 +201,13 @@ module DfE
       def later_step(steps)
         index = steps.index(current_step_name)
         index ? steps[index + 1] : nil
+      end
+
+      def queued_units(path, unit, shown, changed)
+        units = path.filter_map { |step_id| graph.unit_for(step_id) }.uniq(&:id)
+        units.drop_while { |candidate| candidate.id != unit.id }.drop(1).select do |candidate|
+          !shown.include?(candidate.id) && candidate.depends_on.intersect?(changed)
+        end
       end
 
       def changeset
