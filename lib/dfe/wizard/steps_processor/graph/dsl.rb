@@ -20,15 +20,42 @@ module DfE
           # @param node_id [Symbol] Unique node identifier
           # @param klass [Class] Step class to instantiate
           # @param label [String, nil] Display label for documentation
+          # @param depends_on [Array<Symbol>, nil] Answers whose change queues
+          #   this step in a change journey (see #check_answers)
           #
           # @example
           #   g.add_node :personal_info, PersonalInfoStep
           #   g.add_node :confirmation, ConfirmationStep, label: "Review & Confirm"
-          def add_node(node_id, klass, label: nil, skip_when: nil)
+          #   g.add_node :study_pattern, StudyPatternStep, depends_on: %i[qualification]
+          def add_node(node_id, klass, label: nil, skip_when: nil, depends_on: nil)
             raise ArgumentError, "node_id must be a symbol, got #{node_id.class}" unless node_id.is_a?(Symbol)
             raise ArgumentError, "klass must be a Class, got #{klass.class}" unless klass.is_a?(Class)
 
-            @registry.add_node(node_id, klass, label:, skip_when:)
+            depends_on = depends_on_list(":#{node_id}", depends_on)
+            @registry.add_node(node_id, klass, label:, skip_when:, depends_on:)
+          end
+
+          # Mark a node as the check answers page, and turn on change journeys.
+          #
+          # A "Change" link on that page sends the start param
+          # (`return_to_review=<step_id>`). On that GET,
+          # `wizard.journey_start_redirect` starts a change journey for the
+          # step's unit. The journey shows the unit, then every later unit on
+          # the path whose `depends_on` names an answer that changed, then
+          # returns here. The node keeps its edges, step class and operations.
+          #
+          # @param node_id [Symbol] An existing node
+          # @raise [DfE::Wizard::InvalidGraph]
+          # @return [void]
+          #
+          # @example
+          #   g.add_node :check_answers, CheckAnswersStep
+          #   g.check_answers :check_answers
+          def check_answers(node_id)
+            raise InvalidGraph, "graph.check_answers takes a Symbol, got #{node_id.class}" unless node_id.is_a?(Symbol)
+            raise InvalidGraph, 'graph.check_answers is declared twice' if @registry.check_answers_node
+
+            @registry.check_answers_node = node_id
           end
 
           # Set static root node.
@@ -265,6 +292,8 @@ module DfE
           # @param sub_wizard [#draw, #call, nil] Class form object
           # @param steps [Array<Symbol>, nil] Explicit form steps
           # @param exit_to [Symbol, nil] Node for the steps' open exits
+          # @param depends_on [Array<Symbol>, nil] Answers whose change queues
+          #   this sub-wizard in a change journey
           # @raise [DfE::Wizard::InvalidGraph]
           # @return [void]
           #
@@ -273,8 +302,9 @@ module DfE
           #
           # @example Class form
           #   g.add_sub_wizard :visa, CourseWizard::VisaSubWizard, exit_to: :start_date
-          def add_sub_wizard(unit_id, sub_wizard = nil, steps: nil, exit_to: nil)
+          def add_sub_wizard(unit_id, sub_wizard = nil, steps: nil, exit_to: nil, depends_on: nil)
             check_sub_wizard_declaration!(unit_id, exit_to)
+            depends_on = depends_on_list("sub-wizard :#{unit_id}", depends_on)
             if sub_wizard && steps
               raise InvalidGraph, "sub-wizard :#{unit_id} takes steps: or a sub-wizard object, not both"
             end
@@ -283,11 +313,13 @@ module DfE
             end
 
             if steps
-              add_sub_wizard_unit(unit_id, explicit_sub_wizard_steps(unit_id, steps), exit_to:, uses: [], source: nil)
+              step_ids = explicit_sub_wizard_steps(unit_id, steps)
+              add_sub_wizard_unit(unit_id, step_ids, exit_to:, uses: [], source: nil, depends_on:)
             else
               name = sub_wizard_name(unit_id, sub_wizard)
               uses = sub_wizard_uses(name, sub_wizard)
-              add_sub_wizard_unit(unit_id, draw_sub_wizard(name, sub_wizard, uses), exit_to:, uses:, source: sub_wizard)
+              step_ids = draw_sub_wizard(name, sub_wizard, uses)
+              add_sub_wizard_unit(unit_id, step_ids, exit_to:, uses:, source: sub_wizard, depends_on:)
             end
           end
 
@@ -355,14 +387,23 @@ module DfE
             raise InvalidGraph, "sub-wizard :#{unit_id}: steps: must be a non-empty Array of Symbols"
           end
 
-          def add_sub_wizard_unit(unit_id, step_ids, exit_to:, uses:, source:)
+          def add_sub_wizard_unit(unit_id, step_ids, exit_to:, uses:, source:, depends_on: [])
             if exit_to && step_ids.include?(exit_to)
               raise InvalidGraph, "sub-wizard :#{unit_id}: exit_to :#{exit_to} is one of its own steps"
             end
 
             @registry.add_sub_wizard(
-              Registry::Unit.new(id: unit_id, step_ids: step_ids.freeze, exit_to:, uses: uses.freeze, source:),
+              Registry::Unit.new(
+                id: unit_id, step_ids: step_ids.freeze, exit_to:, uses: uses.freeze, source:, depends_on:,
+              ),
             )
+          end
+
+          def depends_on_list(owner, depends_on)
+            return [].freeze if depends_on.nil?
+            return depends_on.uniq.freeze if depends_on.is_a?(Array) && depends_on.all?(Symbol)
+
+            raise InvalidGraph, "#{owner}: depends_on must be an Array of Symbols"
           end
 
           def sub_wizard_name(unit_id, sub_wizard)

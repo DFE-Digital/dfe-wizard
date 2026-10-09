@@ -32,6 +32,14 @@
   answers after a JSON round trip, so values read back from any repository
   compare equal. A `Repository::Model` (or subclass), or a state store
   built without a repository, cannot hold one.
+- **`graph.check_answers :node`** marks the check answers page and turns on
+  change journeys (below). **`depends_on:`** on `add_node` and
+  `add_sub_wizard` names the answers whose change queues that unit.
+  `steps_processor.unit(unit_id)` and `steps_processor.check_answers_step`
+  read them. Draws raise `InvalidGraph` for a check answers node that is not
+  a node, is in a sub-wizard or has `depends_on`, for a `depends_on` name
+  that is not a step attribute, and for a step attribute named
+  `_dfe_wizard`.
 - **`wizard.full_path`** returns every step from the root to the end of the
   graph over the current answers, without stopping at the current step. It
   stops before a Redirect node, an id that is not a node, or a repeated step.

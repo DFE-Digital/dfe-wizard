@@ -10,7 +10,7 @@ module DfE
         # @api private
         class Registry
           # Node definition
-          Node = Struct.new(:id, :klass, :skippable?, :skip_when, keyword_init: true)
+          Node = Struct.new(:id, :klass, :skippable?, :skip_when, :depends_on, keyword_init: true)
 
           # Simple unconditional edge
           Edge = Struct.new(:from, :to, keyword_init: true)
@@ -32,12 +32,14 @@ module DfE
           # @!attribute exit_to [Symbol, nil] Where open exits go
           # @!attribute uses [Array<Symbol>] State store methods a class form calls
           # @!attribute source [Object, nil] The class form object, or nil
+          # @!attribute depends_on [Array<Symbol>] Answers whose change queues this unit in a change journey
           # @api public
-          Unit = Struct.new(:id, :step_ids, :exit_to, :uses, :source, keyword_init: true)
+          Unit = Struct.new(:id, :step_ids, :exit_to, :uses, :source, :depends_on, keyword_init: true)
 
           attr_reader :nodes, :edges, :conditional_edges, :multiple_conditional_edges, :custom_branching_edges,
                       :step_labels, :sub_wizards
-          attr_accessor :root_node, :conditional_root_method, :conditional_root_block, :potential_root_nodes
+          attr_accessor :root_node, :conditional_root_method, :conditional_root_block, :potential_root_nodes,
+                        :check_answers_node
 
           def initialize
             @nodes = {}
@@ -55,8 +57,10 @@ module DfE
             @sub_wizards = {}
           end
 
-          def add_node(node_id, klass, label: nil, skip_when: nil)
-            @nodes[node_id] = Node.new(id: node_id, klass: klass, skip_when:, skippable?: skip_when.present?)
+          def add_node(node_id, klass, label: nil, skip_when: nil, depends_on: [])
+            @nodes[node_id] = Node.new(
+              id: node_id, klass: klass, skip_when:, skippable?: skip_when.present?, depends_on: depends_on.freeze,
+            )
             @step_labels[node_id] = label || humanize(node_id)
           end
 
