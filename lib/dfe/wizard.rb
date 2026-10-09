@@ -121,6 +121,7 @@ module DfE
     autoload :CheckAnswersPresenter, 'dfe/wizard/check_answers_presenter'
     autoload :SubWizard, 'dfe/wizard/sub_wizard'
     autoload :Changeset, 'dfe/wizard/changeset'
+    autoload :Journey, 'dfe/wizard/journey'
 
     # @!group Auto generate Documentation for any wizard
     module Documentation
@@ -327,11 +328,12 @@ module DfE
     #
     # Drops everything built for the old store: the cached graph (it binds
     # Symbol predicates to the store when it is drawn), the default steps
-    # operator, the changeset and the hydrated steps. Sets the store's
-    # wizard to this wizard, so store methods can read context (provider,
-    # cycle) through it. A store given after `new` gets its attribute
-    # readers, as `after_initialize` gives them to the first one. A store
-    # with no `wizard=` or `attribute_names=` writer is accepted as it is.
+    # operator, the changeset, the journey and the hydrated steps. Sets the
+    # store's wizard to this wizard, so store methods can read context
+    # (provider, cycle) through it. A store given after `new` gets its
+    # attribute readers, as `after_initialize` gives them to the first one.
+    # A store with no `wizard=` or `attribute_names=` writer is accepted as
+    # it is.
     #
     # @param store [DfE::Wizard::StateStore::Base]
     # @return [void]
@@ -340,6 +342,7 @@ module DfE
       @cached_steps_processor = nil
       @steps_operator = nil
       @changeset = nil
+      @journey = nil
       @current_step = nil
       @cached_steps = nil
       @state_store = store

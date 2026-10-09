@@ -40,6 +40,16 @@
   a node, is in a sub-wizard or has `depends_on`, for a `depends_on` name
   that is not a step attribute, and for a step attribute named
   `_dfe_wizard`.
+- **Change journeys.** In a wizard that declares `graph.check_answers`, a
+  "Change" link (`return_to_review=<step>`, as in 1.0) starts a journey on
+  its GET: call `wizard.journey_start_redirect` and redirect to the path it
+  returns. The journey opens on the named step (or, when it is not on the
+  path, on its unit's first step on the path), shows the rest of the
+  step's unit (a sub-wizard, or one step), then returns to check answers.
+  Back goes to the previous step of the unit, and from the step it opened
+  on to check answers. A save on a step outside the journey uses 1.0
+  navigation. During a journey, the wizard picks the next and previous step
+  before any `before_next_step` or `before_previous_step` callback runs.
 - **`wizard.full_path`** returns every step from the root to the end of the
   graph over the current answers, without stopping at the current step. It
   stops before a Redirect node, an id that is not a node, or a repeated step.

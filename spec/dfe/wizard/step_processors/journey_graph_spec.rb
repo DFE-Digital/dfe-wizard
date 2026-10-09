@@ -43,6 +43,17 @@ RSpec.describe DfE::Wizard::StepsProcessor::Graph, 'check answers and depends_on
       expect(graph.unit(:check_answers)).to be_nil
     end
 
+    it 'adds no callbacks of its own (the wizard resolves journey navigation)' do
+      graph = draw do |g|
+        parent_nodes(g)
+        g.before_next_step { :start }
+        with_check_answers(g)
+      end
+
+      expect(graph.registry.before_next_callbacks.map(&:call)).to eq(%i[start])
+      expect(graph.registry.before_previous_callbacks).to be_empty
+    end
+
     it 'raises for a node that does not exist' do
       expect do
         draw do |g|
