@@ -1097,6 +1097,120 @@ attribute `_dfe_wizard`.
 The start GET writes state. A link prefetcher can start a journey; the
 next Change click replaces it.
 
+A step whose valid answers depend on an earlier answer (for example an age
+range that depends on the level) should validate its answer against the
+options for the current branch. Otherwise an answer given on another branch
+still passes its validation after the earlier answer changes.
+
+## Edits of saved records
+
+The same wizard can edit a saved record. An edit is one change journey: it
+starts from a page outside the wizard (the caller), shows the unit and every
+dependent unit, commits, and returns to the caller.
+
+The wizard needs `graph.check_answers` (above), a mapper that seeds the
+answers from the record, and a commit operation:
+
+```ruby
+class CourseWizard
+  include DfE::Wizard
+
+  def mapper
+    CourseWizard::Mapper.new
+  end
+
+  def steps_operator
+    DfE::Wizard::StepsOperator::Builder.draw(wizard: self, callable: state_store) do |builder|
+      builder.on_step(:check_answers, use: [CreateCourse])
+      builder.on_commit(use: [UpdateCourse])
+    end
+  end
+end
+
+class CourseWizard::Mapper
+  include DfE::Wizard::Mapper
+
+  def to_answers(course)
+    { funding_type: course.funding, ... }
+  end
+end
+```
+
+Seed only the answers on the record's own branch. A step that a change
+brings onto the path then starts blank, and the user must answer it. Test
+each mapper: `to_answers` must give answers the steps accept.
+
+Build the wizard with `record:` on every request of an edit, and use a new
+`state_key` for each edit. At the entry point, start the edit and redirect:
+
+```ruby
+def new
+  wizard = build_wizard(state_key: SecureRandom.uuid, record: course)
+  step = wizard.start_edit(unit: params[:unit].to_sym, caller: course_path(course))
+  redirect_to wizard.resolve_step_path(step)
+end
+```
+
+On each step request, guard the step and save as usual:
+
+```ruby
+def show
+  redirect_to @wizard.resolve_step_path(@wizard.redirect_step) unless @wizard.step_accessible?(@wizard.current_step_name)
+end
+
+def update
+  if @wizard.save_current_step
+    flash_for(@wizard.commit_result) if @wizard.commit_result
+    redirect_to @wizard.next_step_path
+  else
+    render :show, status: :unprocessable_entity
+  end
+end
+```
+
+In an edit:
+- `unit:` takes a unit id or a step id. A step id opens the edit on that
+  step, as a Change link does: `unit: :visa` opens on the first visa step on
+  the path, and `unit: :deadline_required` on the deadline question.
+- Back from the step the edit opened on goes to the caller
+  (`previous_step_path`).
+- Only the steps of the journey's units are accessible. `save_current_step`
+  raises `DfE::Wizard::StepNotAccessible` for any other step, and the check
+  answers node is never accessible.
+- The save that ends the journey runs the commit, then `next_step_path` is
+  the caller. `save_current_step` returns true, and `commit_result` is
+  `{ status:, errors: }`:
+  - `:unchanged`: no answer on the path differs from the seed; no operation
+    ran;
+  - `:stale`: the record's `updated_at` changed since the seed; no
+    operation ran;
+  - `:committed`: every commit operation succeeded;
+  - `:failed`: an operation returned no success; `errors` are its full
+    messages.
+- The changeset is discarded after every commit. A second submit of the
+  last step raises `DfE::Wizard::ChangesetExpired`.
+
+The commit operation reads `step.wizard.changeset.diff` (the answers on the
+path that differ from the seed, in step attribute names) and
+`step.wizard.record`. It maps the diff to the record itself. It should not
+fail on fields the edit did not change, and it should apply cross-field
+rules whatever the diff contains.
+
+Errors (all include `DfE::Wizard::Error`):
+- `ChangesetExpired`: a request with `record:` finds no edit (it expired,
+  or the commit discarded it);
+- `ChangesetMismatch`: the changeset is an edit of another record, or an
+  edit and the request has no `record:`;
+- `NotCallable`: `start_edit` for a unit with no step on the path.
+
+The checks run on the first `wizard.changeset` call, not in `new`.
+
+`changeset.stale?(record)` compares `updated_at` only. Call it on any
+request to warn early. `changeset.discard!` removes only this changeset's
+data; a custom repository that keeps several `state_key`s under one key
+must make `delete_state` remove only its own. `Repository::Session` has no
+expiry, so it is not suited to edits.
+
 ---
 
 ## Check Your Answers
