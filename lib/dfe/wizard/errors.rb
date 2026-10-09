@@ -23,5 +23,38 @@ module DfE
     class InvalidGraph < ArgumentError
       include Error
     end
+
+    # Raised by `start_edit` when the unit has no step on the path for the
+    # record's answers, so the edit has nothing to show.
+    #
+    # @api public
+    class NotCallable < StandardError
+      include Error
+    end
+
+    # Raised when the changeset does not match the request: an edit
+    # changeset under a request built without `record:`, a draft changeset
+    # under one built with it, or an edit of another record.
+    #
+    # @api public
+    class ChangesetMismatch < StandardError
+      include Error
+    end
+
+    # Raised when a request built with `record:` finds no edit changeset:
+    # it expired, it was discarded by the commit, or it was never seeded.
+    #
+    # @api public
+    class ChangesetExpired < StandardError
+      include Error
+    end
+
+    # Raised by `save_current_step` in an edit for a step that the edit does
+    # not show.
+    #
+    # @api public
+    class StepNotAccessible < StandardError
+      include Error
+    end
   end
 end

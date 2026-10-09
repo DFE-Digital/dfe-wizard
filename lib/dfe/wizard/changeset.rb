@@ -147,6 +147,54 @@ module DfE
         state_store.repository.delete_state
       end
 
+      # Store the record identity and the caller URL of an edit
+      #
+      # @param record [Object]
+      # @param caller_url [String]
+      # @return [void]
+      # @api private
+      def identify!(record:, caller_url:)
+        write_fields(fields.merge(edit: edit_fields.merge(record: self.class.record_key(record), caller: caller_url)))
+      end
+
+      # The caller URL of an edit
+      #
+      # @return [String, nil]
+      # @api private
+      def caller_url
+        edit_fields[:caller]
+      end
+
+      # Raise when the changeset does not match the request
+      #
+      # @param record [Object, nil] the wizard's record: keyword
+      # @return [void]
+      # @raise [ChangesetExpired, ChangesetMismatch]
+      # @api private
+      def check_mode!(record)
+        edit = fields[:edit]
+        if record.nil?
+          return if edit.nil?
+
+          raise ChangesetMismatch, 'this changeset is an edit of a saved record, and the request has no record'
+        end
+
+        raise ChangesetExpired, 'the edit has ended or expired; start it again' if edit.nil?
+
+        stored = edit[:record]
+        key = self.class.record_key(record)
+        raise ChangesetMismatch, "this changeset is an edit of #{stored}, not #{key}" unless stored == key
+      end
+
+      # The stored identity of a record
+      #
+      # @param record [Object]
+      # @return [String]
+      # @api private
+      def self.record_key(record)
+        "#{record.class.name}/#{record.id}"
+      end
+
       # The change journey state, or nil when there is none
       #
       # @return [Hash, nil]

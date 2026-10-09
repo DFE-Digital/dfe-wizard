@@ -97,6 +97,30 @@ module DfE
           end
         end
 
+        # Configure the operations that commit an edit of a saved record
+        #
+        # They run once, in the save that ends the edit, when the answers
+        # on the path differ from the seed and the record is not stale.
+        # Each is built as `new(repository:, step:)` and returns
+        # `{ success:, errors: }`, like a step operation.
+        #
+        # @param use [Array<Class>] the commit operations, in order
+        #
+        # @example
+        #   builder.on_commit(use: [UpdateCourse])
+        #
+        # @return [void]
+        def on_commit(use:)
+          @commit_operations = use.dup.freeze
+        end
+
+        # The operations registered with #on_commit
+        #
+        # @return [Array<Class>] [] when none are registered
+        def commit_operations
+          @commit_operations || []
+        end
+
         # Get operations for a specific step
         #
         # @param step_name [Symbol] The name of the step

@@ -209,6 +209,8 @@ module DfE
         #
         # **Fails fast**: stops and returns false on first failed operation.
         #
+        # Behaviours::Journeys adds change journeys and edits on top.
+        #
         # @return [Boolean] true if all operations succeeded, false if any failed
         #
         # @example With default operations
