@@ -107,13 +107,15 @@ module DfE
 
       # Answers on the path that differ from the seed
       #
-      # Answers for steps that left the path are not included. Both sides
-      # are normalised.
+      # Answers for steps that left the path are not included. Each answer
+      # is compared in its normalised (JSON) form, as the seed is stored, and
+      # returned as the store holds it, so a value that is not plain JSON (a
+      # Date, a Struct) reaches the commit operation unchanged.
       #
       # @return [Hash{Symbol => Object}] in attribute_names order
       def diff
         seeded = seed
-        normalise(@wizard.answers_on_path).reject { |name, value| seeded[name] == value }
+        @wizard.answers_on_path.reject { |name, value| seeded[name] == normalise(value) }
       end
 
       # @return [Boolean]
@@ -268,7 +270,19 @@ module DfE
       end
 
       def normalise(value)
-        JSON.parse(JSON.generate(value), symbolize_names: true)
+        JSON.parse(JSON.generate(utc_times(value)), symbolize_names: true)
+      end
+
+      # JSON.generate writes a Time with to_s, which drops the fraction and
+      # keeps the zone. In UTC to the microsecond, the same instant always
+      # gives the same string.
+      def utc_times(value)
+        case value
+        when Hash then value.transform_values { |item| utc_times(item) }
+        when Array then value.map { |item| utc_times(item) }
+        when Time, DateTime, ActiveSupport::TimeWithZone then stamp(value)
+        else value
+        end
       end
 
       def state_store

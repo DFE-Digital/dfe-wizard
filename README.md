@@ -1191,8 +1191,8 @@ In an edit:
   last step raises `DfE::Wizard::ChangesetExpired`.
 
 The commit operation reads `step.wizard.changeset.diff` (the answers on the
-path that differ from the seed, in step attribute names) and
-`step.wizard.record`. It maps the diff to the record itself. It should not
+path that differ from the seed, in step attribute names, with the values the
+store holds) and `step.wizard.record`. It maps the diff to the record itself. It should not
 fail on fields the edit did not change, and it should apply cross-field
 rules whatever the diff contains.
 

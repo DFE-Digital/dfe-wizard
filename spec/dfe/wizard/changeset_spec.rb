@@ -106,6 +106,43 @@ RSpec.describe DfE::Wizard::Changeset do
     end
   end
 
+  describe '#diff' do
+    { 'InMemory' => -> { DfE::Wizard::Repository::InMemory.new },
+      'Cache' => -> { DfE::Wizard::Repository::Cache.new(cache: ActiveSupport::Cache::MemoryStore.new, key: 'cs') } }
+      .each do |name, build|
+      it "returns an answer that is not plain JSON as the store holds it on #{name}" do
+        wizard = wizard_with_path(build.call)
+        wizard.changeset.seed!({ funding: 'fee', student_visa: Date.new(2027, 1, 15) })
+        wizard.state_store.write(student_visa: Date.new(2027, 2, 1))
+
+        expect(wizard.changeset.diff).to eq(student_visa: Date.new(2027, 2, 1))
+      end
+
+      it "finds no diff for an unchanged answer that is not plain JSON on #{name}" do
+        wizard = wizard_with_path(build.call)
+        wizard.changeset.seed!({ funding: 'fee', student_visa: Date.new(2027, 1, 15) })
+
+        expect(wizard.changeset.diff).to eq({})
+      end
+
+      it "finds a Time answer changed within the same second on #{name}" do
+        wizard = wizard_with_path(build.call)
+        wizard.changeset.seed!({ funding: 'fee', student_visa: seeded_at })
+        wizard.state_store.write(student_visa: seeded_at + 0.5)
+
+        expect(wizard.changeset.diff).to eq(student_visa: seeded_at + 0.5)
+      end
+
+      it "finds no diff for a Time answer at the same instant in another zone on #{name}" do
+        wizard = wizard_with_path(build.call)
+        wizard.changeset.seed!({ funding: 'fee', student_visa: seeded_at })
+        wizard.state_store.write(student_visa: seeded_at.getlocal('+01:00'))
+
+        expect(wizard.changeset.diff).to eq({})
+      end
+    end
+  end
+
   describe '#seed!' do
     it 'raises when the store holds data, before writing' do
       wizard = wizard_on(DfE::Wizard::Repository::InMemory.new)
