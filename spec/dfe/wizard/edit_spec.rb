@@ -172,6 +172,79 @@ RSpec.describe 'Edits of saved records' do
     end
   end
 
+  describe 'the commit' do
+    before { start_edit(:funding) }
+
+    it 'commits the diff of answers on the path, then returns to the caller' do
+      submit_edit(:funding, funding: 'salary')
+      wizard = submit_edit(:skilled, skilled_visa: false)
+
+      expect(EditSpecCommit.calls).to eq([{ funding: 'salary', skilled_visa: false }])
+      expect(wizard.commit_result).to eq(status: :committed, errors: [])
+      expect(wizard.next_step).to be_nil
+      expect(wizard.next_step_path).to eq('/records/1')
+    end
+
+    it 'discards the changeset after the commit' do
+      submit_edit(:funding, funding: 'salary')
+      submit_edit(:skilled, skilled_visa: false)
+
+      expect(edit_repository.read).to eq({})
+    end
+
+    it 'runs no operation when nothing changed' do
+      wizard = submit_edit(:funding, funding: 'fee')
+
+      expect(wizard.commit_result).to eq(status: :unchanged, errors: [])
+      expect(EditSpecCommit.calls).to eq([])
+      expect(edit_repository.read).to eq({})
+    end
+
+    it 'runs no operation when the record changed since the seed' do
+      submit_edit(:funding, funding: 'salary')
+      @request_record = edit_record(updated_at: EditSpecHelpers::SEEDED_AT + 1)
+      wizard = submit_edit(:skilled, skilled_visa: false)
+
+      expect(wizard.commit_result).to eq(status: :stale, errors: [])
+      expect(EditSpecCommit.calls).to eq([])
+      expect(edit_repository.read).to eq({})
+    end
+
+    it 'reports a failed operation with full messages' do
+      errors = ActiveModel::Errors.new(edit_record)
+      errors.add(:base, 'Funding cannot change')
+      EditSpecCommit.result = { success: false, errors: }
+      submit_edit(:funding, funding: 'salary')
+      wizard = submit_edit(:skilled, skilled_visa: false)
+
+      expect(wizard.commit_result).to eq(status: :failed, errors: ['Funding cannot change'])
+      expect(wizard.next_step_path).to eq('/records/1')
+      expect(edit_repository.read).to eq({})
+    end
+
+    it 'flattens errors given as a hash' do
+      EditSpecCommit.result = { success: false, errors: { funding: ['is wrong'] } }
+      submit_edit(:funding, funding: 'salary')
+
+      expect(submit_edit(:skilled, skilled_visa: false).commit_result[:errors]).to eq(['is wrong'])
+    end
+
+    it 'keeps the changeset and the journey when an operation raises' do
+      allow(EditSpecCommit).to receive(:new).and_raise('boom')
+      submit_edit(:funding, funding: 'salary')
+
+      expect { submit_edit(:skilled, skilled_visa: false) }.to raise_error('boom')
+      expect(edit_request(:skilled).changeset.journey).to include(unit: 'visa')
+    end
+
+    it 'raises ChangesetExpired on a second submit of the last step' do
+      submit_edit(:funding, funding: 'salary')
+      submit_edit(:skilled, skilled_visa: false)
+
+      expect { submit_edit(:skilled, skilled_visa: false) }.to raise_error(DfE::Wizard::ChangesetExpired)
+    end
+  end
+
   describe 'step access' do
     before { start_edit(:funding) }
 

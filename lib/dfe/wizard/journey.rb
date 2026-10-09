@@ -155,7 +155,9 @@ module DfE
         if next_unit
           changeset.journey = state.merge(unit: next_unit.id, shown:)
         else
-          changeset.journey = nil
+          # An edit keeps the state until the commit discards the changeset,
+          # so an operation that raises leaves the edit where it was.
+          changeset.journey = nil unless @wizard.editing?
           @finished = true
         end
       end

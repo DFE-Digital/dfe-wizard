@@ -135,9 +135,24 @@ module DfE
           journey.current_unit_first_step
         end
 
+        # The result of the commit, in the request whose save ended an edit
+        #
+        # The changeset is discarded after every commit, whatever the status.
+        #
+        # @return [Hash, nil] `{ status:, errors: }`, with status
+        #   `:committed`, `:unchanged` (no answer on the path differs from
+        #   the seed; no operation ran), `:stale` (the record changed since
+        #   it was seeded; no operation ran) or `:failed` (an operation
+        #   returned no success), and errors as full messages; nil in every
+        #   other request
+        attr_reader :commit_result
+
         # Save the current step (see StateManagement#save_current_step)
         #
         # In a change journey, a save that ends a unit moves the journey on.
+        # In an edit of a saved record, the save that ends the journey also
+        # runs the commit; it still returns true, and `commit_result` holds
+        # the outcome.
         #
         # @return [Boolean] true if all operations succeeded, false if any failed
         # @raise [StepNotAccessible] in an edit, for a step the edit does not show
@@ -147,11 +162,14 @@ module DfE
           end
           return false unless super
 
-          journey.after_save if journeys?
+          if journeys?
+            journey.after_save
+            commit_edit if editing? && journey.finished?
+          end
           true
         end
 
-        # The next step
+        # The next step; nil once this request's save ended an edit
         #
         # In a change journey, the journey picks the step before any
         # before_next_step callback or edge, so a callback cannot override
@@ -163,6 +181,16 @@ module DfE
           return super if target.nil?
 
           journey_step(target).tap { |step| log_next_step_transition(from: current_step_name, to: step) }
+        end
+
+        # The next step's path; the caller URL once this request's save
+        # ended an edit
+        #
+        # @return [String, nil]
+        def next_step_path(options = {})
+          return @edit_caller_url if edit_finished?
+
+          super
         end
 
         # The previous step; nil when Back leaves an edit for its caller
@@ -220,6 +248,18 @@ module DfE
           !cached_steps_processor.check_answers_step.nil?
         end
 
+        # Run the commit of an edit and discard the changeset
+        #
+        # Called by save_current_step when its save ended an edit.
+        #
+        # @return [void]
+        # @api private
+        def commit_edit
+          @edit_caller_url = changeset.caller_url
+          @commit_result = run_commit_operations
+          changeset.discard!
+        end
+
         # @return [DfE::Wizard::Journey]
         # @api private
         def journey
@@ -227,6 +267,10 @@ module DfE
         end
 
         private
+
+        def edit_finished?
+          editing? && journeys? && journey.finished?
+        end
 
         # The start param of the params the wizard was built with, unfiltered
         def journey_start_param
@@ -239,11 +283,31 @@ module DfE
 
         # A journey target as a step. The caller is the check answers node
         # on a draft, and nil in an edit: its caller is a URL, which
-        # previous_step_path returns.
+        # next_step_path and previous_step_path return.
         def journey_step(target)
           return target unless target == Journey::CALLER
 
           cached_steps_processor.check_answers_step unless editing?
+        end
+
+        def run_commit_operations
+          return { status: :unchanged, errors: [] } unless changeset.diff?
+          return { status: :stale, errors: [] } if changeset.stale?(@edit_record)
+
+          steps_operator.commit_operations.each do |operation_class|
+            result = execute_operation(operation_class:, step: current_step)
+            return { status: :failed, errors: commit_errors(result) } unless result && result[:success]
+          end
+
+          { status: :committed, errors: [] }
+        end
+
+        def commit_errors(result)
+          errors = result && result[:errors]
+          return errors.full_messages if errors.respond_to?(:full_messages)
+          return errors.values.flatten.map(&:to_s) if errors.is_a?(Hash)
+
+          Array(errors).map(&:to_s)
         end
       end
     end
