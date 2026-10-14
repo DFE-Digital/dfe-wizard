@@ -1236,7 +1236,9 @@ showed. When the user goes Back and saves a step again, the journey moves
 on as before and ends on the edit review again. A draft never goes to the
 edit review.
 
-`changeset.edit_unit` is the unit given to `start_edit`, for a page title.
+`changeset.edit_unit` is the id of the unit the edit started with, for a
+page title. When `start_edit` is given a step in a sub-wizard, it is the
+sub-wizard id.
 Read it before the save that ends the edit: the commit discards the
 changeset.
 

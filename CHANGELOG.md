@@ -89,7 +89,8 @@
   shown. Drafts never show it. `steps_processor.edit_review_step` returns
   the node, and `steps_processor.skipped?(step_id)` evaluates a node's
   `skip_when`.
-- **`changeset.edit_unit`** returns the unit given to `start_edit`.
+- **`changeset.edit_unit`** returns the id of the unit the edit started
+  with (for a step in a sub-wizard, the sub-wizard id).
   `changeset.caller_url` is now public.
 - **`wizard.full_path`** returns every step from the root to the end of the
   graph over the current answers, without stopping at the current step. It

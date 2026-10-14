@@ -87,6 +87,36 @@ RSpec.describe 'The edit review' do
       expect(wizard.commit_result).to eq(status: :unchanged, errors: [])
       expect(wizard.next_step_path).to eq('/records/1')
     end
+
+    it 'shows the dependent unit again, then the edit review, when an earlier step is saved unchanged' do
+      expect(submit_edit(:funding, funding: 'salary').next_step).to eq(:skilled)
+      expect(edit_request(:skilled).changeset.journey).not_to include(:review)
+      expect(submit_edit(:skilled, skilled_visa: false).next_step).to eq(:confirm)
+      expect(EditSpecCommit.calls).to eq([])
+    end
+  end
+
+  describe 'a save on a step that does not end its unit, while the edit waits on the edit review' do
+    before do
+      submit_edit(:funding, funding: 'salary')
+      submit_edit(:skilled, skilled_visa: true)
+      submit_edit(:deadline_required, deadline_required: false)
+    end
+
+    it 'goes to the next step of the unit and leaves the edit review' do
+      wizard = submit_edit(:skilled, skilled_visa: true)
+
+      expect(wizard.next_step).to eq(:deadline_required)
+      expect(edit_request(:confirm).step_accessible?(:confirm)).to be(false)
+      expect(edit_request(:confirm).redirect_step).to eq(:skilled)
+      expect(EditSpecCommit.calls).to eq([])
+    end
+
+    it 'returns to the edit review when the unit ends again' do
+      submit_edit(:skilled, skilled_visa: true)
+
+      expect(submit_edit(:deadline_required, deadline_required: false).next_step).to eq(:confirm)
+    end
   end
 
   describe 'step access' do

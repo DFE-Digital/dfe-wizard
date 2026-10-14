@@ -169,7 +169,8 @@ module DfE
         edit_fields[:caller]
       end
 
-      # The unit an edit started with (the unit given to start_edit)
+      # The id of the unit an edit started with. start_edit takes a unit id
+      # or a step id; a step in a sub-wizard gives the sub-wizard id.
       #
       # The edit's journey may show later units too. Read it before the
       # save that ends the edit: the commit discards the changeset.
