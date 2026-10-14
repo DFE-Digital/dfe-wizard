@@ -149,22 +149,34 @@ module DfE
         state_store.repository.delete_state
       end
 
-      # Store the record identity and the caller URL of an edit
+      # Store the record identity, the caller URL and the unit of an edit
       #
       # @param record [Object]
       # @param caller_url [String]
+      # @param unit [Symbol] the unit the edit started with
       # @return [void]
       # @api private
-      def identify!(record:, caller_url:)
-        write_fields(fields.merge(edit: edit_fields.merge(record: self.class.record_key(record), caller: caller_url)))
+      def identify!(record:, caller_url:, unit:)
+        write_fields(
+          fields.merge(edit: edit_fields.merge(record: self.class.record_key(record), caller: caller_url, unit:)),
+        )
       end
 
       # The caller URL of an edit
       #
-      # @return [String, nil]
-      # @api private
+      # @return [String, nil] nil when the changeset holds no edit
       def caller_url
         edit_fields[:caller]
+      end
+
+      # The unit an edit started with (the unit given to start_edit)
+      #
+      # The edit's journey may show later units too. Read it before the
+      # save that ends the edit: the commit discards the changeset.
+      #
+      # @return [Symbol, nil] nil when the changeset holds no edit
+      def edit_unit
+        edit_fields[:unit]&.to_sym
       end
 
       # Raise when the changeset does not match the request

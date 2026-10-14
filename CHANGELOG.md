@@ -83,6 +83,14 @@
   does.
 - **Edit errors:** `DfE::Wizard::NotCallable`, `ChangesetMismatch`,
   `ChangesetExpired` and `StepNotAccessible`.
+- **Edit review: `graph.edit_review :node`.** An edit with a change ends on
+  this node instead of committing, unless the node's `skip_when` holds. The
+  commit runs when the user saves the node; Back goes to the last step
+  shown. Drafts never show it. `steps_processor.edit_review_step` returns
+  the node, and `steps_processor.skipped?(step_id)` evaluates a node's
+  `skip_when`.
+- **`changeset.edit_unit`** returns the unit given to `start_edit`.
+  `changeset.caller_url` is now public.
 - **`wizard.full_path`** returns every step from the root to the end of the
   graph over the current answers, without stopping at the current step. It
   stops before a Redirect node, an id that is not a node, or a repeated step.

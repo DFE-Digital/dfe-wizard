@@ -1211,6 +1211,38 @@ data; a custom repository that keeps several `state_key`s under one key
 must make `delete_state` remove only its own. `Repository::Session` has no
 expiry, so it is not suited to edits.
 
+### Edit review
+
+An edit can end on a page that asks the user to confirm before the commit
+runs, for example because the change goes live. Mark a node with no
+incoming edges as the edit review. Its `skip_when` decides which edits
+show it:
+
+```ruby
+graph.add_node :confirm_changes, ConfirmChangesStep, skip_when: -> { !record.published? }
+graph.edit_review :confirm_changes
+```
+
+When an edit's journey ends:
+- with no change, the commit runs and gives `:unchanged`; the edit review
+  is not shown;
+- when the node's `skip_when` holds, the commit runs as above;
+- otherwise `next_step` is the edit review node and nothing is saved.
+  `step_accessible?` is true for it, and `redirect_step` returns it.
+
+Saving the edit review node runs the commit, with the same statuses, and
+`next_step_path` is the caller. Back on it goes to the last step the edit
+showed. When the user goes Back and saves a step again, the journey moves
+on as before and ends on the edit review again. A draft never goes to the
+edit review.
+
+`changeset.edit_unit` is the unit given to `start_edit`, for a page title.
+Read it before the save that ends the edit: the commit discards the
+changeset.
+
+`graph.edit_review` needs `graph.check_answers`. The node must not be the
+check answers node, must be in no sub-wizard, and cannot have `depends_on`.
+
 ---
 
 ## Check Your Answers

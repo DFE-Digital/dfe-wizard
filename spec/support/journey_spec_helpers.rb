@@ -29,8 +29,12 @@ class JourneySpecWizard
         default: :student,
       )
       graph.add_edge from: :start_date, to: :check_answers
+      draw_edit_review(graph)
     end
   end
+
+  # Overridden by the edit review specs
+  def draw_edit_review(graph); end
 
   # Overridden by specs that need a second dependent unit
   def start_date_depends_on

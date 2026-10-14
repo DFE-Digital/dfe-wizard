@@ -1,7 +1,7 @@
 require_relative 'journey_spec_helpers'
 
 # A saved record for edit specs.
-EditSpecRecord = Struct.new(:id, :funding, :student_visa, :skilled_visa, :updated_at, keyword_init: true)
+EditSpecRecord = Struct.new(:id, :funding, :student_visa, :skilled_visa, :updated_at, :published, keyword_init: true)
 
 # Seeds only the answers on the record's own branch.
 class EditSpecMapper
@@ -43,6 +43,15 @@ class EditSpecWizard < JourneySpecWizard
   end
 end
 
+# The edit spec wizard with an edit review, skipped for an unpublished
+# record.
+class EditReviewSpecWizard < EditSpecWizard
+  def draw_edit_review(graph)
+    graph.add_node :confirm, SubWizardSpecSteps::Review, skip_when: -> { !record&.published }
+    graph.edit_review :confirm
+  end
+end
+
 module EditSpecHelpers
   CALLER_URL = '/records/1'.freeze
   SEEDED_AT = Time.utc(2026, 10, 9, 12, 0, 0, 123_456)
@@ -55,8 +64,13 @@ module EditSpecHelpers
     @edit_repository ||= DfE::Wizard::Repository::InMemory.new
   end
 
+  # The wizard every helper builds; override it in a spec
+  def edit_wizard_class
+    EditSpecWizard
+  end
+
   # One request of an edit, as a controller builds it.
-  def edit_request(step, params = {}, record: edit_record, wizard_class: EditSpecWizard)
+  def edit_request(step, params = {}, record: edit_record, wizard_class: edit_wizard_class)
     store = SubWizardSpecStore.new(repository: edit_repository)
     wizard_class.new(state_store: store, current_step: step, current_step_params: params, record:)
   end

@@ -160,6 +160,7 @@ RSpec.describe 'Edits of saved records' do
 
       expect(wizard.changeset.journey).to include(unit: 'visa', entry: 'deadline_required')
       expect(wizard.previous_step_path).to eq('/records/1')
+      expect(wizard.changeset.edit_unit).to eq(:visa)
     end
 
     it 'refuses a step of the unit before the entry step, and redirects to the entry step' do
