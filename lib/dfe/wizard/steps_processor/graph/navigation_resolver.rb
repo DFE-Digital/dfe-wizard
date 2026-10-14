@@ -91,6 +91,14 @@ module DfE
             walk_to_end(compute_root_node)
           end
 
+          # Whether a node's skip_when holds for the current answers
+          #
+          # @param node_id [Symbol]
+          # @return [Boolean] false for a node with no skip_when, or no node
+          def skipped?(node_id)
+            skip_node?(node_id)
+          end
+
           private
 
           def compute_root_node

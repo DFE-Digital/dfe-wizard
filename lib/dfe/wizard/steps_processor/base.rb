@@ -255,6 +255,15 @@ module DfE
           nil
         end
 
+        # The edit review node of an edit of a saved record.
+        #
+        # Only StepsProcessor::Graph declares one.
+        #
+        # @return [nil]
+        def edit_review_step
+          nil
+        end
+
         # Sub-wizards declared in this processor.
         #
         # Only StepsProcessor::Graph declares them.
