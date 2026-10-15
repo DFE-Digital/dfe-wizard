@@ -1113,6 +1113,9 @@ wizard.change_journey(:funding_type)  # => [:visa]
 wizard.change_journey(:start_date)    # => []
 ```
 
+Pin the declarations in a spec with the `queue_after_change` matcher
+([Journey Matchers](#journey-matchers)). `Tooling::Inspect` lists them.
+
 ## Edits of saved records
 
 The same wizard can edit a saved record. An edit is one change journey: it
@@ -1553,6 +1556,9 @@ puts wizard.inspect
 # └─ State: { first_name: "Sarah", last_name: "Smith" }
 ```
 
+A wizard that declares `graph.check_answers` also gets a CHANGE JOURNEYS
+section: each `depends_on` answer, with the units a change to it queues.
+
 ---
 
 ## Testing
@@ -1606,6 +1612,19 @@ expect(:email).to be_valid_step.in(wizard)
 expect(state_store).to have_step_attribute(:first_name)
 expect(state_store).to have_step_attribute(:email).with_value('test@example.com')
 ```
+
+### Journey Matchers
+
+```ruby
+expect(wizard).to queue_after_change(:funding_type).units(:visa)
+expect(wizard).to queue_after_change(:qualification).units(:funding_type, :study_pattern, :visa)
+expect(wizard).to queue_after_change(:start_date).units      # queues nothing
+expect(wizard).not_to queue_after_change(:study_pattern).units(:visa)
+```
+
+`queue_after_change` compares `wizard.change_journey` with the units, in
+order. Negated, it passes when none of the units is queued. It raises
+`ArgumentError` for a name that is not a step attribute.
 
 ### Sub-wizard harness
 

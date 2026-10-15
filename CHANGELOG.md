@@ -101,6 +101,10 @@
   names the answer, in the order the graph declares them. It is a static
   view, for docs and tests. `steps_processor.change_journeys` returns them
   for every answer. Graph only: other processors return `{}`.
+- **`queue_after_change(:attr).units(*ids)`** matcher pins the units a
+  change queues.
+- **`Tooling::Inspect`** lists change journeys (each `depends_on` answer,
+  with its units) for a wizard that declares `graph.check_answers`.
 
 ### Changed
 
