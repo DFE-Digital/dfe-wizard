@@ -26,6 +26,15 @@ RSpec.describe 'change journeys tooling' do
       expect(wizard.steps_processor.change_journeys).to eq(funding: %i[start_date visa])
     end
 
+    it 'leaves out a unit that depends on its own answer' do
+      wizard = draw do |g|
+        parent_nodes(g)
+        g.add_sub_wizard :visa, SubWizardSpecVisa, exit_to: :start_date, depends_on: %i[funding student_visa]
+      end
+
+      expect(wizard.steps_processor.change_journeys).to eq(funding: %i[visa])
+    end
+
     it 'is empty when no unit declares depends_on' do
       wizard = draw { |g| parent_nodes(g) }
 

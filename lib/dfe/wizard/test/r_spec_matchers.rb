@@ -640,7 +640,8 @@ module DfE
         #
         # Compares wizard.change_journey(name) with the units, in order. With
         # no units, it expects the change to queue nothing. Negated, it
-        # passes when none of the units is queued.
+        # passes when none of the units is queued, and raises for an id that
+        # is not a unit.
         #
         # @example
         #   expect(wizard).to queue_after_change(:funding_type).units(:visa)
@@ -660,6 +661,12 @@ module DfE
 
           match_when_negated do |wizard|
             raise ArgumentError, 'queue_after_change needs .units(...) with at least one unit' if @expected_units.blank?
+
+            # A misspelled unit is never queued, so the negated form would pass
+            processor = wizard.steps_processor
+            @expected_units.each do |unit_id|
+              raise ArgumentError, "#{unit_id.inspect} is not a unit" if processor.unit(unit_id).nil?
+            end
 
             @actual_units = wizard.change_journey(name)
             !@actual_units.intersect?(@expected_units)

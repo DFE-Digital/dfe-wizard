@@ -626,5 +626,11 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
         expect(wizard).to queue_after_change(:fundng).units(:visa)
       }.to raise_error(ArgumentError, ':fundng is not a step attribute')
     end
+
+    it 'raises when negated with an id that is not a unit' do
+      expect {
+        expect(wizard).not_to queue_after_change(:funding).units(:vsa)
+      }.to raise_error(ArgumentError, ':vsa is not a unit')
+    end
   end
 end

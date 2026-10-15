@@ -1625,7 +1625,8 @@ expect(wizard).not_to queue_after_change(:study_pattern).units(:visa)
 
 `queue_after_change` compares `wizard.change_journey` with the units, in
 order. Negated, it passes when none of the units is queued. It raises
-`ArgumentError` for a name that is not a step attribute.
+`ArgumentError` for a name that is not a step attribute, and, negated, for
+an id that is not a unit.
 
 ### Sub-wizard harness
 

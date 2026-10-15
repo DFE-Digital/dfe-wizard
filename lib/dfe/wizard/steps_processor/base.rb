@@ -359,8 +359,9 @@ module DfE
 
         # The first step that declares each answer
         #
-        # unflatten_state gives each stored answer to this step. Built once:
-        # the steps are fixed when the processor is built.
+        # unflatten_state gives each stored answer to this step, and
+        # change_journeys reads it to leave out a unit's own answers. Built
+        # once: the steps are fixed when the processor is built.
         #
         # @return [Hash{Symbol => Symbol}] step id by answer name
         # @api private
