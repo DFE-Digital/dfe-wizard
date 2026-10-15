@@ -97,6 +97,26 @@ RSpec.describe 'change journeys tooling' do
       expect(metadata[:change_journeys]).to eq(funding: { from: :funding, units: %i[visa start_date] })
     end
 
+    it 'names the step that owns the answer when its class has no name' do
+      wizard = draw do |g|
+        g.add_node :start, SubWizardSpecSteps::Start
+        g.add_node :funding, Class.new(SubWizardSpecSteps::Funding)
+        g.add_node :start_date, SubWizardSpecSteps::StartDate, depends_on: %i[funding]
+        g.root :start
+      end
+
+      expect(wizard.metadata.to_h[:change_journeys]).to eq(funding: { from: :funding, units: %i[start_date] })
+    end
+
+    it 'draws the graph once' do
+      wizard = journey_request(:start, wizard_class: JourneySpecTwoUnitWizard)
+      allow(wizard).to receive(:steps_processor).and_call_original
+
+      wizard.metadata
+
+      expect(wizard).to have_received(:steps_processor).once
+    end
+
     it 'leaves both keys out for a graph that declares neither' do
       metadata = draw { |g| parent_nodes(g) }.metadata.to_h
 

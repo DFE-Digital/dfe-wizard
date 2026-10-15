@@ -35,8 +35,7 @@ module DfE
             #{state_section}
             #{validation_section}
             #{errors_section}
-            #{change_journeys_section}
-            #{vars_section}
+            #{change_journeys_section}#{vars_section}
             #{store_section}
           OUTPUT
         end
@@ -99,7 +98,8 @@ module DfE
         end
 
         # The units that a change to each answer queues, for a wizard that
-        # declares graph.check_answers
+        # declares graph.check_answers. It shares a line with the next
+        # section, so it ends with its own blank line and adds none when empty.
         def change_journeys_section
           return '' unless wizard.journeys?
 
@@ -114,6 +114,7 @@ module DfE
             ┌─ CHANGE JOURNEYS ──────────────────────────┐
             #{lines}
             └────────────────────────────────────────────┘
+
           JOURNEYS
         end
 

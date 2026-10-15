@@ -42,7 +42,7 @@ module DfE
         # @return [Hash] Enriched metadata with all three layers
         def to_h
           @enriched_metadata ||= begin
-            metadata = @wizard.steps_processor.metadata.deep_dup
+            metadata = processor.metadata.deep_dup
             enrich_with_step_details(metadata)
             enrich_with_units(metadata)
             metadata[:wizard_name] = @wizard.class.to_s.underscore.humanize
@@ -91,8 +91,6 @@ module DfE
         def validate_wizard!
           raise ArgumentError, 'Wizard must have steps_processor method' unless @wizard.respond_to?(:steps_processor)
 
-          processor = @wizard.steps_processor
-
           unless processor.respond_to?(:metadata)
             raise ArgumentError,
                   'Wizard.steps_processor must have #metadata method for documentation'
@@ -128,7 +126,6 @@ module DfE
         # @param metadata [Hash] Metadata with step details
         # @return [void] Modifies metadata in place
         def enrich_with_units(metadata)
-          processor = @wizard.steps_processor
           return unless processor.respond_to?(:sub_wizards) && processor.respond_to?(:change_journeys)
 
           if processor.sub_wizards.any?
@@ -140,20 +137,17 @@ module DfE
           journeys = processor.change_journeys
           return if journeys.empty?
 
+          owners = processor.answer_owners
           metadata[:change_journeys] = journeys.to_h do |name, unit_ids|
-            [name, { from: answer_owner(metadata, name), units: unit_ids }]
+            [name, { from: owners[name], units: unit_ids }]
           end
         end
 
-        # The first step that declares an answer, as unflatten_state gives it
+        # The wizard's steps processor, drawn once for this metadata
         #
-        # @param metadata [Hash] Metadata with step attributes
-        # @param name [Symbol] Answer name
-        # @return [Symbol, nil] Step id
-        def answer_owner(metadata, name)
-          metadata[:steps].find do |_step_id, step_data|
-            step_data[:attributes].any? { |attribute| attribute[:name] == name }
-          end&.first
+        # @return [StepsProcessor::Base]
+        def processor
+          @processor ||= @wizard.steps_processor
         end
 
         # Find step class from metadata

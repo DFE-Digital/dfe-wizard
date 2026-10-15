@@ -237,5 +237,9 @@ RSpec.describe DfE::Wizard::Tooling::Inspect do
     it 'is left out for a wizard without graph.check_answers' do
       expect(output).not_to include('CHANGE JOURNEYS')
     end
+
+    it 'adds no blank line when it is left out' do
+      expect(output).to include("└────────────────────────────────────────────┘\n\n┌─ INSTANCE VARIABLES")
+    end
   end
 end

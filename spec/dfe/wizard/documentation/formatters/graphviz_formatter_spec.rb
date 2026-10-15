@@ -46,6 +46,10 @@ RSpec.describe DfE::Wizard::Documentation::Formatters::GraphvizFormatter do
       DOT
     end
 
+    it 'draws sub-wizard steps only inside the cluster' do
+      expect(result.scan(/^\s*student \[label/).size).to eq(1)
+    end
+
     it 'ends a depends_on edge to a sub-wizard at its cluster' do
       expect(result).to include('  funding -> student [label="funding", style=dashed, color=gray, lhead=cluster_visa];')
     end
