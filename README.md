@@ -1102,6 +1102,17 @@ range that depends on the level) should validate its answer against the
 options for the current branch. Otherwise an answer given on another branch
 still passes its validation after the earlier answer changes.
 
+To see what a change queues, ask the wizard. It reads the `depends_on`
+declarations: every unit that names the answer, in the order the graph
+declares them. The answer's own unit is not included. At run time a
+journey shows only the units later on the path, and only while the answer
+differs from its value at the start.
+
+```ruby
+wizard.change_journey(:funding_type)  # => [:visa]
+wizard.change_journey(:start_date)    # => []
+```
+
 ## Edits of saved records
 
 The same wizard can edit a saved record. An edit is one change journey: it

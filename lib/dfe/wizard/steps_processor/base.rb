@@ -283,6 +283,15 @@ module DfE
           nil
         end
 
+        # The units that a change to each answer queues.
+        #
+        # Only StepsProcessor::Graph declares them.
+        #
+        # @return [Hash{Symbol => Array<Symbol>}] empty
+        def change_journeys
+          {}
+        end
+
         # Find and return the step class for a given step ID.
         #
         # Used by the wizard framework to:

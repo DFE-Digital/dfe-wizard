@@ -97,6 +97,10 @@
   stops before a Redirect node, an id that is not a node, or a repeated step.
   Needs `StepsProcessor::Graph`; other processors raise `NotImplementedError`.
   `flow_path`, `path_traversal` and `dfs_path` are unchanged.
+- **`wizard.change_journey(:attr)`** returns the units whose `depends_on`
+  names the answer, in the order the graph declares them. It is a static
+  view, for docs and tests. `steps_processor.change_journeys` returns them
+  for every answer. Graph only: other processors return `{}`.
 
 ### Changed
 

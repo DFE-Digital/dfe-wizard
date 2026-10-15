@@ -110,6 +110,29 @@ module DfE
           end
         end
 
+        # The units that a change to an answer queues
+        #
+        # Every unit whose depends_on names the answer, in the order the
+        # graph declares their first step. The unit that owns the answer is
+        # not included. It is a static view of the declarations, for docs and
+        # tests: at run time a journey queues only the units later on the
+        # path, and only while the answer differs from the snapshot.
+        #
+        # @param name [Symbol, String] a step attribute
+        # @return [Array<Symbol>] unit ids; empty when no unit depends on it
+        # @raise [ArgumentError] when the name is not a step attribute
+        #
+        # @example
+        #   wizard.change_journey(:funding_type)  # => [:visa]
+        def change_journey(name)
+          name = name.to_sym
+          unless cached_steps_processor.answer_owners.key?(name)
+            raise ArgumentError, "#{name.inspect} is not a step attribute"
+          end
+
+          cached_steps_processor.change_journeys.fetch(name, [])
+        end
+
         # Whether a step may be shown or saved in this request
         #
         # Always true on a draft. In an edit, true when the step is on the

@@ -44,6 +44,7 @@ module DfE
           @enriched_metadata ||= begin
             metadata = @wizard.steps_processor.metadata.deep_dup
             enrich_with_step_details(metadata)
+            enrich_with_units(metadata)
             metadata[:wizard_name] = @wizard.class.to_s.underscore.humanize
             metadata
           end
@@ -119,6 +120,40 @@ module DfE
               step_data[:operations] = []
             end
           end
+        end
+
+        # Add sub-wizards and change journeys, only for a processor that
+        # declares them, so the metadata of other wizards does not change
+        #
+        # @param metadata [Hash] Metadata with step details
+        # @return [void] Modifies metadata in place
+        def enrich_with_units(metadata)
+          processor = @wizard.steps_processor
+          return unless processor.respond_to?(:sub_wizards) && processor.respond_to?(:change_journeys)
+
+          if processor.sub_wizards.any?
+            metadata[:sub_wizards] = processor.sub_wizards.transform_values do |unit|
+              { steps: unit.step_ids, exit_to: unit.exit_to, depends_on: unit.depends_on }
+            end
+          end
+
+          journeys = processor.change_journeys
+          return if journeys.empty?
+
+          metadata[:change_journeys] = journeys.to_h do |name, unit_ids|
+            [name, { from: answer_owner(metadata, name), units: unit_ids }]
+          end
+        end
+
+        # The first step that declares an answer, as unflatten_state gives it
+        #
+        # @param metadata [Hash] Metadata with step attributes
+        # @param name [Symbol] Answer name
+        # @return [Symbol, nil] Step id
+        def answer_owner(metadata, name)
+          metadata[:steps].find do |_step_id, step_data|
+            step_data[:attributes].any? { |attribute| attribute[:name] == name }
+          end&.first
         end
 
         # Find step class from metadata
