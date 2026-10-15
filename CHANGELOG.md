@@ -105,6 +105,12 @@
   change queues.
 - **`Tooling::Inspect`** lists change journeys (each `depends_on` answer,
   with its units) for a wizard that declares `graph.check_answers`.
+- **Docs show units.** `wizard.metadata` gains `sub_wizards` and
+  `change_journeys` for a Graph wizard that has them. The Mermaid and
+  GraphViz formatters draw each sub-wizard as a cluster and each
+  `depends_on` answer as a dashed edge. The Markdown formatter lists
+  sub-wizards and change journeys. Wizards with no sub-wizards and no
+  `depends_on` get the same docs as before.
 
 ### Changed
 

@@ -1114,7 +1114,8 @@ wizard.change_journey(:start_date)    # => []
 ```
 
 Pin the declarations in a spec with the `queue_after_change` matcher
-([Journey Matchers](#journey-matchers)). `Tooling::Inspect` lists them.
+([Journey Matchers](#journey-matchers)). `Tooling::Inspect` lists them, and
+the generated docs draw them.
 
 ## Edits of saved records
 
@@ -1681,6 +1682,14 @@ Run with:
 ```bash
 rake wizard:docs:generate
 ```
+
+For a Graph wizard with sub-wizards or `depends_on`, the Mermaid and
+GraphViz diagrams draw each sub-wizard as a box around its steps, and each
+`depends_on` answer as a dashed edge from the step that owns the answer to
+the unit that depends on it. The Markdown adds a "Sub-wizards" table and a
+"Change Journeys" table. The metadata gains `sub_wizards` and
+`change_journeys` keys only for these wizards, so the docs of other
+wizards do not change.
 
 ---
 

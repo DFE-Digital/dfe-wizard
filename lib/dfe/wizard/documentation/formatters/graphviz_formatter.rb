@@ -55,7 +55,9 @@ module DfE
               render_digraph_start,
               render_graph_attributes,
               render_steps,
+              render_sub_wizards,
               render_transitions,
+              render_change_journeys,
               render_digraph_end,
             ].compact.join("\n")
           end
@@ -68,24 +70,78 @@ module DfE
           end
 
           def render_graph_attributes
-            [
+            attributes = [
               "  rankdir=#{@rankdir};",
               "  bgcolor=\"#{@bgcolor}\";",
               '  node [shape=box, style="rounded,filled", fillcolor="#e8f4f8", fontname="Helvetica"];',
               '  edge [fontname="Helvetica", fontsize=10];',
-            ].join("\n")
+            ]
+            # Lets a depends_on edge end at a sub-wizard's cluster
+            attributes << '  compound=true;' if sub_wizards.any?
+            attributes.join("\n")
           end
 
           def render_steps
             steps = @metadata[:steps] || {}
             return '' if steps.empty?
 
-            steps.map do |step_id, step_data|
-              label = step_data[:label] || step_id.to_s.titleize
-              sanitized_id = sanitize_identifier(step_id.to_s)
-              sanitized_label = sanitize_label(label)
-              "  #{sanitized_id} [label=\"#{sanitized_label}\"];"
+            steps.except(*sub_wizard_step_ids).map do |step_id, step_data|
+              render_step(step_id, step_data)
             end.join("\n")
+          end
+
+          def render_step(step_id, step_data, indent: '  ')
+            label = step_data[:label] || step_id.to_s.titleize
+            sanitized_id = sanitize_identifier(step_id.to_s)
+            sanitized_label = sanitize_label(label)
+            "#{indent}#{sanitized_id} [label=\"#{sanitized_label}\"];"
+          end
+
+          # Each sub-wizard as a cluster that holds its steps
+          def render_sub_wizards
+            return nil if sub_wizards.empty?
+
+            steps = @metadata[:steps] || {}
+            sub_wizards.map do |unit_id, unit_data|
+              lines = [
+                "  subgraph cluster_#{sanitize_identifier(unit_id.to_s)} {",
+                "    label=\"#{sanitize_label(unit_id.to_s.titleize)}\";",
+                '    style=dashed;',
+              ]
+              lines += unit_data[:steps].map { |step_id| render_step(step_id, steps[step_id] || {}, indent: '    ') }
+              lines << '  }'
+              lines.join("\n")
+            end.join("\n")
+          end
+
+          # A dashed edge from the step that owns each depends_on answer to
+          # each unit that depends on it. An edge to a sub-wizard ends at its
+          # cluster.
+          def render_change_journeys
+            journeys = @metadata[:change_journeys] || {}
+            return nil if journeys.empty?
+
+            journeys.flat_map do |name, journey|
+              from = sanitize_identifier(journey[:from].to_s)
+              journey[:units].map do |unit_id|
+                sub_wizard = sub_wizards[unit_id]
+                if sub_wizard
+                  to = sanitize_identifier(sub_wizard[:steps].first.to_s)
+                  lhead = ", lhead=cluster_#{sanitize_identifier(unit_id.to_s)}"
+                else
+                  to = sanitize_identifier(unit_id.to_s)
+                end
+                "  #{from} -> #{to} [label=\"#{sanitize_label(name)}\", style=dashed, color=gray#{lhead}];"
+              end
+            end.join("\n")
+          end
+
+          def sub_wizards
+            @metadata[:sub_wizards] || {}
+          end
+
+          def sub_wizard_step_ids
+            sub_wizards.values.flat_map { |unit_data| unit_data[:steps] }
           end
 
           def render_transitions
