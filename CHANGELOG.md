@@ -26,6 +26,36 @@
   own, with a real state store or a stub store built from `uses`. The
   existing matchers work on `harness.wizard`. A step that calls an app
   wizard method raises `NoMethodError` there.
+- **`wizard.changeset`** keeps gem state beside the answers, under one
+  reserved top-level key, `_dfe_wizard`, written through the state store.
+  `changeset.answers` and `changeset.answer_changes_since(snapshot)` compare
+  answers after a JSON round trip, so values read back from any repository
+  compare equal. A `Repository::Model` (or subclass), or a state store
+  built without a repository, cannot hold one.
+- **`graph.check_answers :node`** marks the check answers page and turns on
+  change journeys (below). **`depends_on:`** on `add_node` and
+  `add_sub_wizard` names the answers whose change queues that unit.
+  `steps_processor.unit(unit_id)` and `steps_processor.check_answers_step`
+  read them. Draws raise `InvalidGraph` for a check answers node that is not
+  a node, is in a sub-wizard or has `depends_on`, for a `depends_on` name
+  that is not a step attribute, and for a step attribute named
+  `_dfe_wizard`.
+- **Change journeys.** In a wizard that declares `graph.check_answers`, a
+  "Change" link (`return_to_review=<step>`, as in 1.0) starts a journey on
+  its GET: call `wizard.journey_start_redirect` and redirect to the path it
+  returns. The journey opens on the named step (or, when it is not on the
+  path, on its unit's first step on the path), shows the rest of the
+  step's unit (a sub-wizard, or one step), then returns to check answers.
+  Back goes to the previous step of the unit, and from the step it opened
+  on to check answers. A save on a step outside the journey uses 1.0
+  navigation. During a journey, the wizard picks the next and previous step
+  before any `before_next_step` or `before_previous_step` callback runs.
+- **Chaining.** When a unit in a change journey ends, the journey shows the
+  first later unit on the path whose `depends_on` names an answer that
+  changed since the journey started, then the next, and returns to check
+  answers when none is left. Back crosses into the unit shown before.
+  Saving a unit the user went Back into makes it current again, so a later
+  unit is asked again if its dependency still changed.
 - **`wizard.full_path`** returns every step from the root to the end of the
   graph over the current answers, without stopping at the current step. It
   stops before a Redirect node, an id that is not a node, or a repeated step.
@@ -42,14 +72,18 @@
   or the root with a Ruby `if` on answers must move that choice into a
   predicate, `skip_when` or `conditional_root`.
 - `state_store=` is now an explicit writer. It drops the cached graph, the
-  default steps operator and the hydrated steps, and gives a store set
-  after `new` its attribute readers.
+  default steps operator, the changeset and the hydrated steps, and gives
+  a store set after `new` its attribute readers.
 - **The wizard sets `state_store.wizard`** in `new` and in `state_store=`,
   so state store methods can read context (for example the provider)
   through the wizard. In 1.0 the attribute existed but was never set.
 - A test that stubs a Symbol predicate or a Symbol callback after the wizard
   is built no longer sees the stub, because the graph bound the method when
   it was drawn. Stub before building the wizard, or use a lambda predicate.
+- `raw_data`, `data` and the metadata readers never return `_dfe_wizard`.
+- `StateStore.new` without `repository:` still uses a new InMemory
+  repository, and `default_repository?` reports it. Passing
+  `repository: nil` now gives that fallback instead of a nil repository.
 
 ### Fixed
 

@@ -196,6 +196,7 @@ RSpec.describe DfE::Wizard, 'graph cache' do
     it 'sets the new store up as new does, and drops what was built for the old one' do
       wizard = build_wizard(current_step: :nationality)
       old_operator = wizard.steps_operator
+      old_changeset = wizard.changeset
 
       new_store = GraphCacheStateStore.new
       new_store.write(nationality: 'other')
@@ -203,6 +204,7 @@ RSpec.describe DfE::Wizard, 'graph cache' do
 
       expect(new_store.nationality).to eq('other')
       expect(wizard.steps_operator).not_to be(old_operator)
+      expect(wizard.changeset).not_to be(old_changeset)
     end
   end
 

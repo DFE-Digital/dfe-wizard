@@ -28,17 +28,18 @@ for how to add a version.
 6. [Navigation](#navigation)
 7. [Conditional Branching](#conditional-branching)
 8. [Sub-wizards](#sub-wizards)
-9. [Check Your Answers](#check-your-answers)
-10. [Step Operators](#step-operators)
-11. [Testing](#testing)
-12. [Auto-generated Documentation](#auto-generated-documentation)
-13. [In Depth: Repositories](#in-depth-repositories)
-14. [In Depth: Steps](#in-depth-steps)
-15. [In Depth: Conditional Edges](#in-depth-conditional-edges)
-16. [In Depth: Route Strategies](#in-depth-route-strategies)
-17. [Advanced: Custom Implementations](#advanced-custom-implementations)
-18. [Examples](#examples)
-19. [Troubleshooting](#troubleshooting)
+9. [Change journeys](#change-journeys)
+10. [Check Your Answers](#check-your-answers)
+11. [Step Operators](#step-operators)
+12. [Testing](#testing)
+13. [Auto-generated Documentation](#auto-generated-documentation)
+14. [In Depth: Repositories](#in-depth-repositories)
+15. [In Depth: Steps](#in-depth-steps)
+16. [In Depth: Conditional Edges](#in-depth-conditional-edges)
+17. [In Depth: Route Strategies](#in-depth-route-strategies)
+18. [Advanced: Custom Implementations](#advanced-custom-implementations)
+19. [Examples](#examples)
+20. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -1031,6 +1032,70 @@ The gem checks these when the graph is drawn, and raises
 `steps_processor.unit_for(step_id)` returns the step's unit: its sub-wizard,
 or a single-step unit for any other node. Other processors have no units:
 they return `{}` and nil.
+
+---
+
+## Change journeys
+
+A "Change" link on check answers should take the user through every page
+the change affects, then back. Declare the check answers node, and say
+which answers each unit depends on:
+
+```ruby
+graph.add_node :funding_type, Steps::FundingType, depends_on: %i[qualification]
+graph.add_sub_wizard :visa, VisaSubWizard, exit_to: :start_date,
+                                           depends_on: %i[qualification funding_type]
+graph.add_node :check_answers, Steps::CheckAnswers
+graph.check_answers :check_answers
+```
+
+Change links keep their 1.0 form (`return_to_review=<step>`, as
+`CheckAnswersPresenter#change_path_for` builds). Start the journey on the
+GET of the step, and redirect:
+
+```ruby
+def show
+  journey_start = @wizard.journey_start_redirect
+  redirect_to(journey_start) if journey_start
+end
+```
+
+Build the wizard with the request's params, unfiltered: the gem reads
+`return_to_review` from them.
+
+The journey:
+1. opens on the step the link names (the entry step) and shows the rest
+   of its unit (its sub-wizard, or the step alone). When the named step is
+   not on the path, it opens on the unit's first step on the path;
+2. when the unit ends, shows the first later unit on the path whose
+   `depends_on` names an answer that changed since the journey started;
+3. repeats, then returns to check answers.
+
+Back goes to the previous step of the unit, then to the unit shown before
+it, then to check answers. Back from the entry step goes to check answers,
+so a Change link on the third step of a sub-wizard opens on that step and
+never goes back to the first. The unit's steps before the entry step are
+outside the journey, and a save on a step outside the journey uses normal
+navigation. Every Change link click starts the journey again.
+
+Rules:
+- `depends_on` names step attributes, never context. Use `skip_when` for a
+  step shown because of context.
+- A step in a sub-wizard has no `depends_on` of its own; declare it on
+  `add_sub_wizard`.
+- Predicates and validations read only answers from earlier on the path.
+- Remove any `return_to_review` callbacks (`before_next_step`,
+  `before_previous_step`): during a journey the wizard picks the step
+  before any callback runs.
+
+The journey state is kept with the answers, under the reserved key
+`_dfe_wizard`. `raw_data` and the metadata readers never return it. A
+`Repository::Model`, or a state store built without a repository, cannot
+hold it: the journey start raises `ArgumentError`. Do not name a step
+attribute `_dfe_wizard`.
+
+The start GET writes state. A link prefetcher can start a journey; the
+next Change click replaces it.
 
 ---
 

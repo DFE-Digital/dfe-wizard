@@ -12,7 +12,7 @@ module DfE
         #
         # @api private
         class SubWizardDSL
-          PARENT_ONLY = %i[root conditional_root before_next_step before_previous_step].freeze
+          PARENT_ONLY = %i[root conditional_root before_next_step before_previous_step check_answers].freeze
 
           # @return [Array<Symbol>] node ids the class added, in order
           attr_reader :added_node_ids
@@ -29,8 +29,11 @@ module DfE
             @added_node_ids = []
           end
 
-          def add_node(node_id, klass, label: nil, skip_when: nil)
+          def add_node(node_id, klass, label: nil, skip_when: nil, depends_on: nil)
             raise InvalidGraph, "#{@name} adds :#{node_id}, which is already a node" if @registry.nodes.key?(node_id)
+            unless depends_on.nil?
+              raise InvalidGraph, "#{@name}: depends_on on :#{node_id}; declare depends_on on add_sub_wizard"
+            end
 
             check_predicate!(skip_when, "skip_when on :#{node_id}") unless skip_when.nil?
             @dsl.add_node(node_id, klass, label:, skip_when:)
