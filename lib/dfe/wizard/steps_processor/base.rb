@@ -283,6 +283,15 @@ module DfE
           nil
         end
 
+        # The units that a change to each answer queues.
+        #
+        # Only StepsProcessor::Graph declares them.
+        #
+        # @return [Hash{Symbol => Array<Symbol>}] empty
+        def change_journeys
+          {}
+        end
+
         # Find and return the step class for a given step ID.
         #
         # Used by the wizard framework to:
@@ -350,8 +359,9 @@ module DfE
 
         # The first step that declares each answer
         #
-        # unflatten_state gives each stored answer to this step. Built once:
-        # the steps are fixed when the processor is built.
+        # unflatten_state gives each stored answer to this step, and
+        # change_journeys reads it to leave out a unit's own answers. Built
+        # once: the steps are fixed when the processor is built.
         #
         # @return [Hash{Symbol => Symbol}] step id by answer name
         # @api private

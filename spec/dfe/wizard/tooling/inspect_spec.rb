@@ -206,4 +206,40 @@ RSpec.describe DfE::Wizard::Tooling::Inspect do
       end
     end
   end
+
+  describe 'change journeys' do
+    include JourneySpecHelpers
+
+    it 'lists each depends_on answer with the units it queues' do
+      wizard = journey_request(:start, wizard_class: JourneySpecTwoUnitWizard)
+      output = described_class.new(wizard:).inspect
+
+      expect(output).to include("┌─ CHANGE JOURNEYS ──────────────────────────┐\n│ funding → visa, start_date\n")
+    end
+
+    it 'says when the graph declares no depends_on' do
+      wizard_class = Class.new(JourneySpecWizard) do
+        def steps_processor
+          DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+            graph.add_node :start, SubWizardSpecSteps::Start
+            graph.add_node :check_answers, SubWizardSpecSteps::Review
+            graph.root :start
+            graph.check_answers :check_answers
+            graph.add_edge from: :start, to: :check_answers
+          end
+        end
+      end
+      output = described_class.new(wizard: journey_request(:start, wizard_class:)).inspect
+
+      expect(output).to include("┌─ CHANGE JOURNEYS ──────────────────────────┐\n│ (no depends_on declared)\n")
+    end
+
+    it 'is left out for a wizard without graph.check_answers' do
+      expect(output).not_to include('CHANGE JOURNEYS')
+    end
+
+    it 'adds no blank line when it is left out' do
+      expect(output).to include("└────────────────────────────────────────────┘\n\n┌─ INSTANCE VARIABLES")
+    end
+  end
 end

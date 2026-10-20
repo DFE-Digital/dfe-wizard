@@ -97,6 +97,20 @@
   stops before a Redirect node, an id that is not a node, or a repeated step.
   Needs `StepsProcessor::Graph`; other processors raise `NotImplementedError`.
   `flow_path`, `path_traversal` and `dfs_path` are unchanged.
+- **`wizard.change_journey(:attr)`** returns the units whose `depends_on`
+  names the answer, in the order the graph declares them. It is a static
+  view, for docs and tests. `steps_processor.change_journeys` returns them
+  for every answer. Graph only: other processors return `{}`.
+- **`queue_after_change(:attr).units(*ids)`** matcher pins the units a
+  change queues.
+- **`Tooling::Inspect`** lists change journeys (each `depends_on` answer,
+  with its units) for a wizard that declares `graph.check_answers`.
+- **Docs show units.** `wizard.metadata` gains `sub_wizards` and
+  `change_journeys` for a Graph wizard that has them. The Mermaid and
+  GraphViz formatters draw each sub-wizard as a cluster and each
+  `depends_on` answer as a dashed edge. The Markdown formatter lists
+  sub-wizards and change journeys. Wizards with no sub-wizards and no
+  `depends_on` get the same docs as before.
 
 ### Changed
 

@@ -1102,6 +1102,21 @@ range that depends on the level) should validate its answer against the
 options for the current branch. Otherwise an answer given on another branch
 still passes its validation after the earlier answer changes.
 
+To see what a change queues, ask the wizard. It reads the `depends_on`
+declarations: every unit that names the answer, in the order the graph
+declares them. The answer's own unit is not included. At run time a
+journey shows only the units later on the path, and only while the answer
+differs from its value at the start.
+
+```ruby
+wizard.change_journey(:funding_type)  # => [:visa]
+wizard.change_journey(:start_date)    # => []
+```
+
+Pin the declarations in a spec with the `queue_after_change` matcher
+([Journey Matchers](#journey-matchers)). `Tooling::Inspect` lists them, and
+the generated docs draw them.
+
 ## Edits of saved records
 
 The same wizard can edit a saved record. An edit is one change journey: it
@@ -1542,6 +1557,9 @@ puts wizard.inspect
 # └─ State: { first_name: "Sarah", last_name: "Smith" }
 ```
 
+A wizard that declares `graph.check_answers` also gets a CHANGE JOURNEYS
+section: each `depends_on` answer, with the units a change to it queues.
+
 ---
 
 ## Testing
@@ -1595,6 +1613,20 @@ expect(:email).to be_valid_step.in(wizard)
 expect(state_store).to have_step_attribute(:first_name)
 expect(state_store).to have_step_attribute(:email).with_value('test@example.com')
 ```
+
+### Journey Matchers
+
+```ruby
+expect(wizard).to queue_after_change(:funding_type).units(:visa)
+expect(wizard).to queue_after_change(:qualification).units(:funding_type, :study_pattern, :visa)
+expect(wizard).to queue_after_change(:start_date).units      # queues nothing
+expect(wizard).not_to queue_after_change(:study_pattern).units(:visa)
+```
+
+`queue_after_change` compares `wizard.change_journey` with the units, in
+order. Negated, it passes when none of the units is queued. It raises
+`ArgumentError` for a name that is not a step attribute, and, negated, for
+an id that is not a unit.
 
 ### Sub-wizard harness
 
@@ -1651,6 +1683,14 @@ Run with:
 ```bash
 rake wizard:docs:generate
 ```
+
+For a Graph wizard with sub-wizards or `depends_on`, the Mermaid and
+GraphViz diagrams draw each sub-wizard as a box around its steps, and each
+`depends_on` answer as a dashed edge from the step that owns the answer to
+the unit that depends on it. The Markdown adds a "Sub-wizards" table and a
+"Change Journeys" table. The metadata gains `sub_wizards` and
+`change_journeys` keys only for these wizards, so the docs of other
+wizards do not change.
 
 ---
 

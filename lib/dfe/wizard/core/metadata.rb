@@ -42,8 +42,9 @@ module DfE
         # @return [Hash] Enriched metadata with all three layers
         def to_h
           @enriched_metadata ||= begin
-            metadata = @wizard.steps_processor.metadata.deep_dup
+            metadata = processor.metadata.deep_dup
             enrich_with_step_details(metadata)
+            enrich_with_units(metadata)
             metadata[:wizard_name] = @wizard.class.to_s.underscore.humanize
             metadata
           end
@@ -90,8 +91,6 @@ module DfE
         def validate_wizard!
           raise ArgumentError, 'Wizard must have steps_processor method' unless @wizard.respond_to?(:steps_processor)
 
-          processor = @wizard.steps_processor
-
           unless processor.respond_to?(:metadata)
             raise ArgumentError,
                   'Wizard.steps_processor must have #metadata method for documentation'
@@ -119,6 +118,36 @@ module DfE
               step_data[:operations] = []
             end
           end
+        end
+
+        # Add sub-wizards and change journeys, only for a processor that
+        # declares them, so the metadata of other wizards does not change
+        #
+        # @param metadata [Hash] Metadata with step details
+        # @return [void] Modifies metadata in place
+        def enrich_with_units(metadata)
+          return unless processor.respond_to?(:sub_wizards) && processor.respond_to?(:change_journeys)
+
+          if processor.sub_wizards.any?
+            metadata[:sub_wizards] = processor.sub_wizards.transform_values do |unit|
+              { steps: unit.step_ids, exit_to: unit.exit_to, depends_on: unit.depends_on }
+            end
+          end
+
+          journeys = processor.change_journeys
+          return if journeys.empty?
+
+          owners = processor.answer_owners
+          metadata[:change_journeys] = journeys.to_h do |name, unit_ids|
+            [name, { from: owners[name], units: unit_ids }]
+          end
+        end
+
+        # The wizard's steps processor, drawn once for this metadata
+        #
+        # @return [StepsProcessor::Base]
+        def processor
+          @processor ||= @wizard.steps_processor
         end
 
         # Find step class from metadata

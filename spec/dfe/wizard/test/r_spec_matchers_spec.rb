@@ -567,4 +567,70 @@ RSpec.describe DfE::Wizard::Test::RSpecMatchers do
       end
     end
   end
+
+  describe '#queue_after_change' do
+    include JourneySpecHelpers
+
+    let(:wizard) { journey_request(:start, wizard_class: JourneySpecTwoUnitWizard) }
+
+    it 'passes when the change queues exactly these units, in order' do
+      expect(wizard).to queue_after_change(:funding).units(:visa, :start_date)
+    end
+
+    it 'fails with a clear message for other units' do
+      expect {
+        expect(wizard).to queue_after_change(:funding).units(:visa)
+      }.to raise_error(RSpec::Expectations::ExpectationNotMetError) do |error|
+        expect(error.message)
+          .to eq('Expected a change to :funding to queue [:visa], but it queues [:visa, :start_date]')
+      end
+    end
+
+    it 'fails for the right units in the wrong order' do
+      expect {
+        expect(wizard).to queue_after_change(:funding).units(:start_date, :visa)
+      }.to raise_error(RSpec::Expectations::ExpectationNotMetError)
+    end
+
+    it 'passes with no units when the change queues nothing' do
+      expect(wizard).to queue_after_change(:student_visa).units
+    end
+
+    it 'passes when negated and none of the units is queued' do
+      expect(wizard).not_to queue_after_change(:student_visa).units(:visa)
+    end
+
+    it 'fails when negated and one of the units is queued' do
+      expect {
+        expect(wizard).not_to queue_after_change(:funding).units(:start, :visa)
+      }.to raise_error(RSpec::Expectations::ExpectationNotMetError) do |error|
+        expect(error.message)
+          .to eq('Expected a change to :funding not to queue [:start, :visa], but it queues [:visa, :start_date]')
+      end
+    end
+
+    it 'raises without .units' do
+      expect {
+        expect(wizard).to queue_after_change(:funding)
+      }.to raise_error(ArgumentError, 'queue_after_change needs .units(...)')
+    end
+
+    it 'raises when negated with no units' do
+      expect {
+        expect(wizard).not_to queue_after_change(:funding).units
+      }.to raise_error(ArgumentError, 'queue_after_change needs .units(...) with at least one unit')
+    end
+
+    it 'raises for a name that is not a step attribute' do
+      expect {
+        expect(wizard).to queue_after_change(:fundng).units(:visa)
+      }.to raise_error(ArgumentError, ':fundng is not a step attribute')
+    end
+
+    it 'raises when negated with an id that is not a unit' do
+      expect {
+        expect(wizard).not_to queue_after_change(:funding).units(:vsa)
+      }.to raise_error(ArgumentError, ':vsa is not a unit')
+    end
+  end
 end

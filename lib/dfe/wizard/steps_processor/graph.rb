@@ -226,6 +226,34 @@ module DfE
           @registry.sub_wizards[unit_id] || unit_for(unit_id)
         end
 
+        # The units that a change to each answer queues, from the depends_on
+        # declarations.
+        #
+        # Each key is an answer that some unit names in depends_on. Its value
+        # lists those units in the order the graph declares their first step.
+        # A unit that names one of its own answers is left out: a change never
+        # queues the unit it was made in. This is a static view: at run time a
+        # journey queues only the units later on the path than the changed
+        # unit, in path order.
+        #
+        # @return [Hash{Symbol => Array<Symbol>}] unit ids by answer name
+        # @api public
+        #
+        # @example
+        #   graph.change_journeys  # => { funding: [:visa] }
+        def change_journeys
+          units = units_by_step.values.uniq
+          owners = answer_owners
+
+          units.each_with_object({}) do |unit, journeys|
+            unit.depends_on.each do |name|
+              next if unit.step_ids.include?(owners[name])
+
+              (journeys[name] ||= []) << unit.id
+            end
+          end
+        end
+
         # The check answers node, which turns on change journeys.
         #
         # @return [Symbol, nil] nil when graph.check_answers is not declared

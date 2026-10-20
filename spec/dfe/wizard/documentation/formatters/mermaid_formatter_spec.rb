@@ -45,4 +45,31 @@ RSpec.describe DfE::Wizard::Documentation::Formatters::MermaidFormatter do
       MSG
     end
   end
+
+  describe 'sub-wizards and change journeys' do
+    include JourneySpecHelpers
+
+    let(:result) do
+      described_class.new(journey_request(:start, wizard_class: JourneySpecTwoUnitWizard).metadata).render
+    end
+
+    it 'draws each sub-wizard as a subgraph that holds its steps' do
+      expect(result).to include(<<~MERMAID.indent(2))
+        subgraph visa ["Visa"]
+          student["Student"]
+          skilled["Skilled"]
+          deadline_required["Deadline Required"]
+          deadline_at["Deadline At"]
+        end
+      MERMAID
+    end
+
+    it 'draws sub-wizard steps only inside the subgraph' do
+      expect(result.scan(/^\s*student\[/).size).to eq(1)
+    end
+
+    it 'draws a dashed edge from the step that owns each answer to each unit that depends on it' do
+      expect(result).to include("  funding -.->|funding| visa\n  funding -.->|funding| start_date")
+    end
+  end
 end

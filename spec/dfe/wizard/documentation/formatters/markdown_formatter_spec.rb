@@ -21,4 +21,23 @@ RSpec.describe DfE::Wizard::Documentation::Formatters::MarkdownFormatter do
   rescue Errno::ENOENT
     raise "Expected markdown fixture not found: #{fixture_path}"
   end
+
+  describe 'sub-wizards and change journeys' do
+    include JourneySpecHelpers
+
+    let(:result) do
+      wizard = journey_request(:start, wizard_class: JourneySpecTwoUnitWizard)
+      described_class.new(wizard.metadata, include_raw_metadata: false).render
+    end
+
+    it 'lists each sub-wizard' do
+      expect(result).to include(
+        '| `visa` | `student`, `skilled`, `deadline_required`, `deadline_at` | `start_date` | `funding` |',
+      )
+    end
+
+    it 'lists each depends_on answer with its step and the units it queues' do
+      expect(result).to include('| `funding` | `funding` | `visa`, `start_date` |')
+    end
+  end
 end

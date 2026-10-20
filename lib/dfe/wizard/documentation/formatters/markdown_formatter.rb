@@ -22,6 +22,8 @@ module DfE
               render_conditional_transitions,
               render_multiple_conditional_transitions,
               render_custom_branching_transitions,
+              render_sub_wizards,
+              render_change_journeys,
               render_statistics,
               render_example_journeys,
               render_raw_metadata,
@@ -412,6 +414,47 @@ module DfE
               - **#{cond_count} conditional transitions** – If/else branching logic
               - **#{multi_count} multiple conditional transitions** – N-way branching
               - **#{custom_count} custom branching transitions** – Complex status-driven routing
+            MD
+          end
+
+          def render_sub_wizards
+            sub_wizards = @metadata[:sub_wizards] || {}
+            return nil if sub_wizards.empty?
+
+            rows = sub_wizards.map do |unit_id, unit_data|
+              steps = unit_data[:steps].map { |step_id| "`#{step_id}`" }.join(', ')
+              exit_to = unit_data[:exit_to] ? "`#{unit_data[:exit_to]}`" : '-'
+              depends_on = unit_data[:depends_on].map { |name| "`#{name}`" }.join(', ').presence || '-'
+              "| `#{unit_id}` | #{steps} | #{exit_to} | #{depends_on} |"
+            end.join("\n")
+
+            <<~MD
+              ## Sub-wizards
+
+              | Sub-wizard | Steps | Exit to | Depends on |
+              |------------|-------|---------|------------|
+              #{rows}
+            MD
+          end
+
+          def render_change_journeys
+            journeys = @metadata[:change_journeys] || {}
+            return nil if journeys.empty?
+
+            rows = journeys.map do |name, journey|
+              from = journey[:from] ? "`#{journey[:from]}`" : '-'
+              units = journey[:units].map { |unit_id| "`#{unit_id}`" }.join(', ')
+              "| `#{name}` | #{from} | #{units} |"
+            end.join("\n")
+
+            <<~MD
+              ## Change Journeys
+
+              A change to an answer on check answers shows the answer's unit, then each later unit on the path that depends on it.
+
+              | Answer | Step | Units it queues |
+              |--------|------|-----------------|
+              #{rows}
             MD
           end
 

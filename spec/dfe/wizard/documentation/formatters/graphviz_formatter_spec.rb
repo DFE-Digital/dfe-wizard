@@ -21,4 +21,41 @@ RSpec.describe DfE::Wizard::Documentation::Formatters::GraphvizFormatter do
   rescue Errno::ENOENT
     raise "Expected markdown fixture not found: #{fixture_path}"
   end
+
+  describe 'sub-wizards and change journeys' do
+    include JourneySpecHelpers
+
+    let(:result) do
+      described_class.new(journey_request(:start, wizard_class: JourneySpecTwoUnitWizard).metadata.to_h).render
+    end
+
+    it 'turns on compound edges' do
+      expect(result).to include("  compound=true;\n")
+    end
+
+    it 'draws each sub-wizard as a cluster that holds its steps' do
+      expect(result).to include(<<~DOT.indent(2))
+        subgraph cluster_visa {
+          label="Visa";
+          style=dashed;
+          student [label="Student"];
+          skilled [label="Skilled"];
+          deadline_required [label="Deadline Required"];
+          deadline_at [label="Deadline At"];
+        }
+      DOT
+    end
+
+    it 'draws sub-wizard steps only inside the cluster' do
+      expect(result.scan(/^\s*student \[label/).size).to eq(1)
+    end
+
+    it 'ends a depends_on edge to a sub-wizard at its cluster' do
+      expect(result).to include('  funding -> student [label="funding", style=dashed, color=gray, lhead=cluster_visa];')
+    end
+
+    it 'ends a depends_on edge to a single-step unit at the step' do
+      expect(result).to include('  funding -> start_date [label="funding", style=dashed, color=gray];')
+    end
+  end
 end
