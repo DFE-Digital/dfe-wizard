@@ -17,3 +17,12 @@ RSpec.describe DfE::Wizard::InvalidGraph do
     expect(message).to eq('bad graph')
   end
 end
+
+RSpec.describe 'Edit errors' do
+  [DfE::Wizard::NotCallable, DfE::Wizard::ChangesetMismatch,
+   DfE::Wizard::ChangesetExpired, DfE::Wizard::StepNotAccessible].each do |error_class|
+    it "#{error_class} is a StandardError and a DfE::Wizard::Error" do
+      expect(error_class.new).to be_a(StandardError).and be_a(DfE::Wizard::Error)
+    end
+  end
+end

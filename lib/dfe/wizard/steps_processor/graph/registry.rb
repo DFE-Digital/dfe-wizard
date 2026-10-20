@@ -39,7 +39,7 @@ module DfE
           attr_reader :nodes, :edges, :conditional_edges, :multiple_conditional_edges, :custom_branching_edges,
                       :step_labels, :sub_wizards
           attr_accessor :root_node, :conditional_root_method, :conditional_root_block, :potential_root_nodes,
-                        :check_answers_node
+                        :check_answers_node, :edit_review_node
 
           def initialize
             @nodes = {}

@@ -12,7 +12,7 @@ module DfE
         #
         # @api private
         class SubWizardDSL
-          PARENT_ONLY = %i[root conditional_root before_next_step before_previous_step check_answers].freeze
+          PARENT_ONLY = %i[root conditional_root before_next_step before_previous_step check_answers edit_review].freeze
 
           # @return [Array<Symbol>] node ids the class added, in order
           attr_reader :added_node_ids

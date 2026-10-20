@@ -122,6 +122,7 @@ module DfE
     autoload :SubWizard, 'dfe/wizard/sub_wizard'
     autoload :Changeset, 'dfe/wizard/changeset'
     autoload :Journey, 'dfe/wizard/journey'
+    autoload :Mapper, 'dfe/wizard/mapper'
 
     # @!group Auto generate Documentation for any wizard
     module Documentation
@@ -261,6 +262,8 @@ module DfE
     # @param current_step [Symbol, nil] Name of the current step
     # @param current_step_params [Hash] Parameters for the current step (typically from request)
     # @param state_store [DfE::Wizard::StateStore] State persistence adapter
+    # @param record [Object, nil] the saved record, on every request of an
+    #   edit (see #start_edit); nil on a draft
     #
     # @example
     #   wizard = MyWizard.new(
@@ -272,9 +275,11 @@ module DfE
     #   )
     #
     # @return [self]
-    def initialize(state_store:, current_step: nil, current_step_params: {})
+    def initialize(state_store:, current_step: nil, current_step_params: {}, record: nil)
       @current_step_name = current_step&.to_sym
       @current_step_params = current_step_params
+      # Not @record: an app wizard may already use that name
+      @edit_record = record
       self.state_store = state_store
 
       after_initialize

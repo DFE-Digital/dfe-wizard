@@ -52,10 +52,29 @@ module DfE
           #   g.add_node :check_answers, CheckAnswersStep
           #   g.check_answers :check_answers
           def check_answers(node_id)
-            raise InvalidGraph, "graph.check_answers takes a Symbol, got #{node_id.class}" unless node_id.is_a?(Symbol)
-            raise InvalidGraph, 'graph.check_answers is declared twice' if @registry.check_answers_node
+            mark_node(:check_answers_node, 'graph.check_answers', node_id)
+          end
 
-            @registry.check_answers_node = node_id
+          # Mark a node as the edit review: the page an edit of a saved
+          # record ends on before it commits.
+          #
+          # When an edit's journey ends with a change, the edit goes to this
+          # node instead of committing, unless the node's skip_when holds.
+          # The commit runs when the user saves the node. Back on it goes to
+          # the last step the edit showed. A draft never goes to it.
+          #
+          # The node needs no edges: no edge should lead to it. It belongs to
+          # no unit.
+          #
+          # @param node_id [Symbol] An existing node
+          # @raise [DfE::Wizard::InvalidGraph]
+          # @return [void]
+          #
+          # @example Confirm only edits of published records
+          #   g.add_node :confirm_changes, ConfirmChangesStep, skip_when: :unpublished_record?
+          #   g.edit_review :confirm_changes
+          def edit_review(node_id)
+            mark_node(:edit_review_node, 'graph.edit_review', node_id)
           end
 
           # Set static root node.
@@ -397,6 +416,14 @@ module DfE
                 id: unit_id, step_ids: step_ids.freeze, exit_to:, uses: uses.freeze, source:, depends_on:,
               ),
             )
+          end
+
+          # Store a check answers or edit review node on the registry
+          def mark_node(attribute, directive, node_id)
+            raise InvalidGraph, "#{directive} takes a Symbol, got #{node_id.class}" unless node_id.is_a?(Symbol)
+            raise InvalidGraph, "#{directive} is declared twice" if @registry.public_send(attribute)
+
+            @registry.public_send(:"#{attribute}=", node_id)
           end
 
           def depends_on_list(owner, depends_on)

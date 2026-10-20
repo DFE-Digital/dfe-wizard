@@ -199,6 +199,14 @@ RSpec.describe DfE::Wizard::Repository::Session do
           'wizard_2' => { 'name' => 'Jane' },
         )
       end
+
+      it 'removes the key when its state was the last one' do
+        session['wizard_key'] = { 'wizard_1' => { 'name' => 'John' } }
+
+        repository.clear
+
+        expect(session['wizard_key']).to be_nil
+      end
     end
   end
 end

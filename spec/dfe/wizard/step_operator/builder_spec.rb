@@ -188,4 +188,19 @@ RSpec.describe DfE::Wizard::StepsOperator::Builder do
       expect(builder.operations_for(:step_three)).to eq([])
     end
   end
+  describe '#on_commit' do
+    let(:builder) { described_class.new(wizard: TestWizard.new, callable: TestStateStore.new) }
+
+    it 'stores the commit operations apart from the steps' do
+      commit = Class.new
+      builder.on_commit(use: [commit])
+
+      expect(builder.commit_operations).to eq([commit])
+      expect(builder.all_operations).to eq({})
+    end
+
+    it 'has no commit operations by default' do
+      expect(builder.commit_operations).to eq([])
+    end
+  end
 end
