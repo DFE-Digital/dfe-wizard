@@ -156,6 +156,19 @@ module DfE
         end
 
         # @api public
+        # Merge new data into existing data, with string keys on both sides.
+        #
+        # read_data returns symbol keys and transform_for_write returns string
+        # keys. A plain merge keeps both forms of a key, and when the JSON is
+        # parsed the old value wins.
+        # @param existing [Hash] Data from read_data (symbol keys)
+        # @param new_data [Hash] Data from transform_for_write (string keys)
+        # @return [Hash] Merged data with string keys
+        def merge_data(existing, new_data)
+          existing.deep_stringify_keys.merge(new_data)
+        end
+
+        # @api public
         # Normalize expiration input into seconds.
         # @param value [Integer, ActiveSupport::Duration, nil]
         # @return [Integer, nil] seconds or nil.

@@ -79,6 +79,18 @@ module DfE
             remaining_path ? [current] + remaining_path : nil
           end
 
+          # Steps from the root to the end of the graph, over the current answers.
+          #
+          # Does not stop at the current step. Stops, without the stopping id,
+          # at a step with no next step, a Redirect node, an id that is not a
+          # node, a step already on the path, or a skip_when loop. Runs no
+          # callbacks.
+          #
+          # @return [Array<Symbol>]
+          def full_path
+            walk_to_end(compute_root_node)
+          end
+
           private
 
           def compute_root_node
@@ -89,6 +101,24 @@ module DfE
             elsif @registry.conditional_root_method
               @wizard.method(@registry.conditional_root_method).call
             end
+          end
+
+          def walk_to_end(step_id)
+            path = []
+
+            while step_id && walkable_node?(step_id) && !path.include?(step_id)
+              path << step_id
+              step_id = next_step_without_callbacks(step_id)
+            end
+
+            path
+          end
+
+          def walkable_node?(node_id)
+            node = @registry.nodes[node_id]
+            return false unless node
+
+            !(node.klass <= DfE::Wizard::Core::Redirect)
           end
 
           def next_step_without_callbacks(target_step)

@@ -77,7 +77,7 @@ module DfE
         #
         # @api public
         def valid_path_to?(target_step)
-          return true if target_step == steps_processor.root_step
+          return true if target_step == cached_steps_processor.root_step
 
           path = flow_path(target_step)
           idx = path.index(target_step)

@@ -608,10 +608,11 @@ module DfE
         def unflatten_state(flat_hash)
           steps = {}
           metadata = {}
+          owners = cached_steps_processor.answer_owners
 
           flat_hash.each do |key, value|
             # Find which step owns this attribute
-            step_id = find_step_for_attribute(key)
+            step_id = owners[key.to_sym]
 
             if step_id
               steps[step_id] ||= {}
@@ -662,30 +663,6 @@ module DfE
           flat.merge!(metadata)
 
           flat
-        end
-
-        # Find which step owns an attribute
-        #
-        # Searches through all step definitions to find the step class
-        # that declares the given attribute.
-        #
-        # @param attribute_name [Symbol, String] Attribute name
-        # @return [Symbol, nil] Step ID that owns attribute, or nil if not found
-        #
-        # @example
-        #   find_step_for_attribute(:first_name)  # => :personal_details
-        #   find_step_for_attribute(:email)  # => :contact
-        #   find_step_for_attribute(:user_id)  # => nil (metadata, not a step attribute)
-        #
-        # @api private
-        def find_step_for_attribute(attribute_name)
-          result = steps_processor.step_definitions.find do |_, step_class|
-            next unless step_class.respond_to?(:attribute_names)
-
-            step_class.attribute_names.map(&:to_sym).include?(attribute_name.to_sym)
-          end
-
-          result[0] if result
         end
       end
     end

@@ -176,6 +176,18 @@ module DfE
           @resolver.path_traversal(target_step)
         end
 
+        # Steps from the root to the end of the graph, over the current answers.
+        #
+        # Unlike path_traversal, it does not stop at a target step.
+        #
+        # @return [Array<Symbol>]
+        #
+        # @example
+        #   graph.full_path  # => [:name, :nationality, :review]
+        def full_path
+          @resolver.full_path
+        end
+
         # Find step class by node ID.
         #
         # Returns the step class associated with a node. Used by wizard to

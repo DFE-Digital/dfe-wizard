@@ -20,7 +20,7 @@ module DfE
         # @example
         #   wizard.next_step  # => :email
         def next_step
-          steps_processor.next_step(current_step_name).tap do |next_step_id|
+          cached_steps_processor.next_step(current_step_name).tap do |next_step_id|
             log_next_step_transition(from: current_step_name, to: next_step_id)
           end
         end
@@ -32,7 +32,7 @@ module DfE
         # @example
         #   wizard.previous_step  # => :name
         def previous_step
-          steps_processor.previous_step(current_step_name).tap do |previous_step_id|
+          cached_steps_processor.previous_step(current_step_name).tap do |previous_step_id|
             log_previous_step_transition(current: current_step_name, previous: previous_step_id)
           end
         end
@@ -105,9 +105,32 @@ module DfE
         # @example Non-UK national
         #   wizard.flow_path  # => [:name, :nationality, :right_to_work, :immigration_status, :review]
         def flow_path(target = current_step_name)
-          steps_processor.path_traversal(target).tap do |path|
+          cached_steps_processor.path_traversal(target).tap do |path|
             log_flow_path_resolved(target:, path:)
           end
+        end
+
+        # Steps from the root to the end of the wizard, over the current answers
+        #
+        # Unlike flow_path, it does not stop at the current step. It is
+        # computed on every call.
+        #
+        # Every edge is evaluated, including edges from steps with no answer.
+        # A predicate sees nil for a missing answer, so the walk takes the
+        # branch that nil gives (often the default). Steps off the route
+        # are never visited, so their blank answers do not matter. Call it
+        # once the user has been through a route, for example from check
+        # answers or during an edit. Even then, a changed answer can open
+        # steps that were never answered: the path runs through them on
+        # their nil branch, and follows the real answer on the next call
+        # after they are saved.
+        #
+        # @return [Array<Symbol>]
+        #
+        # @example
+        #   wizard.full_path  # => [:name, :nationality, :right_to_work, :review]
+        def full_path
+          cached_steps_processor.full_path
         end
 
         # Check if step is in current flow

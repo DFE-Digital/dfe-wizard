@@ -1,3 +1,43 @@
+## [Unreleased]
+
+### Added
+
+- **`DfE::Wizard::Error`** is a module included by every error the gem
+  raises on purpose, so `rescue DfE::Wizard::Error` catches them all.
+  **`DfE::Wizard::InvalidGraph`** (an `ArgumentError`) is raised when a
+  graph breaks a sub-wizard rule.
+- **`wizard.full_path`** returns every step from the root to the end of the
+  graph over the current answers, without stopping at the current step. It
+  stops before a Redirect node, an id that is not a node, or a repeated step.
+  Needs `StepsProcessor::Graph`; other processors raise `NotImplementedError`.
+  `flow_path`, `path_traversal` and `dfs_path` are unchanged.
+
+### Changed
+
+- **The graph is drawn once per wizard instance.** The gem now caches the
+  result of `steps_processor` and uses it at every internal call site.
+  `unflatten_state` builds its attribute-to-step map once per call. Check
+  answers on a 14-step wizard went from 303 draws to 1. The public
+  `steps_processor` is unchanged. A draw block that chooses nodes, edges
+  or the root with a Ruby `if` on answers must move that choice into a
+  predicate, `skip_when` or `conditional_root`.
+- `state_store=` is now an explicit writer. It drops the cached graph, the
+  default steps operator and the hydrated steps, and gives a store set
+  after `new` its attribute readers.
+- **The wizard sets `state_store.wizard`** in `new` and in `state_store=`,
+  so state store methods can read context (for example the provider)
+  through the wizard. In 1.0 the attribute existed but was never set.
+- A test that stubs a Symbol predicate or a Symbol callback after the wizard
+  is built no longer sees the stub, because the graph bound the method when
+  it was drawn. Stub before building the wizard, or use a lambda predicate.
+
+### Fixed
+
+- **`Repository::Redis#write` now replaces an existing key.** In 1.0 a second
+  write of the same key kept the old value on read, because the stored JSON
+  held the key twice. This applies with and without a `state_key`, and with
+  encryption.
+
 ## [1.0.0] - 2026-08-20
 
 First stable release. The API is now frozen — subsequent breaking changes will
