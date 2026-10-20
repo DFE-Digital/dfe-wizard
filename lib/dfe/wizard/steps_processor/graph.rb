@@ -1,6 +1,8 @@
 require_relative 'graph/dsl'
 require_relative 'graph/registry'
 require_relative 'graph/navigation_resolver'
+require_relative 'graph/sub_wizard_dsl'
+require_relative 'graph/sub_wizard_checks'
 
 module DfE
   module Wizard
@@ -46,6 +48,7 @@ module DfE
         #
         # @raise [ArgumentError] If no block given
         # @raise [ArgumentError] If root node not set
+        # @raise [DfE::Wizard::InvalidGraph] If a sub-wizard breaks a rule
         #
         # @example
         #   Graph.draw(wizard, predicate_caller: state_store) do |g|
@@ -63,6 +66,8 @@ module DfE
             raise ArgumentError, 'Graph must have a root node set. Call g.root(:some_step)'
           end
 
+          graph.registry.wire_sub_wizard_exits
+          SubWizardChecks.new(graph.registry).run!
           graph
         end
 
@@ -186,6 +191,26 @@ module DfE
         #   graph.full_path  # => [:name, :nationality, :review]
         def full_path
           @resolver.full_path
+        end
+
+        # Sub-wizards declared in this graph.
+        #
+        # @return [Hash{Symbol => Registry::Unit}] by sub-wizard id
+        # @api public
+        def sub_wizards
+          @registry.sub_wizards
+        end
+
+        # The unit that holds a step.
+        #
+        # A step in a sub-wizard belongs to that sub-wizard. Any other node is
+        # its own single-step unit, whose id is the step id.
+        #
+        # @param step_id [Symbol]
+        # @return [Registry::Unit, nil] nil when step_id is not a node
+        # @api public
+        def unit_for(step_id)
+          units_by_step[step_id]
         end
 
         # Find step class by node ID.
@@ -338,6 +363,26 @@ module DfE
             multiple_conditional_edges: @registry.multiple_conditional_edges.size,
             custom_branching_edges: @registry.custom_branching_edges.size,
           }
+        end
+
+        private
+
+        # The unit of every node, built on first use: the graph is drawn
+        # once.
+        def units_by_step
+          @units_by_step ||= @registry.nodes.each_with_object({}) do |(step_id, node), index|
+            index[step_id] = @registry.sub_wizard_for(step_id) || single_step_unit(node)
+          end.freeze
+        end
+
+        def single_step_unit(node)
+          Registry::Unit.new(
+            id: node.id,
+            step_ids: [node.id].freeze,
+            exit_to: nil,
+            uses: [].freeze,
+            source: nil,
+          ).freeze
         end
       end
     end

@@ -24,8 +24,19 @@ module DfE
           # Custom branching edge for arbitrary logic
           CustomBranchingEdge = Struct.new(:from, :conditional, :potential_transitions, keyword_init: true)
 
+          # A unit of steps: a declared sub-wizard, or a single-step unit
+          # built by Graph#unit_for. The steps are nodes of this graph.
+          #
+          # @!attribute id [Symbol] Sub-wizard id, or the step id for a single-step unit
+          # @!attribute step_ids [Array<Symbol>] The unit's steps, in declaration or draw order
+          # @!attribute exit_to [Symbol, nil] Where open exits go
+          # @!attribute uses [Array<Symbol>] State store methods a class form calls
+          # @!attribute source [Object, nil] The class form object, or nil
+          # @api public
+          Unit = Struct.new(:id, :step_ids, :exit_to, :uses, :source, keyword_init: true)
+
           attr_reader :nodes, :edges, :conditional_edges, :multiple_conditional_edges, :custom_branching_edges,
-                      :step_labels
+                      :step_labels, :sub_wizards
           attr_accessor :root_node, :conditional_root_method, :conditional_root_block, :potential_root_nodes
 
           def initialize
@@ -41,6 +52,7 @@ module DfE
             @previous_step_before_callbacks = []
             @step_labels = {}
             @potential_root_nodes = []
+            @sub_wizards = {}
           end
 
           def add_node(node_id, klass, label: nil, skip_when: nil)
@@ -94,6 +106,38 @@ module DfE
 
           def before_previous_callbacks
             @previous_step_before_callbacks
+          end
+
+          def add_sub_wizard(unit)
+            @sub_wizards[unit.id] = unit
+          end
+
+          # The sub-wizard that holds a step
+          #
+          # @param step_id [Symbol]
+          # @return [Unit, nil]
+          def sub_wizard_for(step_id)
+            @sub_wizards.each_value.find { |unit| unit.step_ids.include?(step_id) }
+          end
+
+          # Wire each sub-wizard's open exits to its exit_to node.
+          #
+          # Adds a simple edge to exit_to from every unit step that has no
+          # simple edge. Simple edges are evaluated last, so the new edge is
+          # the fallback when the step's other edges give nil, and the only
+          # edge of a step that has none. A step's own simple edge is kept.
+          #
+          # @return [void]
+          def wire_sub_wizard_exits
+            @sub_wizards.each_value do |unit|
+              next unless unit.exit_to
+
+              unit.step_ids.each do |step_id|
+                next if @edges.any? { |edge| edge.from == step_id }
+
+                add_edge(from: step_id, to: unit.exit_to)
+              end
+            end
           end
 
           private

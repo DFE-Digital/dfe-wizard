@@ -6,6 +6,26 @@
   raises on purpose, so `rescue DfE::Wizard::Error` catches them all.
   **`DfE::Wizard::InvalidGraph`** (an `ArgumentError`) is raised when a
   graph breaks a sub-wizard rule.
+- **Sub-wizards: `graph.add_sub_wizard :id, steps: [...]`** names a group of
+  steps in a Graph wizard. The steps stay ordinary nodes, so every path API
+  is unchanged. `exit_to:` sends the steps' open exits (no edge, no
+  `default:`, a nil branch) to one node. `steps_processor.sub_wizards` and
+  `steps_processor.unit_for(step_id)` return the units. Graph only: other
+  processors return `{}` and nil.
+- **Sub-wizard classes: `graph.add_sub_wizard :id, SubWizardClass`.** The
+  class (`extend DfE::Wizard::SubWizard`) draws its own nodes and edges into
+  the parent graph and lists the state store methods it calls with `uses`.
+  It gets a restricted graph: nodes and edges only, edges only from its own
+  nodes, and every predicate a Symbol listed in `uses`. Both forms give the
+  same unit, so a unit can move between them without other changes.
+- **Draw-time sub-wizard checks.** Each draw raises `InvalidGraph` when a
+  path leaves a sub-wizard and comes back, a sub-wizard exits to more than
+  one node, a step is in two sub-wizards, a sub-wizard id is a node id, or
+  an explicit step is not a node. Graphs with no sub-wizards skip them.
+- **`DfE::Wizard::Test::SubWizardHarness`** runs one sub-wizard class on its
+  own, with a real state store or a stub store built from `uses`. The
+  existing matchers work on `harness.wizard`. A step that calls an app
+  wizard method raises `NoMethodError` there.
 - **`wizard.full_path`** returns every step from the root to the end of the
   graph over the current answers, without stopping at the current step. It
   stops before a Redirect node, an id that is not a node, or a repeated step.
