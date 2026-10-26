@@ -550,7 +550,7 @@ module DfE
         # @see #set_metadata
         # @api public
         def get_metadata(key, default: nil)
-          raw_data.fetch(key, default)
+          raw_data.fetch(key.to_sym, default)
         end
 
         # Get all metadata (non-step data)
