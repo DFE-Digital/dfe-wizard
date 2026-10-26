@@ -232,6 +232,10 @@ module DfE
         #     return [] unless target_index
         #     @steps_array[0..target_index]
         #   end
+        #
+        # @note Processors may also accept `from:` (the step to start from).
+        #   {DfE::Wizard::Behaviours::Navigation#flow_path} passes it only when
+        #   the caller gives one, so processors without it keep working.
         def path_traversal(target_step)
           raise NotImplementedError, 'Subclass must implement #path_traversal'
         end

@@ -104,10 +104,18 @@ module DfE
         #
         # @example Non-UK national
         #   wizard.flow_path  # => [:name, :nationality, :right_to_work, :immigration_status, :review]
-        def flow_path(target = current_step_name)
-          steps_processor.path_traversal(target).tap do |path|
-            log_flow_path_resolved(target:, path:)
-          end
+        #
+        # @example What is ahead of a step, over the current answers
+        #   wizard.flow_path(:review, from: :nationality)
+        #   # => [:nationality, :right_to_work, :immigration_status, :review]
+        #
+        # @param target [Symbol] Last step of the path (defaults to the current step)
+        # @param from [Symbol, nil] Step to start from (defaults to the root).
+        #   It is included in the result. Gives [] when target is unreachable from it.
+        def flow_path(target = current_step_name, from: nil)
+          path = from ? steps_processor.path_traversal(target, from:) : steps_processor.path_traversal(target)
+
+          path.tap { log_flow_path_resolved(target:, path:) }
         end
 
         # The check answers step declared in the graph

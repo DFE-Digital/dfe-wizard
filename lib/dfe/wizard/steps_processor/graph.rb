@@ -153,15 +153,17 @@ module DfE
           @resolver.previous_step(step)
         end
 
-        # Calculate the path from root to a target step.
+        # Calculate the path from root (or from a given step) to a target step.
         #
-        # Uses graph traversal (BFS) to find all steps between root and target,
-        # respecting all edge types and their conditions.
+        # Uses graph traversal (BFS) to find all steps between the start and
+        # target, respecting all edge types and their conditions.
         #
-        # Returns empty array if target is unreachable from root.
+        # Returns empty array if target is unreachable from the start, or the
+        # start is not a node.
         #
         # @param target_step [Symbol, nil] Target step (defaults to wizard's current)
-        # @return [Array<Symbol>] Path from root to target (empty if unreachable)
+        # @param from [Symbol, nil] Step to start from (defaults to the root)
+        # @return [Array<Symbol>] Path from start to target, both included (empty if unreachable)
         #
         # @example Linear path
         #   graph.path_traversal(:step3)  # => [:step1, :step2, :step3]
@@ -172,8 +174,11 @@ module DfE
         #
         # @example Unreachable step
         #   graph.path_traversal(:orphaned)  # => []
-        def path_traversal(target_step = nil)
-          @resolver.path_traversal(target_step)
+        #
+        # @example From a given step
+        #   graph.path_traversal(:review, from: :student)  # => [:student, :review]
+        def path_traversal(target_step = nil, from: nil)
+          @resolver.path_traversal(target_step, from:)
         end
 
         # Find step class by node ID.

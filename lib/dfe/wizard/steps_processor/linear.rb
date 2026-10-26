@@ -100,15 +100,17 @@ module DfE
           @steps_array[current_index - 1]
         end
 
-        # Calculate path from root to target step.
+        # Calculate path from root (or from a given step) to target step.
         #
         # @param target_step [Symbol] Target step ID
-        # @return [Array<Symbol>] Path from root to target (empty if unreachable)
-        def path_traversal(target_step)
+        # @param from [Symbol, nil] Step to start from (defaults to the root)
+        # @return [Array<Symbol>] Path from start to target (empty if unreachable)
+        def path_traversal(target_step, from: nil)
+          start_index = from ? @steps_array.index(from) : 0
           target_index = @steps_array.index(target_step)
-          return [] unless target_index
+          return [] unless start_index && target_index && start_index <= target_index
 
-          @steps_array[0..target_index]
+          @steps_array[start_index..target_index]
         end
 
         # Find step class by ID.
