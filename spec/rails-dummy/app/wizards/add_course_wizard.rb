@@ -31,7 +31,7 @@ class AddCourseWizard
 
       # Final steps
       graph.add_node(:start_date, Steps::Courses::StartDate)
-      graph.add_node(:review, Steps::Courses::Review)
+      graph.check_answers(:review, Steps::Courses::Review)
       graph.add_node(:courses_list, DfE::Wizard::Redirect)
 
       # Root entry point

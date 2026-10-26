@@ -1,7 +1,7 @@
 # Wizard Documentation
 
 **Structure Type:** `graph`
-**Generated:** 2025-12-22T07:03:20Z
+**Generated:** 2026-10-26T17:34:15Z
 **Processor:** DfE::Wizard::StepsProcessor
 
 
@@ -22,6 +22,15 @@
 **Entry Point:** `level`
 
 All users start at this step. No conditional logic applies.
+
+
+## Check Answers
+
+**Check Answers Step:** `review`
+
+Users review their answers here and follow Change links. After a change,
+the review navigation shows only the steps ahead that need an answer
+(blank or not valid), then returns here.
 
 
 ## Wizard Flow
@@ -109,12 +118,10 @@ this step's purpose, user interactions, and business logic.
 | Attribute | Type | Required | Description |
 |-----------|------|:--------:|-------------|
 | `level` | `ActiveModel::Type::String` | ✗ |  |
-| `send` | `ActiveModel::Type::String` | ✗ |  |
 
 #### Validations
 
 - **level** (`presence`): 
-- **send** (`presence`): 
 
 #### Operations
 
@@ -141,7 +148,6 @@ this step's purpose, user interactions, and business logic.
 | Attribute | Type | Required | Description |
 |-----------|------|:--------:|-------------|
 | `main_subject` | `ActiveModel::Type::String` | ✗ |  |
-| `second_subject` | `ActiveModel::Type::String` | ✗ |  |
 
 #### Validations
 
@@ -783,6 +789,7 @@ N-way transitions route to different steps based on multiple independent conditi
 {
   :structure_type: "graph",
   :root_step: "level",
+  :check_answers_step: "review",
   :steps: {
     :level: {
       :class: "Steps::Courses::Level",
@@ -791,21 +798,11 @@ N-way transitions route to different steps based on multiple independent conditi
         {
           :name: "level",
           :type: "ActiveModel::Type::String"
-        },
-        {
-          :name: "send",
-          :type: "ActiveModel::Type::String"
         }
       ],
       :validators: [
         {
           :name: "level",
-          :class: "ActiveModel::Validations::PresenceValidator",
-          :type: "presence",
-          :message: null
-        },
-        {
-          :name: "send",
           :class: "ActiveModel::Validations::PresenceValidator",
           :type: "presence",
           :message: null
@@ -828,10 +825,6 @@ N-way transitions route to different steps based on multiple independent conditi
       :attributes: [
         {
           :name: "main_subject",
-          :type: "ActiveModel::Type::String"
-        },
-        {
-          :name: "second_subject",
           :type: "ActiveModel::Type::String"
         }
       ],

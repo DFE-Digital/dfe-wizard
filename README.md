@@ -759,6 +759,14 @@ wizard.in_flow?(:review)
 # => true (review is reachable based on answers)
 ```
 
+`flow_path` can also start from a given step, to see what is ahead of it over
+the current answers. The step is included; an unreachable target gives `[]`:
+
+```ruby
+wizard.flow_path(:review, from: :nationality)
+# => [:nationality, :right_to_work, :immigration_status, :review]
+```
+
 ### Understanding the Three Paths
 
 | Path | Question it answers |
@@ -1006,34 +1014,134 @@ Each row provides:
 
 ### Return to Review Flow
 
-When users click "Change", they go to the step with `?return_to_review=step_id`. After saving, they return to the review page.
+When users click "Change", they go to the step with `?return_to_review=step_id`.
+After saving, they should see only the questions the change affects, then go
+straight back to the review page. Back links should retrace the same pages.
 
-Implement this with callbacks:
+Declare the review page with `graph.check_answers`, and use the review
+navigation in the graph callbacks:
 
 ```ruby
 def steps_processor
   DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
     # ... steps ...
+    graph.check_answers :review, Steps::Review
 
-    graph.before_next_step(:handle_return_to_review)
-    graph.before_previous_step(:handle_back_to_review)
+    graph.before_next_step { next_step_in_review if return_to_review }
+    graph.before_previous_step { previous_step_in_review(return_to_review) }
   end
 end
 
-def handle_return_to_review
-  return unless @current_step_params[:return_to_review].present?
-  return unless valid_path_to?(:review)
-
-  :review
-end
-
-def handle_back_to_review
-  return unless @current_step_params[:return_to_review].to_s == current_step_name.to_s
-  return unless valid_path_to?(:review)
-
-  :review
+def return_to_review
+  @current_step_params[:return_to_review]
 end
 ```
+
+`graph.check_answers :id, StepClass` adds an ordinary node (edges, paths and
+documentation treat it like any other) and marks it, so `wizard.check_answers_step`
+returns it and the generated docs highlight it. A graph has at most one.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `next_step_in_review(finish:, only:)` | Symbol | The first step ahead, on the path to check answers, that is blank or not valid; otherwise `finish` (the check answers step) |
+| `previous_step_in_review(origin, finish:)` | Symbol or nil | The previous step shown in this change; `finish` on the origin step; nil when there is no origin, so the callback falls through |
+| `track_review_step` | – | Records the current step as shown, for back links |
+| `review_shown` | Array | Steps recorded since the last `clear_review` |
+| `clear_review` | – | Forgets the shown steps |
+| `clear_off_path_answers` | Array | Clears the answers of steps no longer on the path; returns their ids |
+
+In the controller, record each step saved during a change, clear answers left
+behind by the change, and don't carry `return_to_review` onto the review page:
+
+```ruby
+def update
+  if @wizard.save_current_step
+    if params[:return_to_review].present?
+      @wizard.track_review_step
+      @wizard.clear_off_path_answers
+    end
+
+    next_step = @wizard.next_step
+    options = next_step == @wizard.check_answers_step ? {} : { return_to_review: params[:return_to_review].presence }
+    redirect_to @wizard.resolve_step_path(next_step, options.compact)
+  else
+    render :show
+  end
+end
+
+# On the review page
+def show
+  @wizard.clear_review if @wizard.current_step_name == @wizard.check_answers_step
+end
+```
+
+With funding changed from fee to salary, the user sees the funding question,
+then the skilled worker visa question (new on the path), then check answers.
+Steps that are still valid are skipped.
+
+**Validate against the current branch.** "Needs an answer" means blank or not
+valid. A step whose valid options depend on an earlier answer (for example age
+ranges that depend on the level) must validate against the current options,
+or a change to the earlier answer will skip it.
+
+`handle_return_to_check_your_answers` and `handle_back_in_check_your_answers`
+still work as before. `handle_return_to_check_your_answers` now defaults to the
+declared check answers step.
+
+### Clearing Answers That Left the Path
+
+Answers of steps that a change takes off the path stay in the store. They can
+be read by mistake (a summary, a submission), and they are silently reused if
+the step comes back, so the user is never asked again.
+
+`clear_off_path_answers` sets them to nil. A step is off the path when it is not
+on the path to check answers, over the current answers, and not reachable from
+the check answers step, so answers after the review page (a declaration) stay.
+
+```ruby
+wizard.clear_off_path_answers
+# => [:student_visa, :deadline_required, :deadline_at]
+```
+
+A blank answer can hide the steps after it, so their answers are cleared too
+until it is answered. That is usually what a change needs: after fee becomes
+salary, the deadline questions come back blank once the visa question is
+answered. Nothing is cleared when the path does not reach check answers.
+
+### Editing a Saved Record
+
+An edit of a saved record is a change with a different start and end. Seed the
+wizard from the record, open the step behind the Change link, use the same
+review navigation, and save the record yourself when the edit finishes. The gem
+does not save records: transactions, locking and messages stay in the app.
+
+```ruby
+class CourseEditsController < ApplicationController
+  def new
+    wizard = build_wizard(state_key: SecureRandom.uuid)
+    wizard.state_store.write(CourseMapper.new.to_answers(course))
+    redirect_to wizard.resolve_step_path(params[:step].to_sym, return_to_review: params[:step])
+  end
+
+  def update
+    return render(:show) unless @wizard.save_current_step
+
+    @wizard.track_review_step
+    @wizard.clear_off_path_answers
+    next_step = @wizard.next_step_in_review(finish: :course_page, only: EDITABLE_STEPS)
+    return redirect_to(@wizard.resolve_step_path(next_step, return_to_review: params[:return_to_review])) unless next_step == :course_page
+
+    Course.transaction { UpdateCourse.call(course, @wizard.state_store.read) }
+    @wizard.clear_state
+    redirect_to course_path(course)
+  end
+end
+```
+
+- `finish:` ends the edit somewhere other than check answers: a confirm page,
+  or a Redirect node back to the record.
+- `only:` limits the steps the edit can show, when the mapper seeds just some
+  of the answers. Seeding the whole record lets you drop it.
 
 ---
 
@@ -1304,6 +1412,10 @@ Run with:
 ```bash
 rake wizard:docs:generate
 ```
+
+A wizard that declares `graph.check_answers` gets a "Check Answers" section in
+the Markdown, and its check answers node is highlighted in the Mermaid and
+GraphViz diagrams.
 
 ---
 

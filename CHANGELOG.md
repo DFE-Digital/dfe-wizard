@@ -1,3 +1,36 @@
+## [Unreleased]
+
+### Added
+
+- **`graph.check_answers :id, StepClass`** declares the check answers page. It
+  adds an ordinary node and marks it, so `wizard.check_answers_step` returns it,
+  the graph metadata names it, and the generated Markdown, Mermaid and Graphviz
+  docs highlight it. A second declaration, or an id that is already a node,
+  raises.
+- **`flow_path(target, from: step)`** walks the graph from a given step instead
+  of the root, over the current answers. Graph and Linear processors support
+  it; custom processors without `from:` keep working.
+- **Review navigation** in `CheckYourAnswers`, for changes from check answers
+  and edits of saved records:
+  - `next_step_in_review(finish:, only:)` goes to the first step ahead that is
+    blank or not valid, skipping valid steps, and otherwise to check answers
+    (or `finish:`). It only reads state.
+  - `previous_step_in_review(origin, finish:)` retraces the steps shown in the
+    change, recorded with `track_review_step` until `clear_review`.
+- **`clear_off_path_answers`** sets to nil the answers of steps that a change
+  took off the path, so they are not read by mistake and are asked again if
+  the step comes back.
+
+### Changed
+
+- `handle_return_to_check_your_answers` defaults its target to the declared
+  check answers step.
+
+### Fixed
+
+- `get_metadata` accepts a String key, as documented. It returned the default
+  since state keys are normalised to symbols.
+
 ## [1.0.0] - 2026-08-20
 
 First stable release. The API is now frozen — subsequent breaking changes will
