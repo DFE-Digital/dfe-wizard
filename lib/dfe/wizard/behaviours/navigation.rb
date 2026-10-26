@@ -110,6 +110,19 @@ module DfE
           end
         end
 
+        # The check answers step declared in the graph
+        #
+        # @return [Symbol, nil] Step ID, or nil if the graph declares none
+        #
+        # @example
+        #   # graph.check_answers :check_answers, Steps::CheckAnswers
+        #   wizard.check_answers_step  # => :check_answers
+        #
+        # @api public
+        def check_answers_step
+          steps_processor.check_answers_step
+        end
+
         # Check if step is in current flow
         #
         # @param step_id [Symbol] Step to check

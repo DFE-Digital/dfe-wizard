@@ -31,6 +31,33 @@ module DfE
             @registry.add_node(node_id, klass, label:, skip_when:)
           end
 
+          # Add the check answers node: the page where users review their
+          # answers and follow Change links.
+          #
+          # Adds an ordinary node, so edges, flow_path and documentation treat
+          # it like any other, and marks it so the review helpers in
+          # {DfE::Wizard::Behaviours::CheckYourAnswers} default to it.
+          #
+          # @param node_id [Symbol] Unique node identifier
+          # @param klass [Class] Step class to instantiate
+          # @param label [String, nil] Display label for documentation
+          #
+          # @raise [ArgumentError] If a check answers node is already declared,
+          #   or node_id is already a node
+          #
+          # @example
+          #   g.check_answers :check_answers, Steps::CheckAnswers
+          #   g.add_edge from: :start_date, to: :check_answers
+          def check_answers(node_id, klass, label: nil)
+            if @registry.check_answers_node
+              raise ArgumentError, "check_answers is already declared as :#{@registry.check_answers_node}"
+            end
+            raise ArgumentError, ":#{node_id} is already a node" if @registry.nodes.key?(node_id)
+
+            add_node(node_id, klass, label:)
+            @registry.check_answers_node = node_id
+          end
+
           # Set static root node.
           #
           # @param node_id [Symbol]

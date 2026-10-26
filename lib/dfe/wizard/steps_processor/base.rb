@@ -301,6 +301,20 @@ module DfE
           raise NotImplementedError, 'Subclass must implement #step_definitions'
         end
 
+        # Return the check answers step, if the processor declares one.
+        #
+        # Processors without a check answers declaration return nil.
+        #
+        # @return [Symbol, nil] Step ID, or nil
+        #
+        # @example Graph processor
+        #   def check_answers_step
+        #     @registry.check_answers_node
+        #   end
+        def check_answers_step
+          nil
+        end
+
         # Generate and return comprehensive metadata for insight.
         #
         # This can be used for creating documentation in multiple formats:

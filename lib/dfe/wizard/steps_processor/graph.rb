@@ -213,6 +213,19 @@ module DfE
           @registry.nodes.transform_values(&:klass)
         end
 
+        # The check answers node, declared with `g.check_answers`.
+        #
+        # @return [Symbol, nil] Node ID, or nil if the graph declares none
+        #
+        # @example
+        #   Graph.draw(wizard, predicate_caller: state_store) do |g|
+        #     g.check_answers :check_answers, CheckAnswersStep
+        #   end
+        #   graph.check_answers_step  # => :check_answers
+        def check_answers_step
+          @registry.check_answers_node
+        end
+
         # Generate comprehensive metadata for documentation and visualization.
         #
         # Produces rich hash suitable for:
@@ -224,6 +237,7 @@ module DfE
         # @return [Hash] Metadata structure with:
         #   - structure_type: :graph
         #   - root_step: Symbol
+        #   - check_answers_step: Symbol (only when the graph declares one)
         #   - steps: { id => { class:, label: } }
         #   - edges: [ { from:, to:, type:, label: } ]
         #   - branch_metadata: { from => { branches: [...], default: } }
@@ -255,10 +269,11 @@ module DfE
           {
             structure_type: :graph,
             root_step: build_root_step,
+            check_answers_step: check_answers_step,
             steps: build_steps_metadata,
             transitions: build_all_transitions_metadata,
             counts: build_counts_metadata,
-          }
+          }.compact
         end
 
         def build_root_step
