@@ -197,6 +197,52 @@ module DfE
           all_steps.except(*flow_path)
         end
 
+        # Clear the answers of steps that are no longer on the path
+        #
+        # A change can take steps off the path: changing funding from fee to
+        # salary leaves the student visa answer behind. Left in the store, such
+        # an answer can be read by mistake, and is silently reused if the step
+        # comes back. Clearing it means the step starts blank when it returns,
+        # so the user answers it again.
+        #
+        # Off the path means: not on the path from the root to the check
+        # answers step, over the current answers, and not reachable from the
+        # check answers step (so answers after it, like a declaration, stay).
+        # A blank answer can hide the steps after it, so their answers are
+        # cleared too until it is answered.
+        #
+        # Answers are set to nil, which every repository supports. When the
+        # path does not reach check answers, nothing is cleared.
+        #
+        # Call it after a step saves during a change, and before the final
+        # submission.
+        #
+        # @return [Array<Symbol>] IDs of the steps whose answers were cleared
+        # @raise [ArgumentError] If the graph declares no check answers step
+        #
+        # @example Funding changed from fee to salary
+        #   wizard.clear_off_path_answers
+        #   # => [:student_visa, :deadline_required, :deadline_at]
+        #
+        # @see #orphaned_steps_data For the answers off the path to the current step
+        # @api public
+        def clear_off_path_answers
+          review_step = check_answers_step
+          raise ArgumentError, 'Declare the check answers step with graph.check_answers' unless review_step
+
+          on_path = flow_path(review_step)
+          return [] if on_path.empty?
+
+          answered = (raw_data[:steps] || {}).select { |_step_id, data| data.values.any? { |value| !value.nil? } }
+          off_path = answered.keys.map(&:to_sym) - on_path
+          off_path.reject! { |step_id| flow_path(step_id, from: review_step).any? }
+          return [] if off_path.empty?
+
+          cleared = off_path.flat_map { |step_id| find_step(step_id).attribute_names.map(&:to_sym) }
+          state_store.write(cleared.index_with(nil))
+          off_path
+        end
+
         # Save current step using configured operations pipeline
         #
         # Gets the configured operations for the current step from `steps_operator`,
