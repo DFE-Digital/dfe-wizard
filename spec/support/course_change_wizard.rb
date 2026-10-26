@@ -11,6 +11,8 @@
 #            └──────────────── student_visa ─(yes)───────┘   ├─(yes)─ deadline_at ─ start_date
 #                                                            └──────────────────── start_date
 #   start_date ─ check_answers ─ declaration ─ courses (redirect)
+#
+# During a change (a return_to_review param) it uses the review navigation.
 module CourseChange
   class StateStore
     include DfE::Wizard::StateStore
@@ -125,7 +127,15 @@ module CourseChange
         graph.add_edge from: :start_date, to: :check_answers
         graph.add_edge from: :check_answers, to: :declaration
         graph.add_edge from: :declaration, to: :courses
+
+        graph.before_next_step { next_step_in_review if return_to_review }
+        graph.before_previous_step { previous_step_in_review(return_to_review) }
       end
+    end
+
+    # The step whose Change link the user followed on check answers
+    def return_to_review
+      @current_step_params[:return_to_review]
     end
 
     # Answers for a complete secondary history course: QTS, fee-paying,
