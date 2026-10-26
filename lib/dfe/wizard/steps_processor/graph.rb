@@ -278,7 +278,7 @@ module DfE
             steps: build_steps_metadata,
             transitions: build_all_transitions_metadata,
             counts: build_counts_metadata,
-          }.compact
+          }.tap { |metadata| metadata.delete(:check_answers_step) unless check_answers_step }
         end
 
         def build_root_step

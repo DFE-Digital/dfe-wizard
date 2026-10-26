@@ -47,41 +47,69 @@ module CourseChange
   end
 
   module Steps
-    def self.choice(name, attribute, options)
-      Class.new do
-        include DfE::Wizard::Step
+    # A question: its permitted params are its attributes
+    class Question
+      include DfE::Wizard::Step
 
-        attribute attribute, :string
-        validates attribute, inclusion: { in: options }
-
-        define_singleton_method(:permitted_params) { [attribute] }
-        define_singleton_method(:name) { "CourseChange::Steps::#{name}" }
+      def self.permitted_params
+        attribute_names.map(&:to_sym)
       end
     end
 
-    def self.yes_no(name, attribute)
-      Class.new do
-        include DfE::Wizard::Step
-
-        attribute attribute, :boolean
-        validates attribute, inclusion: { in: [true, false] }
-
-        define_singleton_method(:permitted_params) { [attribute] }
-        define_singleton_method(:name) { "CourseChange::Steps::#{name}" }
-      end
+    Level = Class.new(Question) do
+      attribute :level, :string
+      validates :level, inclusion: { in: %w[secondary further_education] }
     end
 
-    Level = choice('Level', :level, %w[secondary further_education])
-    Subject = choice('Subject', :subject, %w[physics history])
-    PhysicsSpecialism = choice('PhysicsSpecialism', :physics_specialism, %w[engineers none])
-    Qualification = choice('Qualification', :qualification, %w[qts tda])
-    FundingType = choice('FundingType', :funding_type, %w[fee salary])
-    StudentVisa = yes_no('StudentVisa', :can_sponsor_student_visa)
-    SkilledWorkerVisa = yes_no('SkilledWorkerVisa', :can_sponsor_skilled_worker_visa)
-    DeadlineRequired = yes_no('DeadlineRequired', :visa_deadline_required)
-    DeadlineAt = choice('DeadlineAt', :visa_deadline_at, %w[2026-09-01 2026-10-01])
-    StartDate = choice('StartDate', :start_date, %w[2026-09 2027-01])
-    Declaration = yes_no('Declaration', :declared)
+    Subject = Class.new(Question) do
+      attribute :subject, :string
+      validates :subject, inclusion: { in: %w[physics history] }
+    end
+
+    PhysicsSpecialism = Class.new(Question) do
+      attribute :physics_specialism, :string
+      validates :physics_specialism, inclusion: { in: %w[engineers none] }
+    end
+
+    Qualification = Class.new(Question) do
+      attribute :qualification, :string
+      validates :qualification, inclusion: { in: %w[qts tda] }
+    end
+
+    FundingType = Class.new(Question) do
+      attribute :funding_type, :string
+      validates :funding_type, inclusion: { in: %w[fee salary] }
+    end
+
+    StudentVisa = Class.new(Question) do
+      attribute :can_sponsor_student_visa, :boolean
+      validates :can_sponsor_student_visa, inclusion: { in: [true, false] }
+    end
+
+    SkilledWorkerVisa = Class.new(Question) do
+      attribute :can_sponsor_skilled_worker_visa, :boolean
+      validates :can_sponsor_skilled_worker_visa, inclusion: { in: [true, false] }
+    end
+
+    DeadlineRequired = Class.new(Question) do
+      attribute :visa_deadline_required, :boolean
+      validates :visa_deadline_required, inclusion: { in: [true, false] }
+    end
+
+    DeadlineAt = Class.new(Question) do
+      attribute :visa_deadline_at, :string
+      validates :visa_deadline_at, inclusion: { in: %w[2026-09-01 2026-10-01] }
+    end
+
+    StartDate = Class.new(Question) do
+      attribute :start_date, :string
+      validates :start_date, inclusion: { in: %w[2026-09 2027-01] }
+    end
+
+    Declaration = Class.new(Question) do
+      attribute :declared, :boolean
+      validates :declared, inclusion: { in: [true, false] }
+    end
 
     class CheckAnswers
       include DfE::Wizard::Step
@@ -151,6 +179,23 @@ module CourseChange
         visa_deadline_at: '2026-09-01',
         start_date: '2026-09',
       }
+    end
+  end
+
+  # A graph whose path stops before check answers when the level is not
+  # further education: the edge from level has no matching branch
+  class DeadEndWizard
+    include DfE::Wizard
+
+    def steps_processor
+      DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+        graph.add_node :level, Steps::Level
+        graph.add_node :subject, Steps::Subject
+        graph.check_answers :check_answers, Steps::CheckAnswers
+        graph.root :level
+        graph.add_multiple_conditional_edges from: :level, branches: [{ when: :further_education?, then: :subject }]
+        graph.add_edge from: :subject, to: :check_answers
+      end
     end
   end
 end

@@ -235,7 +235,8 @@ module DfE
         #
         # @note Processors may also accept `from:` (the step to start from).
         #   {DfE::Wizard::Behaviours::Navigation#flow_path} passes it only when
-        #   the caller gives one, so processors without it keep working.
+        #   the caller gives one, so processors without it keep working. The
+        #   review navigation and `clear_off_path_answers` need it.
         def path_traversal(target_step)
           raise NotImplementedError, 'Subclass must implement #path_traversal'
         end

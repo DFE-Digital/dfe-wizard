@@ -1043,7 +1043,7 @@ returns it and the generated docs highlight it. A graph has at most one.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `next_step_in_review(finish:, only:)` | Symbol | The first step ahead, on the path to check answers, that is blank or not valid; otherwise `finish` (the check answers step) |
+| `next_step_in_review(finish:, only:)` | Symbol or nil | The first step ahead, on the path to check answers, that is not valid (a required question left blank is not valid); otherwise `finish` (the check answers step). nil on or after check answers, or when the path ahead does not reach it, so the callback falls through |
 | `previous_step_in_review(origin, finish:)` | Symbol or nil | The previous step shown in this change; `finish` on the origin step; nil when there is no origin, so the callback falls through |
 | `track_review_step` | – | Records the current step as shown, for back links |
 | `review_shown` | Array | Steps recorded since the last `clear_review` |
@@ -1079,10 +1079,18 @@ With funding changed from fee to salary, the user sees the funding question,
 then the skilled worker visa question (new on the path), then check answers.
 Steps that are still valid are skipped.
 
-**Validate against the current branch.** "Needs an answer" means blank or not
-valid. A step whose valid options depend on an earlier answer (for example age
-ranges that depend on the level) must validate against the current options,
-or a change to the earlier answer will skip it.
+**Validate against the current branch.** "Needs an answer" means not valid. A
+required question left blank is not valid, so a required question that a change
+brings onto the path is shown. Steps with nothing required (an optional
+question, an information page) are valid, so they are skipped. A step whose
+valid options depend on an earlier answer (for example age ranges that depend on
+the level) must validate against the current options, or a change to the
+earlier answer will skip it.
+
+**Repositories.** The shown steps are kept in the wizard metadata
+(`set_metadata`). `Repository::Model` stores model columns only, so use another
+repository (or `WizardState`) for review navigation. `return_to_review` above
+reads Rails params; with a plain Hash, use a Symbol key.
 
 `handle_return_to_check_your_answers` and `handle_back_in_check_your_answers`
 still work as before. `handle_return_to_check_your_answers` now defaults to the
@@ -1139,7 +1147,13 @@ end
 ```
 
 - `finish:` ends the edit somewhere other than check answers: a confirm page,
-  or a Redirect node back to the record.
+  or a Redirect node back to the record. Pass the same `finish:` for the Back
+  link, so Back from the first step goes to the record:
+
+  ```erb
+  <%= govuk_back_link href: @wizard.resolve_step_path(
+        @wizard.previous_step_in_review(params[:return_to_review], finish: :course_page)) %>
+  ```
 - `only:` limits the steps the edit can show, when the mapper seeds just some
   of the answers. Seeding the whole record lets you drop it.
 

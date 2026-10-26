@@ -211,8 +211,13 @@ module DfE
         # A blank answer can hide the steps after it, so their answers are
         # cleared too until it is answered.
         #
-        # Answers are set to nil, which every repository supports. When the
-        # path does not reach check answers, nothing is cleared.
+        # Kept as well: the answers of steps with `skip_when` (the app may fill
+        # them in while the step is skipped), and any attribute that a kept
+        # step also declares.
+        #
+        # Answers are set to nil, which every repository supports (with
+        # `Repository::Model`, the columns are set to NULL). When the path does
+        # not reach check answers, nothing is cleared.
         #
         # Call it after a step saves during a change, and before the final
         # submission.
@@ -233,14 +238,17 @@ module DfE
           on_path = flow_path(review_step)
           return [] if on_path.empty?
 
+          kept = on_path | steps_after(review_step) | skippable_steps
           answered = (raw_data[:steps] || {}).select { |_step_id, data| data.values.any? { |value| !value.nil? } }
-          off_path = answered.keys.map(&:to_sym) - on_path
-          off_path.reject! { |step_id| flow_path(step_id, from: review_step).any? }
-          return [] if off_path.empty?
+          kept_attributes = kept.flat_map { |step_id| step_attribute_names(step_id) }
 
-          cleared = off_path.flat_map { |step_id| find_step(step_id).attribute_names.map(&:to_sym) }
-          state_store.write(cleared.index_with(nil))
-          off_path
+          cleared = (answered.keys.map(&:to_sym) - kept)
+                    .index_with { |step_id| step_attribute_names(step_id) - kept_attributes }
+                    .reject { |_step_id, attributes| attributes.empty? }
+          return [] if cleared.empty?
+
+          state_store.write(cleared.values.flatten.index_with(nil))
+          cleared.keys
         end
 
         # Save current step using configured operations pipeline
@@ -708,6 +716,21 @@ module DfE
           flat.merge!(metadata)
 
           flat
+        end
+
+        # Steps reachable from a step, over the current answers
+        def steps_after(step_id)
+          (step_definitions.keys.map(&:to_sym) - [step_id]).select { |other| flow_path(other, from: step_id).any? }
+        end
+
+        # Steps declared with skip_when
+        def skippable_steps
+          steps_processor.metadata.fetch(:steps, {}).select { |_step_id, data| data[:skippable?] }.keys
+        end
+
+        def step_attribute_names(step_id)
+          step_class = find_step(step_id)
+          step_class.respond_to?(:attribute_names) ? step_class.attribute_names.map(&:to_sym) : []
         end
 
         # Find which step owns an attribute

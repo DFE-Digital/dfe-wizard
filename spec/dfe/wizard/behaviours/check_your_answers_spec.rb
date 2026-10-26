@@ -56,6 +56,25 @@ RSpec.describe DfE::Wizard::Behaviours::CheckYourAnswers do
       expect(submit_change(:start_date, { start_date: '2026-09' })).to eq(:check_answers)
     end
 
+    it 'falls through to the graph on check answers' do
+      wizard = wizard_at(:check_answers, origin: :funding_type)
+
+      expect(wizard.next_step_in_review).to be_nil
+      expect(wizard.next_step).to eq(:declaration)
+    end
+
+    it 'falls through to the graph after check answers' do
+      expect(wizard_at(:declaration, origin: :funding_type).next_step_in_review).to be_nil
+    end
+
+    it 'falls through to the graph when the path ahead does not reach check answers' do
+      wizard = CourseChange::DeadEndWizard.new(
+        state_store:, current_step: :level, current_step_params: { return_to_review: :level },
+      )
+
+      expect(wizard.next_step_in_review).to be_nil
+    end
+
     it 'finishes on the given step' do
       wizard = wizard_at(:start_date, { start_date: '2027-01' }, origin: :start_date)
       wizard.save_current_step
@@ -124,6 +143,10 @@ RSpec.describe DfE::Wizard::Behaviours::CheckYourAnswers do
 
     it 'goes back to check answers when the step is not on the path from the origin' do
       expect(wizard_at(:skilled_worker_visa, origin: :funding_type).previous_step).to eq(:check_answers)
+    end
+
+    it 'goes to the given step from the origin step' do
+      expect(wizard_at(:funding_type).previous_step_in_review(:funding_type, finish: :courses)).to eq(:courses)
     end
 
     it 'falls through to the graph outside a change' do

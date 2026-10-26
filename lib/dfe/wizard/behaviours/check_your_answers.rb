@@ -116,14 +116,21 @@ module DfE
         # Next step after a change from check answers
         #
         # Looks at the steps ahead of the current one on the path to check
-        # answers, over the current answers, and returns the first that needs
-        # an answer: blank, or not valid. When none does, returns `finish`.
+        # answers, over the current answers, and returns the first that is not
+        # valid. A required question left blank is not valid. When none is,
+        # returns `finish`.
         #
-        # Steps that are still valid are skipped, so a change only shows the
-        # questions it affects: a step that is new on the path, or whose answer
-        # the change made invalid. A step whose valid options depend on an
-        # earlier answer must validate against the current branch for this to
-        # work.
+        # Valid steps are skipped, so a change only shows the questions it
+        # affects: a required question that is new on the path, or whose
+        # answer the change made invalid. Steps with nothing required (an
+        # optional question, an information page) are valid, so they are
+        # skipped. A step whose valid options depend on an earlier answer must
+        # validate against the current branch for this to work.
+        #
+        # Returns nil, so a `before_next_step` callback falls through to the
+        # graph, when the current step is the check answers step, is after it,
+        # or the path from it does not reach check answers (an edge with no
+        # matching branch).
         #
         # It only reads state, so it is safe in a `before_next_step` callback.
         #
@@ -132,7 +139,7 @@ module DfE
         #   finish on a confirm step or a Redirect node instead.
         # @param only [Array<Symbol>, nil] When given, only these steps can be
         #   shown. Useful for an edit that seeds just some of the answers.
-        # @return [Symbol] Step to go to next
+        # @return [Symbol, nil] Step to go to next, or nil to fall through
         # @raise [ArgumentError] If the graph declares no check answers step
         #
         # @example In the graph
@@ -149,7 +156,12 @@ module DfE
         # @api public
         def next_step_in_review(finish: check_answers_step, only: nil)
           review_step = required_check_answers_step
-          ahead = flow_path(review_step, from: current_step_name).drop(1) - [review_step]
+          return if current_step_name == review_step
+
+          path = flow_path(review_step, from: current_step_name)
+          return if path.empty?
+
+          ahead = path[1...-1]
           ahead &= only.map(&:to_sym) if only
 
           ahead.find { |step_id| !valid?(step_id) } || finish
@@ -194,7 +206,9 @@ module DfE
         #
         # Call it after the step saves, while a change is in progress. Back
         # links ({#previous_step_in_review}) retrace the recorded steps.
-        # Kept in the wizard metadata under `:review_shown`.
+        # Kept in the wizard metadata under `:review_shown`, so it needs a
+        # repository that stores metadata: `Repository::Model` stores model
+        # columns only.
         #
         # @return [void]
         #

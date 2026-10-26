@@ -74,7 +74,14 @@ RSpec.describe 'clear_off_path_answers' do
     end
   end
 
-  context 'when the path does not reach check answers' do
+  it 'clears nothing when the path does not reach check answers' do
+    wizard = CourseChange::DeadEndWizard.new(state_store:, current_step: :level)
+
+    expect(wizard.clear_off_path_answers).to eq([])
+    expect(repository.read).to include(subject: 'history')
+  end
+
+  context 'with a step skipped by skip_when' do
     let(:wizard_class) do
       Class.new do
         include DfE::Wizard
@@ -82,21 +89,48 @@ RSpec.describe 'clear_off_path_answers' do
         def steps_processor
           DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
             graph.add_node :level, CourseChange::Steps::Level
-            graph.add_node :subject, CourseChange::Steps::Subject
+            graph.add_node :subject, CourseChange::Steps::Subject, skip_when: -> { true }
             graph.check_answers :check_answers, CourseChange::Steps::CheckAnswers
             graph.root :level
-            graph.add_multiple_conditional_edges from: :level, branches: [{ when: :further_education?, then: :subject }]
+            graph.add_edge from: :level, to: :subject
             graph.add_edge from: :subject, to: :check_answers
           end
         end
       end
     end
 
-    it 'clears nothing' do
-      wizard = wizard_class.new(state_store:, current_step: :level)
-
-      expect(wizard.clear_off_path_answers).to eq([])
+    it 'keeps the answer the app filled in for it' do
+      expect(wizard_class.new(state_store:).clear_off_path_answers).to eq([])
       expect(repository.read).to include(subject: 'history')
+    end
+  end
+
+  context 'with an attribute shared by a step on the path and one off it' do
+    let(:wizard_class) do
+      Class.new do
+        include DfE::Wizard
+
+        def steps_processor
+          DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+            graph.add_node :funding_type, CourseChange::Steps::FundingType
+            graph.add_node :fee_start_date, CourseChange::Steps::StartDate
+            graph.add_node :salary_start_date, CourseChange::Steps::StartDate
+            graph.check_answers :check_answers, CourseChange::Steps::CheckAnswers
+            graph.root :funding_type
+            graph.add_conditional_edge from: :funding_type, when: :salary?, then: :salary_start_date,
+                                       else: :fee_start_date
+            graph.add_edge from: :fee_start_date, to: :check_answers
+            graph.add_edge from: :salary_start_date, to: :check_answers
+          end
+        end
+      end
+    end
+
+    it 'keeps the answer the step on the path owns' do
+      state_store.write(funding_type: 'salary')
+
+      expect(wizard_class.new(state_store:).clear_off_path_answers).to eq([])
+      expect(repository.read).to include(start_date: '2026-09')
     end
   end
 

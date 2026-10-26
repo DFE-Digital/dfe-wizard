@@ -13,13 +13,16 @@
 - **Review navigation** in `CheckYourAnswers`, for changes from check answers
   and edits of saved records:
   - `next_step_in_review(finish:, only:)` goes to the first step ahead that is
-    blank or not valid, skipping valid steps, and otherwise to check answers
-    (or `finish:`). It only reads state.
+    not valid (a required question left blank is not valid), skipping valid
+    steps, and otherwise to check answers (or `finish:`). It only reads state,
+    and returns nil (falling through) on or after check answers or when the
+    path ahead does not reach it.
   - `previous_step_in_review(origin, finish:)` retraces the steps shown in the
     change, recorded with `track_review_step` until `clear_review`.
 - **`clear_off_path_answers`** sets to nil the answers of steps that a change
   took off the path, so they are not read by mistake and are asked again if
-  the step comes back.
+  the step comes back. Answers of `skip_when` steps, and attributes that a kept
+  step also declares, are kept.
 
 ### Changed
 

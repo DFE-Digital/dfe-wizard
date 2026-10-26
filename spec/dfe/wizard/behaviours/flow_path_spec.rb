@@ -50,6 +50,10 @@ RSpec.describe 'flow_path from:' do
       expect(linear.path_traversal(:start_date, from: :subject)).to eq(%i[subject start_date])
     end
 
+    it 'gives only the step when it is the target' do
+      expect(linear.path_traversal(:subject, from: :subject)).to eq(%i[subject])
+    end
+
     it 'is empty when the target is before the step' do
       expect(linear.path_traversal(:level, from: :subject)).to eq([])
     end
