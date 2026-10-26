@@ -4,6 +4,10 @@ source 'https://rubygems.org'
 # dependencies resolve to the same Rails. CI sets this per matrix entry.
 rails_version = ENV.fetch('RAILS_VERSION', '7.2')
 
+# json 3 dropped the quirks_mode option that ActiveSupport before 8.1 passes to
+# JSON.generate, so loading the dummy app's schema raises on those Rails.
+gem 'json', '< 3' if Gem::Version.new(rails_version) < Gem::Version.new('8.1')
+
 gem 'cssbundling-rails', '~> 1.4'
 gem 'dfe-wizard', path: '../../'
 gem 'govuk-components'
