@@ -1130,6 +1130,7 @@ class CourseWizard
   def steps_processor
     DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
       graph.flow :course_details
+      graph.add_node :courses_index, DfE::Wizard::Redirect
       graph.add_edge from: :check_answers, to: :courses_index
       graph.before_next_step { next_step_in_review if return_to_review }
       graph.before_previous_step { previous_step_in_review(return_to_review) }
@@ -1174,9 +1175,13 @@ class EditCourseWizard < CourseWizard
     end
   end
 
-  # Seeds the edit, and returns the step it opens on
+  # Seeds the edit, and returns the step it opens on, or nil when the record
+  # does not ask that question
   def start(entry)
     state_store.write(CourseMapper.new.to_answers(record))
+    entry = entry.to_sym
+    return unless EDITABLE_STEPS.include?(entry) && flow_path(check_answers_step).include?(entry)
+
     set_metadata(:edit_entry, entry)
     entry
   end
@@ -1186,13 +1191,26 @@ class EditCourseWizard < CourseWizard
   def return_to_review
     get_metadata(:edit_entry)&.to_sym
   end
+
+  # The edit's questions: the one it opened on and the editable ones after it
+  def question_steps
+    path = flow_path(check_answers_step)
+    return [] unless path.include?(return_to_review)
+
+    path.drop(path.index(return_to_review)) & EDITABLE_STEPS
+  end
 end
 ```
 
 In the controller, save the record when the edit reaches its end. The gem does
 not save records: transactions and messages stay in the app.
 
+A URL names any step of the graph, and `only:` limits where navigation goes,
+not what a request can open. Check the step before showing or saving it:
+
 ```ruby
+before_action -> { redirect_to course_path(course) unless @wizard.question_steps.include?(@wizard.current_step_name) }
+
 def update
   return render(:show) unless @wizard.save_current_step
 
