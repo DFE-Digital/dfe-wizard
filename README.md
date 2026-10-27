@@ -1116,46 +1116,103 @@ until it is answered. That is usually what a change needs: after fee becomes
 salary, the deadline questions come back blank once the visa question is
 answered. Nothing is cleared when the path does not reach check answers.
 
-### Editing a Saved Record
+### Sharing a Flow Between Wizards
 
-An edit of a saved record is a change with a different start and end. Seed the
-wizard from the record, open the step behind the Change link, use the same
-review navigation, and save the record yourself when the edit finishes. The gem
-does not save records: transactions, locking and messages stay in the app.
+Two wizards can ask the same questions with different endings: creating a
+record ends on check answers, editing a saved one on a confirm page or back on
+the record. Draw the shared questions once, in a method on the wizard (a
+flow), and draw it in each wizard with `graph.flow`:
 
 ```ruby
-class CourseEditsController < ApplicationController
-  def new
-    wizard = build_wizard(state_key: SecureRandom.uuid)
-    wizard.state_store.write(CourseMapper.new.to_answers(course))
-    redirect_to wizard.resolve_step_path(params[:step].to_sym, return_to_review: params[:step])
+class CourseWizard
+  include DfE::Wizard
+
+  def steps_processor
+    DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+      graph.flow :course_details
+      graph.add_edge from: :check_answers, to: :courses_index
+      graph.before_next_step { next_step_in_review if return_to_review }
+      graph.before_previous_step { previous_step_in_review(return_to_review) }
+    end
   end
 
-  def update
-    return render(:show) unless @wizard.save_current_step
+  private
 
-    @wizard.track_review_step
-    @wizard.clear_off_path_answers
-    next_step = @wizard.next_step_in_review(finish: :course_page, only: EDITABLE_STEPS)
-    return redirect_to(@wizard.resolve_step_path(next_step, return_to_review: params[:return_to_review])) unless next_step == :course_page
-
-    Course.transaction { UpdateCourse.call(course, @wizard.state_store.read) }
-    @wizard.clear_state
-    redirect_to course_path(course)
+  # The questions about a course, up to check answers
+  def course_details(graph)
+    graph.root :level
+    graph.add_node :level, Steps::Level
+    # ... the questions and their edges
+    graph.check_answers :check_answers, Steps::CheckAnswers
+    graph.add_edge from: :start_date, to: :check_answers
   end
 end
 ```
 
-- `finish:` ends the edit somewhere other than check answers: a confirm page,
-  or a Redirect node back to the record. Pass the same `finish:` for the Back
-  link, so Back from the first step goes to the record:
+A flow takes the graph, like the block of `Graph.draw`. It can be private,
+come from a parent class or an included module, and draw other flows.
 
-  ```erb
-  <%= govuk_back_link href: @wizard.resolve_step_path(
-        @wizard.previous_step_in_review(params[:return_to_review], finish: :course_page)) %>
-  ```
+### Editing a Saved Record
+
+An edit of a saved record is a change from check answers with a different
+start and end: it starts from the record's answers, and ends on the record.
+Draw the same flow in an edit wizard, seed it from the record, and use the
+review navigation with `finish:` and `only:`:
+
+```ruby
+class EditCourseWizard < CourseWizard
+  EDITABLE_STEPS = %i[funding_type visa_sponsorship].freeze
+
+  attr_accessor :record
+
+  def steps_processor
+    DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+      graph.flow :course_details
+      graph.add_node :course_page, DfE::Wizard::Redirect
+      graph.before_next_step { next_step_in_review(finish: :course_page, only: EDITABLE_STEPS) }
+      graph.before_previous_step { previous_step_in_review(return_to_review, finish: :course_page) }
+    end
+  end
+
+  # Seeds the edit, and returns the step it opens on
+  def start(entry)
+    state_store.write(CourseMapper.new.to_answers(record))
+    set_metadata(:edit_entry, entry)
+    entry
+  end
+
+  # The step the edit opened on, kept in the wizard state: a URL param
+  # could be changed to open a step the user may not edit
+  def return_to_review
+    get_metadata(:edit_entry)&.to_sym
+  end
+end
+```
+
+In the controller, save the record when the edit reaches its end. The gem does
+not save records: transactions and messages stay in the app.
+
+```ruby
+def update
+  return render(:show) unless @wizard.save_current_step
+
+  @wizard.track_review_step
+  @wizard.clear_off_path_answers
+  return redirect_to(@wizard.next_step_path) unless @wizard.next_step == :course_page
+
+  @wizard.execute_operation(operation_class: UpdateCourse, step: @wizard.current_step)
+  @wizard.clear_state
+  redirect_to course_path(course)
+end
+```
+
+- `finish:` ends the edit somewhere other than check answers: a confirm page,
+  or a Redirect node back to the record. Back from the first step goes there
+  too.
 - `only:` limits the steps the edit can show, when the mapper seeds just some
-  of the answers. Seeding the whole record lets you drop it.
+  of the answers.
+- Check answers stays in the flow: the review navigation reads the path up to
+  it, but an edit never shows it.
 
 ---
 

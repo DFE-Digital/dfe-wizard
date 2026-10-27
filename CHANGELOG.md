@@ -19,6 +19,9 @@
     path ahead does not reach it.
   - `previous_step_in_review(origin, finish:)` retraces the steps shown in the
     change, recorded with `track_review_step` until `clear_review`.
+- **`graph.flow :method_name`** draws a flow: a method on the wizard that
+  draws part of the graph. Wizards that share questions (creating a record and
+  editing a saved one) draw them once, each with its own ending.
 - **`clear_off_path_answers`** sets to nil the answers of steps that a change
   took off the path, so they are not read by mistake and are asked again if
   the step comes back. Answers of `skip_when` steps, and attributes that a kept
