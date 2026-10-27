@@ -643,6 +643,18 @@ RSpec.describe DfE::Wizard::Behaviours::StateManagement do
       expect(wizard.get_metadata(:missing, default: 'N/A')).to eq('N/A')
     end
 
+    context 'with a Session repository' do
+      let(:repository) { DfE::Wizard::Repository::Session.new(session: {}, key: :registration) }
+
+      it 'retrieves metadata by symbol or string key' do
+        wizard.set_metadata(:user_id, 123)
+
+        expect(wizard.get_metadata(:user_id)).to eq(123)
+        expect(wizard.get_metadata('user_id')).to eq(123)
+        expect(wizard.get_metadata(:missing, default: 'N/A')).to eq('N/A')
+      end
+    end
+
     it 'does not interfere with step data' do
       repository.write({ name: 'John', email: 'john@example.com' })
       wizard.set_metadata(:user_id, 999)

@@ -31,6 +31,77 @@ module DfE
             @registry.add_node(node_id, klass, label:, skip_when:)
           end
 
+          # Add the check answers node: the page where users review their
+          # answers and follow Change links.
+          #
+          # Adds an ordinary node, so edges, flow_path and documentation treat
+          # it like any other, and marks it so the review helpers in
+          # {DfE::Wizard::Behaviours::CheckYourAnswers} default to it.
+          #
+          # @param node_id [Symbol] Unique node identifier
+          # @param klass [Class] Step class to instantiate
+          # @param label [String, nil] Display label for documentation
+          #
+          # @raise [ArgumentError] If a check answers node is already declared,
+          #   or node_id is already a node
+          #
+          # @example
+          #   g.check_answers :check_answers, Steps::CheckAnswers
+          #   g.add_edge from: :start_date, to: :check_answers
+          def check_answers(node_id, klass, label: nil)
+            if @registry.check_answers_node
+              raise ArgumentError, "check_answers is already declared as :#{@registry.check_answers_node}"
+            end
+            raise ArgumentError, ":#{node_id} is already a node" if @registry.nodes.key?(node_id)
+
+            add_node(node_id, klass, label:)
+            @registry.check_answers_node = node_id
+          end
+
+          # Draw a flow: a method on the wizard that draws part of the graph.
+          #
+          # Wizards that share questions (creating a record and editing a saved
+          # one, say) draw them in one method, and each adds its own ending.
+          # The method takes the graph, like the block of {Graph.draw}, and can
+          # be private. A flow can draw other flows.
+          #
+          # @param method_name [Symbol] Method on the wizard that draws the flow
+          # @raise [NameError] If the wizard has no such method
+          #
+          # @example A flow shared by two wizards
+          #   class CourseWizard
+          #     include DfE::Wizard
+          #
+          #     def steps_processor
+          #       DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+          #         graph.flow :course_details
+          #         graph.add_edge from: :check_answers, to: :courses_index
+          #       end
+          #     end
+          #
+          #     private
+          #
+          #     def course_details(graph)
+          #       graph.root :level
+          #       graph.add_node :level, Steps::Level
+          #       # ...
+          #     end
+          #   end
+          #
+          #   class EditCourseWizard < CourseWizard
+          #     def steps_processor
+          #       DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+          #         graph.flow :course_details
+          #         graph.add_node :confirm_changes, Steps::ConfirmChanges
+          #       end
+          #     end
+          #   end
+          #
+          # @api public
+          def flow(method_name)
+            @wizard.method(method_name).call(self)
+          end
+
           # Set static root node.
           #
           # @param node_id [Symbol]
