@@ -1043,7 +1043,7 @@ returns it and the generated docs highlight it. A graph has at most one.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `next_step_in_review(finish:, only:, show:)` | Symbol or nil | The first step ahead, on the path to check answers, that is not valid (a required question left blank is not valid) or is in `show`; otherwise `finish` (the check answers step). nil on or after check answers, or when the path ahead does not reach it, so the callback falls through |
+| `next_step_in_review(finish:, only:, show:)` | Symbol or nil | The first step ahead, on the path to check answers, that is not valid (a required question left blank is not valid) or is in `show`; otherwise `finish` (the check answers step); `only` limits both. nil on or after check answers, or when the path ahead does not reach it, so the callback falls through |
 | `previous_step_in_review(origin, finish:)` | Symbol or nil | The previous step shown in this change; `finish` on the origin step; nil when there is no origin, so the callback falls through |
 | `track_review_step` | – | Records the current step as shown, for back links |
 | `review_shown` | Array | Steps recorded since the last `clear_review` |

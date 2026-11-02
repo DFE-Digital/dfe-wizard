@@ -139,7 +139,7 @@ module DfE
         #   finish on a confirm step or a Redirect node instead.
         # @param only [Array<Symbol>, nil] When given, only these steps can be
         #   shown. Useful for an edit that seeds just some of the answers.
-        # @param show [Array<Symbol>] Steps to show when they are on the path
+        # @param show [Array<Symbol, String>, Symbol, nil] Steps to show when they are on the path
         #   ahead, even when valid. Useful for a check answers row that shows
         #   the answers of several steps behind one Change link (a subject and
         #   its specialisms), so the user can change each of them. `only`
@@ -172,7 +172,7 @@ module DfE
 
           ahead = path[1...-1]
           ahead &= only.map(&:to_sym) if only
-          to_show = show.map(&:to_sym)
+          to_show = Array(show).map(&:to_sym)
 
           ahead.find { |step_id| to_show.include?(step_id) || !valid?(step_id) } || finish
         end

@@ -101,6 +101,15 @@ RSpec.describe DfE::Wizard::Behaviours::CheckYourAnswers do
         expect(wizard.next_step_in_review(show: %w[physics_specialism])).to eq(:physics_specialism)
       end
 
+      it 'takes a single step, or nil for none' do
+        wizard = wizard_at(:subject, { subject: 'physics' }, origin: :subject)
+        wizard.save_current_step
+
+        expect(wizard.next_step_in_review(show: :physics_specialism)).to eq(:physics_specialism)
+        expect(wizard.next_step_in_review(show: nil)).to eq(:check_answers)
+      end
+
+      # The current step is never shown again, or the change would loop on it
       it 'goes on to check answers from the shown step' do
         wizard = wizard_at(:physics_specialism, { physics_specialism: 'none' }, origin: :subject)
         wizard.save_current_step
