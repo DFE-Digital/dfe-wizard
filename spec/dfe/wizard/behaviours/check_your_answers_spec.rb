@@ -90,6 +90,39 @@ RSpec.describe DfE::Wizard::Behaviours::CheckYourAnswers do
       expect(wizard.next_step_in_review(only: %w[skilled_worker_visa])).to eq(:skilled_worker_visa)
     end
 
+    context 'with steps to show' do
+      let(:answers) { CourseChange::Wizard.complete_answers.merge(subject: 'physics', physics_specialism: 'engineers') }
+
+      it 'shows a valid step on the path ahead' do
+        wizard = wizard_at(:subject, { subject: 'physics' }, origin: :subject)
+        wizard.save_current_step
+
+        expect(wizard.next_step_in_review).to eq(:check_answers)
+        expect(wizard.next_step_in_review(show: %w[physics_specialism])).to eq(:physics_specialism)
+      end
+
+      it 'goes on to check answers from the shown step' do
+        wizard = wizard_at(:physics_specialism, { physics_specialism: 'none' }, origin: :subject)
+        wizard.save_current_step
+
+        expect(wizard.next_step_in_review(show: %i[physics_specialism])).to eq(:check_answers)
+      end
+
+      it 'ignores a step the change took off the path' do
+        wizard = wizard_at(:subject, { subject: 'history' }, origin: :subject)
+        wizard.save_current_step
+
+        expect(wizard.next_step_in_review(show: %i[physics_specialism])).to eq(:check_answers)
+      end
+
+      it 'shows only the steps that only allows' do
+        wizard = wizard_at(:subject, { subject: 'physics' }, origin: :subject)
+        wizard.save_current_step
+
+        expect(wizard.next_step_in_review(only: %i[start_date], show: %i[physics_specialism])).to eq(:check_answers)
+      end
+    end
+
     it 'does not change the wizard state' do
       state_store.write(funding_type: 'salary')
 

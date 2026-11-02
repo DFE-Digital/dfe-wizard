@@ -139,6 +139,11 @@ module DfE
         #   finish on a confirm step or a Redirect node instead.
         # @param only [Array<Symbol>, nil] When given, only these steps can be
         #   shown. Useful for an edit that seeds just some of the answers.
+        # @param show [Array<Symbol>] Steps to show when they are on the path
+        #   ahead, even when valid. Useful for a check answers row that shows
+        #   the answers of several steps behind one Change link (a subject and
+        #   its specialisms), so the user can change each of them. `only`
+        #   still applies.
         # @return [Symbol, nil] Step to go to next, or nil to fall through
         # @raise [ArgumentError] If the graph declares no check answers step
         #
@@ -153,8 +158,12 @@ module DfE
         # @example An edit of a saved course that finishes on a confirm page
         #   wizard.next_step_in_review(finish: :confirm_changes, only: %i[funding_type skilled_worker_visa])
         #
+        # @example A subject row that also shows the languages
+        #   # path ahead of :subject: languages (valid), start_date (valid)
+        #   wizard.next_step_in_review(show: %i[languages])  # => :languages
+        #
         # @api public
-        def next_step_in_review(finish: check_answers_step, only: nil)
+        def next_step_in_review(finish: check_answers_step, only: nil, show: [])
           review_step = required_check_answers_step
           return if current_step_name == review_step
 
@@ -163,8 +172,9 @@ module DfE
 
           ahead = path[1...-1]
           ahead &= only.map(&:to_sym) if only
+          to_show = show.map(&:to_sym)
 
-          ahead.find { |step_id| !valid?(step_id) } || finish
+          ahead.find { |step_id| to_show.include?(step_id) || !valid?(step_id) } || finish
         end
 
         # Previous step during a change from check answers

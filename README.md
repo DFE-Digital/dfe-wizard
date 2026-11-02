@@ -1043,7 +1043,7 @@ returns it and the generated docs highlight it. A graph has at most one.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `next_step_in_review(finish:, only:)` | Symbol or nil | The first step ahead, on the path to check answers, that is not valid (a required question left blank is not valid); otherwise `finish` (the check answers step). nil on or after check answers, or when the path ahead does not reach it, so the callback falls through |
+| `next_step_in_review(finish:, only:, show:)` | Symbol or nil | The first step ahead, on the path to check answers, that is not valid (a required question left blank is not valid) or is in `show`; otherwise `finish` (the check answers step). nil on or after check answers, or when the path ahead does not reach it, so the callback falls through |
 | `previous_step_in_review(origin, finish:)` | Symbol or nil | The previous step shown in this change; `finish` on the origin step; nil when there is no origin, so the callback falls through |
 | `track_review_step` | – | Records the current step as shown, for back links |
 | `review_shown` | Array | Steps recorded since the last `clear_review` |
@@ -1086,6 +1086,20 @@ question, an information page) are valid, so they are skipped. A step whose
 valid options depend on an earlier answer (for example age ranges that depend on
 the level) must validate against the current options, or a change to the
 earlier answer will skip it.
+
+**One row, several steps.** A step whose answer has no Change link of its own
+can only be changed when navigation shows it. When a check answers row shows
+the answers of several steps (a subject and its specialisms, say), pass those
+steps as `show:` for that row's Change link. They are shown when they are on the
+path ahead, even when valid:
+
+```ruby
+SUBJECT_ROW_STEPS = %i[languages].freeze
+
+graph.before_next_step do
+  next_step_in_review(show: return_to_review.to_s == 'subject' ? SUBJECT_ROW_STEPS : []) if return_to_review
+end
+```
 
 **Repositories.** The shown steps are kept in the wizard metadata
 (`set_metadata`). `Repository::Model` stores model columns only, so use another
