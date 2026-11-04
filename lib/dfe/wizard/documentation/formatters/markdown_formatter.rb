@@ -14,6 +14,7 @@ module DfE
               render_header,
               render_overview,
               render_root_section,
+              render_check_answers_section,
               render_flow_diagram,
               render_steps_inventory,
               render_detailed_steps,
@@ -99,6 +100,21 @@ module DfE
               #{roots_list}
 
               **Determination:** Evaluated at initialization based on wizard state. See "Conditional Root Logic" section for details on which conditions route to which entry points.
+            MD
+          end
+
+          def render_check_answers_section
+            check_answers = @metadata[:check_answers_step]
+            return nil unless check_answers
+
+            <<~MD
+              ## Check Answers
+
+              **Check Answers Step:** `#{check_answers}`
+
+              Users review their answers here and follow Change links. After a change,
+              the review navigation shows only the steps ahead that need an answer
+              (blank or not valid), then returns here.
             MD
           end
 

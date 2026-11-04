@@ -10,6 +10,10 @@ gemspec
 # bundles resolve to the same Rails.
 rails_version = ENV.fetch('RAILS_VERSION', '7.2')
 
+# json 3 dropped the quirks_mode option that ActiveSupport before 8.1 passes to
+# JSON.generate, so loading the dummy app's schema raises on those Rails.
+gem 'json', '< 3' if Gem::Version.new(rails_version) < Gem::Version.new('8.1')
+
 gem 'actionpack', "~> #{rails_version}.0"
 gem 'better_errors'
 gem 'binding_of_caller'

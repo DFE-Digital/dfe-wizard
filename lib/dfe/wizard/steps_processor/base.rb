@@ -232,6 +232,11 @@ module DfE
         #     return [] unless target_index
         #     @steps_array[0..target_index]
         #   end
+        #
+        # @note Processors may also accept `from:` (the step to start from).
+        #   {DfE::Wizard::Behaviours::Navigation#flow_path} passes it only when
+        #   the caller gives one, so processors without it keep working. The
+        #   review navigation and `clear_off_path_answers` need it.
         def path_traversal(target_step)
           raise NotImplementedError, 'Subclass must implement #path_traversal'
         end
@@ -299,6 +304,20 @@ module DfE
         #   end
         def step_definitions
           raise NotImplementedError, 'Subclass must implement #step_definitions'
+        end
+
+        # Return the check answers step, if the processor declares one.
+        #
+        # Processors without a check answers declaration return nil.
+        #
+        # @return [Symbol, nil] Step ID, or nil
+        #
+        # @example Graph processor
+        #   def check_answers_step
+        #     @registry.check_answers_node
+        #   end
+        def check_answers_step
+          nil
         end
 
         # Generate and return comprehensive metadata for insight.

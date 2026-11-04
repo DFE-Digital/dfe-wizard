@@ -1,4 +1,4 @@
-digraph Add course wizard {
+digraph Add_course_wizard {
   rankdir=LR;
   bgcolor="#ffffff";
   node [shape=box, style="rounded,filled", fillcolor="#e8f4f8", fontname="Helvetica"];
@@ -21,7 +21,7 @@ digraph Add course wizard {
   visa_sponsorship_application_deadline_at [label="Visa Sponsorship Application Deadline At"];
   applications_open [label="Applications Open"];
   start_date [label="Start Date"];
-  review [label="Review"];
+  review [label="Review\n✓ Check answers", peripheries=2, fillcolor="#d2e2f1"];
   courses_list [label="Courses List"];
   funding_type -> full_or_part_time [style=solid];
   full_or_part_time -> school [style=solid];

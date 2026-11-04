@@ -18,7 +18,9 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: .ruby-version
+          # The latest 3.2 patch: runner images only build the latest patch of
+          # each series, so the exact .ruby-version can disappear from them
+          ruby-version: '3.2'
           bundler-cache: true
 
       - name: Run RuboCop

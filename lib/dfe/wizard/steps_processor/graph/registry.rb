@@ -26,7 +26,8 @@ module DfE
 
           attr_reader :nodes, :edges, :conditional_edges, :multiple_conditional_edges, :custom_branching_edges,
                       :step_labels
-          attr_accessor :root_node, :conditional_root_method, :conditional_root_block, :potential_root_nodes
+          attr_accessor :root_node, :conditional_root_method, :conditional_root_block, :potential_root_nodes,
+                        :check_answers_node
 
           def initialize
             @nodes = {}
@@ -37,6 +38,7 @@ module DfE
             @root_node = nil
             @conditional_root_method = nil
             @conditional_root_block = nil
+            @check_answers_node = nil
             @next_step_before_callbacks = []
             @previous_step_before_callbacks = []
             @step_labels = {}

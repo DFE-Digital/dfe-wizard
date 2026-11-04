@@ -15,6 +15,14 @@ RSpec.describe DfE::Wizard::Documentation::Formatters::MarkdownFormatter do
     end
   end
 
+  it 'documents the check answers step' do
+    wizard = CourseChange::Wizard.new(state_store: CourseChange::StateStore.new)
+
+    result = described_class.new(wizard.metadata, generated_at: '2025-12-04T08:04:13Z').render
+
+    expect(result).to include("## Check Answers\n\n**Check Answers Step:** `check_answers`")
+  end
+
   def load_expected_markdown(scenario_name)
     fixture_path = File.join('spec', 'fixtures', 'documentation', 'markdown', "#{scenario_name}.md")
     File.read(File.expand_path(fixture_path))
