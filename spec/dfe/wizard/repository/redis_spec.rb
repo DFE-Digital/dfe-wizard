@@ -90,6 +90,104 @@ RSpec.describe DfE::Wizard::Repository::Redis do
       # Verify data was written
       expect(redis.exists?('test')).to be true
     end
+
+    context 'when a key is written twice' do
+      it 'returns the new value' do
+        repository.write({ first_name: 'a' })
+        repository.write({ first_name: 'b' })
+
+        expect(repository.read).to eq(first_name: 'b')
+      end
+
+      it 'stores the key once' do
+        repository.write({ first_name: 'a' })
+        repository.write({ first_name: 'b' })
+
+        expect(JSON.parse(redis.get('wizard:user:123'))).to eq('first_name' => 'b')
+      end
+
+      it 'keeps the other keys' do
+        repository.write({ first_name: 'a', email: 'a@example.com' })
+        repository.write({ first_name: 'b' })
+
+        expect(repository.read).to eq(first_name: 'b', email: 'a@example.com')
+      end
+
+      it 'replaces a value with nil' do
+        repository.write({ first_name: 'a' })
+        repository.write({ first_name: nil })
+
+        expect(repository.read).to eq(first_name: nil)
+      end
+
+      it 'replaces a nested hash value' do
+        repository.write({ address: { line1: 'old' } })
+        repository.write({ address: { line1: 'new' } })
+
+        expect(repository.read).to eq(address: { line1: 'new' })
+      end
+
+      it 'replaces a value written with a symbol key by one written with a string key' do
+        repository.write({ first_name: 'a' })
+        repository.write({ 'first_name' => 'b' })
+
+        expect(repository.read).to eq(first_name: 'b')
+        expect(JSON.parse(redis.get('wizard:user:123'))).to eq('first_name' => 'b')
+      end
+    end
+
+    context 'when a key is written twice with a state_key' do
+      let(:repository) { described_class.new(redis:, key: 'wizards', state_key: 'user_123') }
+
+      before do
+        redis.set('wizards', JSON.generate('user_456' => { 'first_name' => 'Jane' }))
+      end
+
+      it 'returns the new value and keeps the other states' do
+        repository.write({ first_name: 'a' })
+        repository.write({ first_name: 'b' })
+
+        expect(repository.read).to eq(first_name: 'b')
+        expect(JSON.parse(redis.get('wizards'))).to eq(
+          'user_123' => { 'first_name' => 'b' },
+          'user_456' => { 'first_name' => 'Jane' },
+        )
+      end
+    end
+
+    context 'when a key is written twice with encryption' do
+      let(:encryptor) do
+        key = ActiveSupport::KeyGenerator.new('test-secret-encryption-key-123')
+                                         .generate_key('fixed-salt-for-reproducible-tests', 32)
+        ActiveSupport::MessageEncryptor.new(key)
+      end
+
+      it 'returns the new value' do
+        encrypted_repository = described_class.new(redis:, key: 'wizard:user:123', encrypted: true, encryptor:)
+        encrypted_repository.write({ first_name: 'a' })
+        encrypted_repository.write({ first_name: 'b' })
+
+        expect(encrypted_repository.read).to eq(first_name: 'b')
+        expect(JSON.parse(redis.get('wizard:user:123')).keys).to eq(['first_name'])
+      end
+
+      it 'returns the new value with a state_key' do
+        encrypted_repository = described_class.new(
+          redis:, key: 'wizards', state_key: 'user_123', encrypted: true, encryptor:,
+        )
+        encrypted_repository.write({ first_name: 'a' })
+        encrypted_repository.write({ first_name: 'b' })
+
+        expect(encrypted_repository.read).to eq(first_name: 'b')
+      end
+    end
+
+    it 'leaves save as a full replacement after a write' do
+      repository.write({ first_name: 'a', email: 'a@example.com' })
+      repository.save({ email: 'b@example.com' })
+
+      expect(repository.read).to eq(email: 'b@example.com')
+    end
   end
 
   describe '#execute_operation' do

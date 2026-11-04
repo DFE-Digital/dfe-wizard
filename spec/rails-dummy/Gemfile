@@ -9,6 +9,8 @@ gem 'dfe-wizard', path: '../../'
 gem 'govuk-components'
 gem 'govuk_design_system_formbuilder'
 gem 'jsbundling-rails', '~> 1.3'
+# json 3 removed options ActiveSupport 7.2 still passes (quirks_mode).
+gem 'json', '< 3'
 gem 'pg', '~> 1.6', '>= 1.6.2'
 gem 'propshaft'
 gem 'puma', '>= 5.0'

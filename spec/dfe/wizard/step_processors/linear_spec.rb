@@ -286,6 +286,14 @@ RSpec.describe DfE::Wizard::StepsProcessor::Linear do
     end
   end
 
+  describe '#full_path' do
+    it 'raises NotImplementedError' do
+      processor = DfE::Wizard::StepsProcessor::Linear.new(HmrcSelfAssessmentWizard.new)
+
+      expect { processor.full_path }.to raise_error(NotImplementedError, 'full_path needs StepsProcessor::Graph')
+    end
+  end
+
   describe '#find_step' do
     let(:wizard) { HmrcSelfAssessmentWizard.new }
     let(:processor) do

@@ -757,15 +757,31 @@ wizard.valid_path_to?(:review)
 
 wizard.in_flow?(:review)
 # => true (review is reachable based on answers)
+
+wizard.full_path
+# => [:name, :email, :review]
+# Every step from the root to the end, over the current answers.
+# Unlike flow_path, it does not stop at the current step.
 ```
 
-### Understanding the Three Paths
+### Understanding the Paths
 
 | Path | Question it answers |
 |------|---------------------|
 | `flow_path` | "What steps would the user visit?" |
 | `saved_path` | "What steps have data?" |
 | `valid_path` | "What steps are complete and valid?" |
+| `full_path` | "What steps would the user visit, start to end?" |
+
+`full_path` evaluates every edge from the root, including edges from steps the
+user has not answered yet. So:
+
+- Predicates must accept nil (an unanswered step) and choose a branch without
+  raising.
+- Read context (for example the provider or the cycle) live through the state
+  store or the wizard. Set it before you call `full_path`.
+- `full_path` needs `StepsProcessor::Graph`. Other processors raise
+  `NotImplementedError`.
 
 Use cases:
 
@@ -918,6 +934,16 @@ end
 ```
 
 This applies to any expensive operation: database queries, API calls, or complex calculations.
+
+Memoize context, never answers. The wizard keeps its graph for the whole
+request, and a value memoized from an answer keeps the old value after a
+write in the same request, so navigation takes the wrong branch.
+
+For the same reason, draw the same graph for every state. The
+`steps_processor` block runs once per wizard instance, before the current
+step is saved. Put a choice that depends on an answer or on context set
+after `new` in a predicate, `skip_when` or `conditional_root`, never in a
+Ruby `if` around `add_node` or `add_edge`, or in the value given to `root`.
 
 ---
 

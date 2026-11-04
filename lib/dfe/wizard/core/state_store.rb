@@ -3,9 +3,11 @@ module DfE
     module Core
       module StateStore
         # Reference to the wizard instance that uses this state store.
-        # Set during wizard initialization via {#step_attributes_methods}.
+        # Set by the wizard in `new` and in `state_store=`. Read context
+        # through it lazily (for example `wizard.provider`), so context the
+        # app sets after `new` is in place when predicates run.
         #
-        # @return [DfE::Wizard, nil] the wizard instance, or nil if not yet initialized
+        # @return [DfE::Wizard, nil] the wizard instance, or nil before it is given to a wizard
         attr_accessor :wizard
 
         # The repository instance used for persistent storage.
