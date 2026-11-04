@@ -46,7 +46,8 @@ module DfE
             raise InvalidGraph, "sub-wizard :#{unit.id} lists #{list(missing)}, which #{verb}"
           end
 
-          # Rule 3
+          # Rule 3 (JourneyChecks keeps the check answers node out of every
+          # sub-wizard)
           def check_one_sub_wizard_per_step!(units)
             owners = Hash.new { |hash, step_id| hash[step_id] = [] }
             units.each { |unit| unit.step_ids.each { |step_id| owners[step_id] << unit.id } }

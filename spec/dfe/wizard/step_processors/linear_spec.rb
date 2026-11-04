@@ -304,6 +304,10 @@ RSpec.describe DfE::Wizard::StepsProcessor::Linear do
     it 'has no units' do
       expect(processor.unit_for(:personal_details)).to be_nil
     end
+
+    it 'has no check answers step, so no change journeys' do
+      expect(processor.check_answers_step).to be_nil
+    end
   end
 
   describe '#find_step' do

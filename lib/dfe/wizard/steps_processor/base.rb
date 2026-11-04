@@ -246,6 +246,15 @@ module DfE
           raise NotImplementedError, 'full_path needs StepsProcessor::Graph'
         end
 
+        # The check answers node that turns on change journeys.
+        #
+        # Only StepsProcessor::Graph declares one.
+        #
+        # @return [nil]
+        def check_answers_step
+          nil
+        end
+
         # Sub-wizards declared in this processor.
         #
         # Only StepsProcessor::Graph declares them.
