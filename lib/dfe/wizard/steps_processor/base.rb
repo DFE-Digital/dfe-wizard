@@ -246,6 +246,25 @@ module DfE
           raise NotImplementedError, 'full_path needs StepsProcessor::Graph'
         end
 
+        # Sub-wizards declared in this processor.
+        #
+        # Only StepsProcessor::Graph declares them.
+        #
+        # @return [Hash{Symbol => Object}] empty
+        def sub_wizards
+          {}
+        end
+
+        # The unit that holds a step.
+        #
+        # Only StepsProcessor::Graph has units.
+        #
+        # @param _step_id [Symbol]
+        # @return [nil]
+        def unit_for(_step_id)
+          nil
+        end
+
         # Find and return the step class for a given step ID.
         #
         # Used by the wizard framework to:
