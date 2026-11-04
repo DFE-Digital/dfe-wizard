@@ -184,7 +184,7 @@ module DfE
           if @state_key
             data = session_data
             data.delete(@state_key)
-            @session[@key] = data if data.any?
+            @session[@key] = data
           else
             @session.delete(@key)
           end

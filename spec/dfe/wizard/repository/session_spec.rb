@@ -199,6 +199,18 @@ RSpec.describe DfE::Wizard::Repository::Session do
           'wizard_2' => { 'name' => 'Jane' },
         )
       end
+
+      context 'when it is the only stored state' do
+        before do
+          session['wizard_key'] = { 'wizard_1' => { 'name' => 'Itachi' } }
+        end
+
+        it 'clears the stored state' do
+          repository.clear
+
+          expect(repository.read).to eq({})
+        end
+      end
     end
   end
 end
