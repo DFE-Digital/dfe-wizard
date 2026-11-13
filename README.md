@@ -1012,28 +1012,27 @@ Each row provides:
 | `step_id` | The step ID |
 | `attribute` | The attribute name |
 
-### Return to Review Flow
+### Review Navigation
 
 When users click "Change", they go to the step with `?return_to_review=step_id`.
 After saving, they should see only the questions the change affects, then go
 straight back to the review page. Back links should retrace the same pages.
 
-Declare the review page with `graph.check_answers`, and use the review
-navigation in the graph callbacks:
+Declare the review page with `graph.check_answers`, and turn the review
+navigation on:
 
 ```ruby
-def steps_processor
-  DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
-    # ... steps ...
-    graph.check_answers :review, Steps::Review
+class RegistrationWizard
+  include DfE::Wizard
 
-    graph.before_next_step { next_step_in_review if return_to_review }
-    graph.before_previous_step { previous_step_in_review(return_to_review) }
+  def review_navigation? = true
+
+  def steps_processor
+    DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+      # ... steps ...
+      graph.check_answers :review, Steps::Review
+    end
   end
-end
-
-def return_to_review
-  @current_step_params[:return_to_review]
 end
 ```
 
@@ -1041,70 +1040,145 @@ end
 documentation treat it like any other) and marks it, so `wizard.check_answers_step`
 returns it and the generated docs highlight it. A graph has at most one.
 
+`review_navigation?` is false by default, so wizards written for 1.0 behave as
+before. When it is true (it needs `graph.check_answers`: drawing the graph
+raises without it):
+
+| When | The gem |
+|------|---------|
+| A step saves | Runs `Operations::ReviewNavigation` after Persist. During a change it records the step for Back links, starting afresh on the step whose Change link was followed. On every save of a step on the path it clears the answers the save took off the path |
+| Continue during a change | Goes to the first step ahead that needs an answer, then to check answers |
+| Back during a change | Retraces the steps shown in the change; from the step whose Change link was followed, goes to check answers |
+| A step path is built during a change | Adds `return_to_review`, except to check answers and the steps after it |
+
+With funding changed from fee to salary, the user sees the funding question,
+then the skilled worker visa question (new on the path), then check answers.
+Steps that are still valid are skipped.
+
+The controller stays as it is: build the wizard with the request params, save
+the step, then redirect. Forms that post to `current_step_path` and Back links
+from `previous_step_path` carry the change along.
+
+```ruby
+def update
+  if @wizard.save_current_step
+    redirect_to @wizard.next_step_path
+  else
+    render :show
+  end
+end
+```
+
+Link the rows of the review page with `change_path` (the
+[presenter](#creating-a-review-presenter) does it for you):
+
+```ruby
+link_to 'Change', @wizard.change_path(:email)  # => "/registration/email?return_to_review=email"
+```
+
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `next_step_in_review(finish:, only:, show:)` | Symbol or nil | The first step ahead, on the path to check answers, that is not valid (a required question left blank is not valid) or is in `show`; otherwise `finish` (the check answers step); `only` limits both. nil on or after check answers, or when the path ahead does not reach it, so the callback falls through |
+| `review_navigation?` | Boolean | Turns the review navigation on. Default false |
+| `return_to_review` | Symbol or nil | The step whose Change link was followed, read from the `return_to_review` param. nil outside a change, or when the param is not a step of the wizard (a tampered URL) or is check answers |
+| `return_to_review?` | Boolean | Whether a change is in progress |
+| `change_path(step_id)` | String | The path for a Change link |
+| `review_asks_again(origin)` | Array | Steps a change asks even when valid (see below). Default none |
+| `clear_off_path_answers?` | Boolean | Whether saving the current step clears the answers off the path: only when the step is on the path |
+
+Override these methods to change how the review works. The gem calls them on
+the wizard, so keep the overrides public: a private `review_navigation?` turns
+the review navigation off.
+
+**Your own callbacks win.** The gem adds its callbacks after the wizard's own
+`before_next_step` and `before_previous_step`. A callback of the wizard that
+returns a step wins, so remove any review callbacks you wired by hand when you
+turn it on.
+
+**Steps with their own operations.** `on_step(:step, add: [...])` keeps the
+review: `ReviewNavigation` runs after the added operations. `use:` replaces
+every default operation, so list it to keep the review on that step:
+
+```ruby
+builder.on_step(:subject, use: [Operations::Validate, Operations::Persist, Operations::ReviewNavigation])
+```
+
+**Validate against the current branch.** "Needs an answer" means not valid. A
+required question left blank is not valid, so a required question that a change
+brings onto the path is shown. Steps with nothing required (an optional
+question, an information page) are valid, so they are skipped: return an
+optional question from `review_asks_again` to ask it. A step whose valid options
+depend on an earlier answer (for example age ranges that depend on the level)
+must validate against the current options, or a change to the earlier answer
+will skip it.
+
+**One row, several steps.** A step whose answer has no Change link of its own
+can only be changed when navigation shows it. When a check answers row shows
+the answers of several steps (a subject and its specialisms, say), return those
+steps from `review_asks_again` for that row's Change link. They are asked when
+they are on the path ahead, even when valid, so the graph still decides whether
+each one is asked:
+
+```ruby
+SUBJECT_ROW_STEPS = %i[languages].freeze
+
+def review_asks_again(origin)
+  origin == :subject ? SUBJECT_ROW_STEPS : []
+end
+```
+
+**Repositories.** The shown steps are kept in the wizard metadata
+(`set_metadata`). `Repository::Model` stores model columns only, so with it
+Back during a change goes to the step whose Change link was followed, skipping
+the steps shown since. Use another repository (or `WizardState`) for review
+navigation.
+
+**Steps a request can open.** The review navigation decides where Continue and
+Back go, not what a request can open: a URL can name any step. Check the step
+in the controller, as in [Guard against URL manipulation](#understanding-the-three-paths).
+
+**Graphs only.** A Linear wizard gets no review navigation.
+
+#### Wiring it by hand
+
+With `review_navigation?` off, the same helpers can be wired in the graph and
+the controller. The edit of a saved record below does this.
+
+```ruby
+graph.before_next_step { next_step_in_review if return_to_review? }
+graph.before_previous_step { previous_step_in_review(return_to_review) }
+```
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `next_step_in_review(finish:, only:)` | Symbol or nil | The first step ahead, on the path to check answers, that is not valid (a required question left blank is not valid) or is in `review_asks_again`; otherwise `finish` (the check answers step); `only` limits both. nil on or after check answers, or when the path ahead does not reach it, so the callback falls through |
 | `previous_step_in_review(origin, finish:)` | Symbol or nil | The previous step shown in this change; `finish` on the origin step; nil when there is no origin, so the callback falls through |
 | `track_review_step` | – | Records the current step as shown, for back links |
 | `review_shown` | Array | Steps recorded since the last `clear_review` |
 | `clear_review` | – | Forgets the shown steps |
 | `clear_off_path_answers` | Array | Clears the answers of steps no longer on the path; returns their ids |
 
-In the controller, record each step saved during a change, clear answers left
-behind by the change, and don't carry `return_to_review` onto the review page:
+In the controller, record each step saved during a change, clear the answers
+left behind, pass `return_to_review` on to the next step (but not to check
+answers), and forget the shown steps when the review page is shown. Back links
+need the param as well.
 
 ```ruby
 def update
   if @wizard.save_current_step
-    if params[:return_to_review].present?
-      @wizard.track_review_step
-      @wizard.clear_off_path_answers
-    end
+    @wizard.track_review_step if @wizard.return_to_review?
+    @wizard.clear_off_path_answers if @wizard.clear_off_path_answers?
 
-    next_step = @wizard.next_step
-    options = next_step == @wizard.check_answers_step ? {} : { return_to_review: params[:return_to_review].presence }
-    redirect_to @wizard.resolve_step_path(next_step, options.compact)
+    options = @wizard.next_step == @wizard.check_answers_step ? {} : { return_to_review: @wizard.return_to_review }
+    redirect_to @wizard.next_step_path(options.compact)
   else
     render :show
   end
 end
 
-# On the review page
 def show
   @wizard.clear_review if @wizard.current_step_name == @wizard.check_answers_step
 end
 ```
-
-With funding changed from fee to salary, the user sees the funding question,
-then the skilled worker visa question (new on the path), then check answers.
-Steps that are still valid are skipped.
-
-**Validate against the current branch.** "Needs an answer" means not valid. A
-required question left blank is not valid, so a required question that a change
-brings onto the path is shown. Steps with nothing required (an optional
-question, an information page) are valid, so they are skipped. A step whose
-valid options depend on an earlier answer (for example age ranges that depend on
-the level) must validate against the current options, or a change to the
-earlier answer will skip it.
-
-**One row, several steps.** A step whose answer has no Change link of its own
-can only be changed when navigation shows it. When a check answers row shows
-the answers of several steps (a subject and its specialisms, say), pass those
-steps as `show:` for that row's Change link. They are shown when they are on the
-path ahead, even when valid:
-
-```ruby
-SUBJECT_ROW_STEPS = %i[languages].freeze
-
-graph.before_next_step do
-  next_step_in_review(show: return_to_review.to_s == 'subject' ? SUBJECT_ROW_STEPS : []) if return_to_review
-end
-```
-
-**Repositories.** The shown steps are kept in the wizard metadata
-(`set_metadata`). `Repository::Model` stores model columns only, so use another
-repository (or `WizardState`) for review navigation. `return_to_review` above
-reads Rails params; with a plain Hash, use a Symbol key.
 
 `handle_return_to_check_your_answers` and `handle_back_in_check_your_answers`
 still work as before. `handle_return_to_check_your_answers` now defaults to the
@@ -1130,6 +1204,15 @@ until it is answered. That is usually what a change needs: after fee becomes
 salary, the deadline questions come back blank once the visa question is
 answered. Nothing is cleared when the path does not reach check answers.
 
+Clear after a step saves, when `clear_off_path_answers?` says so: only a step on
+the path says something about the path. A step saved from off it (opened from a
+bookmark, say) changes no branch, and clearing would throw away its answer. With
+`review_navigation?` on, the gem does this on every save.
+
+```ruby
+wizard.clear_off_path_answers if wizard.clear_off_path_answers?
+```
+
 ### Sharing a Flow Between Wizards
 
 Two wizards can ask the same questions with different endings: creating a
@@ -1146,10 +1229,10 @@ class CourseWizard
       graph.flow :course_details
       graph.add_node :courses_index, DfE::Wizard::Redirect
       graph.add_edge from: :check_answers, to: :courses_index
-      graph.before_next_step { next_step_in_review if return_to_review }
-      graph.before_previous_step { previous_step_in_review(return_to_review) }
     end
   end
+
+  def review_navigation? = true
 
   private
 
@@ -1171,14 +1254,17 @@ come from a parent class or an included module, and draw other flows.
 
 An edit of a saved record is a change from check answers with a different
 start and end: it starts from the record's answers, and ends on the record.
-Draw the same flow in an edit wizard, seed it from the record, and use the
-review navigation with `finish:` and `only:`:
+Draw the same flow in an edit wizard, seed it from the record, and wire the
+review navigation by hand with `finish:` and `only:`:
 
 ```ruby
 class EditCourseWizard < CourseWizard
   EDITABLE_STEPS = %i[funding_type visa_sponsorship].freeze
 
   attr_accessor :record
+
+  # The edit wires the review itself
+  def review_navigation? = false
 
   def steps_processor
     DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
@@ -1229,7 +1315,7 @@ def update
   return render(:show) unless @wizard.save_current_step
 
   @wizard.track_review_step
-  @wizard.clear_off_path_answers
+  @wizard.clear_off_path_answers if @wizard.clear_off_path_answers?
   return redirect_to(@wizard.next_step_path) unless @wizard.next_step == :course_page
 
   @wizard.execute_operation(operation_class: UpdateCourse, step: @wizard.current_step)
@@ -1319,7 +1405,8 @@ end
 
 ### Step Operators
 
-Customise what happens when a step is saved. By default, each step runs: `Validate → Persist`.
+Customise what happens when a step is saved. By default, each step runs: `Validate → Persist`,
+then `ReviewNavigation` in a wizard with [review navigation](#review-navigation) on.
 
 ```ruby
 def steps_operator
@@ -1327,7 +1414,8 @@ def steps_operator
     # use: replaces the entire pipeline
     b.on_step(:payment, use: [Validate, ProcessPayment, Persist])
 
-    # add: appends to the default pipeline (Validate → Persist → YourOperator)
+    # add: appends to the default pipeline (Validate → Persist → YourOperator,
+    # then ReviewNavigation when review navigation is on)
     b.on_step(:notification, add: [SendConfirmationEmail])
 
     # use: [] skips all operations (useful for review steps)
@@ -1338,7 +1426,8 @@ end
 
 **`use:` - Replace the pipeline**
 
-Completely replaces the default Validate → Persist with your operators:
+Completely replaces the default Validate → Persist with your operators
+(`ReviewNavigation` too: list it to keep the review navigation on the step):
 
 ```ruby
 # Only validate, don't persist (dry run)
@@ -1353,7 +1442,8 @@ b.on_step(:check_answers, use: [])
 
 **`add:` - Extend the pipeline**
 
-Adds operators after the default Validate → Persist:
+Adds operators after the default Validate → Persist (and before
+`ReviewNavigation`, when review navigation is on):
 
 ```ruby
 # Validate → Persist → SendConfirmationEmail
@@ -2223,8 +2313,8 @@ Now `@wizard.next_step_path` automatically includes the `state_key`:
 @wizard.next_step_path
 # => "/applications/abc-123-def/email"
 
-@wizard.next_step_path(return_to_review: true)
-# => "/applications/abc-123-def/email?return_to_review=true"
+@wizard.next_step_path(return_to_review: :name)
+# => "/applications/abc-123-def/email?return_to_review=name"
 ```
 
 ---
