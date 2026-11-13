@@ -83,6 +83,8 @@ module DfE
         #
         # @api private
         def resolve_step_path(step_id, options = {})
+          options = review_path_options(step_id).merge(options) if review_navigation?
+
           route_strategy.resolve(step_id:, options:).tap do |path|
             log_route_resolved(step: step_id, path:)
           end
@@ -104,10 +106,31 @@ module DfE
         #
         # @example Non-UK national
         #   wizard.flow_path  # => [:name, :nationality, :right_to_work, :immigration_status, :review]
-        def flow_path(target = current_step_name)
-          steps_processor.path_traversal(target).tap do |path|
-            log_flow_path_resolved(target:, path:)
-          end
+        #
+        # @example What is ahead of a step, over the current answers
+        #   wizard.flow_path(:review, from: :nationality)
+        #   # => [:nationality, :right_to_work, :immigration_status, :review]
+        #
+        # @param target [Symbol] Last step of the path (defaults to the current step)
+        # @param from [Symbol, nil] Step to start from (defaults to the root).
+        #   It is included in the result. Gives [] when target is unreachable from it.
+        def flow_path(target = current_step_name, from: nil)
+          path = from ? steps_processor.path_traversal(target, from:) : steps_processor.path_traversal(target)
+
+          path.tap { log_flow_path_resolved(target:, path:) }
+        end
+
+        # The check answers step declared in the graph
+        #
+        # @return [Symbol, nil] Step ID, or nil if the graph declares none
+        #
+        # @example
+        #   # graph.check_answers :check_answers, Steps::CheckAnswers
+        #   wizard.check_answers_step  # => :check_answers
+        #
+        # @api public
+        def check_answers_step
+          steps_processor.check_answers_step
         end
 
         # Check if step is in current flow
@@ -120,6 +143,23 @@ module DfE
         #   wizard.in_flow?(:skipped_step)    # => false
         def in_flow?(step_id)
           flow_path(step_id).include?(step_id)
+        end
+
+        private
+
+        # During a change, step paths carry the step whose Change link was
+        # followed, so the change goes on across requests. Check answers and
+        # the steps reachable from it (a declaration, a Redirect node) don't.
+        #
+        # @api private
+        def review_path_options(step_id)
+          return {} if step_id.nil? || !return_to_review?
+
+          review_step = check_answers_step
+          return {} unless review_step
+          return {} if flow_path(step_id.to_sym, from: review_step).any?
+
+          { return_to_review: }
         end
       end
     end

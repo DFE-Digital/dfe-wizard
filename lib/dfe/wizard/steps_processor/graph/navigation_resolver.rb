@@ -54,16 +54,19 @@ module DfE
             previous_step_without_callbacks(target_step)
           end
 
-          # Calculate path from root to target step.
+          # Calculate path from root (or from a given step) to target step.
           #
           # Uses graph traversal (BFS) respecting all edge types.
           #
           # @param target_step [Symbol, nil]
+          # @param from [Symbol, nil] Step to start from (defaults to the root)
           # @return [Array<Symbol>]
-          def path_traversal(target_step = @wizard.current_step_name, max_depth: @registry.nodes.size)
-            root = compute_root_node
+          def path_traversal(target_step = @wizard.current_step_name, from: nil, max_depth: @registry.nodes.size)
+            return [] if from && !@registry.nodes.key?(from)
 
-            path = dfs_path(root, target_step, Set.new, max_depth:)
+            start = from || compute_root_node
+
+            path = dfs_path(start, target_step, Set.new, max_depth:)
             path || []
           end
 

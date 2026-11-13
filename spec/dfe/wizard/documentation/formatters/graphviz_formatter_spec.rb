@@ -15,6 +15,16 @@ RSpec.describe DfE::Wizard::Documentation::Formatters::GraphvizFormatter do
     end
   end
 
+  it 'marks the check answers step' do
+    wizard = CourseChange::Wizard.new(state_store: CourseChange::StateStore.new)
+
+    result = described_class.new(wizard.metadata, generated_at: '2025-12-04T08:04:13Z').render
+
+    expect(result).to include(
+      '  check_answers [label="Check Answers\\n✓ Check answers", peripheries=2, fillcolor="#d2e2f1"];',
+    )
+  end
+
   def load_expected_graphviz(scenario_name)
     fixture_path = File.join('spec', 'fixtures', 'documentation', 'graphviz', "#{scenario_name}.dot")
     File.read(File.expand_path(fixture_path))

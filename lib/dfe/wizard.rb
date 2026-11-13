@@ -128,11 +128,13 @@ module DfE
 
     # @!group Default operations in every step of a wizard
     #
-    # Provide default operations
+    # Provide default operations: Validate and Persist, then ReviewNavigation
+    # in a wizard with review navigation on
     #
     module Operations
       autoload :Validate, 'dfe/wizard/operations/validate'
       autoload :Persist, 'dfe/wizard/operations/persist'
+      autoload :ReviewNavigation, 'dfe/wizard/operations/review_navigation'
     end
     # @!endgroup
 

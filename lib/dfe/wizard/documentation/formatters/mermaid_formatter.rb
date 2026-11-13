@@ -60,14 +60,19 @@ module DfE
 
           def render_styles
             skippable_steps = @metadata[:steps].select { |_, data| data[:skippable?] }.keys
-            return '' if skippable_steps.empty?
-
-            skippable_steps.map do |skippable_step|
+            styles = skippable_steps.map do |skippable_step|
               "  style #{skippable_step} stroke:#FFA500,stroke-dasharray: 5 5,stroke-width:2px"
-            end.join("\n")
+            end
+            styles << "  style #{check_answers_step} stroke:#1D70B8,stroke-width:3px" if check_answers_step
+
+            styles.join("\n")
           end
 
           private
+
+          def check_answers_step
+            @metadata[:check_answers_step]
+          end
 
           def render_header
             'flowchart TD'
@@ -87,6 +92,7 @@ module DfE
               end
 
               sanitized_label = sanitize_label(label)
+              sanitized_label += "\n✓ Check answers" if step_id == check_answers_step
 
               if skippable_text.present?
                 "  #{step_id}[\"#{sanitized_label}\n#{skippable_text}\"]"

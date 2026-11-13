@@ -1,3 +1,69 @@
+## [Unreleased]
+
+### Added
+
+- **`graph.check_answers :id, StepClass`** declares the check answers page. It
+  adds an ordinary node and marks it, so `wizard.check_answers_step` returns it,
+  the graph metadata names it, and the generated Markdown, Mermaid and Graphviz
+  docs highlight it. A second declaration, or an id that is already a node,
+  raises.
+- **`flow_path(target, from: step)`** walks the graph from a given step instead
+  of the root, over the current answers. Graph and Linear processors support
+  it; custom processors without `from:` keep working.
+- **Review navigation** in `CheckYourAnswers`, for changes from check answers
+  and edits of saved records:
+  - `next_step_in_review(finish:, only:)` goes to the first step ahead that
+    is not valid (a required question left blank is not valid), skipping
+    valid steps, and otherwise to check answers (or `finish:`). It only reads
+    state, and returns nil (falling through) on or after check answers or when
+    the path ahead does not reach it.
+  - `review_asks_again(origin)` names steps a change asks even when valid, for
+    a check answers row that covers several steps. It returns none by default;
+    the steps are asked only when they are on the path ahead.
+  - `previous_step_in_review(origin, finish:)` retraces the steps shown in the
+    change, recorded with `track_review_step` until `clear_review`.
+- **`review_navigation?`** turns the review navigation on for a wizard. It is
+  false by default, so 1.0 wizards are unchanged. When a wizard returns true
+  (it needs `graph.check_answers`, or drawing the graph raises):
+  - **`Operations::ReviewNavigation`** runs after Persist on every step that
+    keeps the default operations (after an `add:` step's own operations; a
+    `use:` step lists it to keep it). During a change it records the step for
+    Back links, starting afresh on the step whose Change link was followed.
+    On every save of a step on the path it clears the answers the save took
+    off the path (`clear_off_path_answers?`). It never returns a failure.
+  - The graph gets `before_next_step` and `before_previous_step` callbacks
+    for `next_step_in_review` and `previous_step_in_review`, after the
+    wizard's own callbacks, which win when they return a step.
+  - Step paths carry `return_to_review` during a change, except check answers
+    and the steps after it.
+- **`return_to_review`** reads the step whose Change link was followed from
+  the `return_to_review` request param. It gives a Symbol only for a step of
+  the wizard other than check answers, and nil for a missing or tampered value.
+  **`return_to_review?`** says whether a change is in progress, and
+  **`change_path(step_id)`** builds a Change link. `CheckAnswersPresenter`
+  now calls `wizard.change_path`, so a wizard that defines its own
+  `change_path` is used by the presenter. Wizards can override the reader to
+  keep the origin elsewhere.
+- **`graph.flow :method_name`** draws a flow: a method on the wizard that
+  draws part of the graph. Wizards that share questions (creating a record and
+  editing a saved one) draw them once, each with its own ending.
+- **`clear_off_path_answers`** sets to nil the answers of steps that a change
+  took off the path, so they are not read by mistake and are asked again if
+  the step comes back. Answers of `skip_when` steps, and attributes that a kept
+  step also declares, are kept. **`clear_off_path_answers?`** says whether to
+  clear after saving the current step: only a step on the path says
+  something about the path. Wizards can override it.
+
+### Changed
+
+- `handle_return_to_check_your_answers` defaults its target to the declared
+  check answers step.
+
+### Fixed
+
+- `get_metadata` accepts a String key, as documented. It returned the default
+  since state keys are normalised to symbols.
+
 ## [1.0.0] - 2026-08-20
 
 First stable release. The API is now frozen — subsequent breaking changes will

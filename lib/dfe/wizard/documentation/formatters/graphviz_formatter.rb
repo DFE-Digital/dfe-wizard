@@ -84,7 +84,11 @@ module DfE
               label = step_data[:label] || step_id.to_s.titleize
               sanitized_id = sanitize_identifier(step_id.to_s)
               sanitized_label = sanitize_label(label)
-              "  #{sanitized_id} [label=\"#{sanitized_label}\"];"
+              if step_id == @metadata[:check_answers_step]
+                %(  #{sanitized_id} [label="#{sanitized_label}\\n✓ Check answers", peripheries=2, fillcolor="#d2e2f1"];)
+              else
+                "  #{sanitized_id} [label=\"#{sanitized_label}\"];"
+              end
             end.join("\n")
           end
 

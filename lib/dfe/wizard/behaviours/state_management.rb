@@ -44,7 +44,8 @@ module DfE
         # ## Default Behavior
         #
         # If your wizard doesn't define a `steps_operator` method, this provides:
-        # - **All steps**: Default to [Validate, Persist] operations
+        # - **All steps**: Default to [Validate, Persist] operations, plus
+        #   ReviewNavigation when {#review_navigation?} is on
         # - **No filtering**: Same operations run for all steps
         # - **Extensible**: Override `steps_operator` in your wizard to customize
         #
@@ -195,6 +196,83 @@ module DfE
         def orphaned_steps_data
           all_steps = raw_data[:steps] || {}
           all_steps.except(*flow_path)
+        end
+
+        # Clear the answers of steps that are no longer on the path
+        #
+        # A change can take steps off the path: changing funding from fee to
+        # salary leaves the student visa answer behind. Left in the store, such
+        # an answer can be read by mistake, and is silently reused if the step
+        # comes back. Clearing it means the step starts blank when it returns,
+        # so the user answers it again.
+        #
+        # Off the path means: not on the path from the root to the check
+        # answers step, over the current answers, and not reachable from the
+        # check answers step (so answers after it, like a declaration, stay).
+        # A blank answer can hide the steps after it, so their answers are
+        # cleared too until it is answered.
+        #
+        # Kept as well: the answers of steps with `skip_when` (the app may fill
+        # them in while the step is skipped), and any attribute that a kept
+        # step also declares.
+        #
+        # Answers are set to nil, which every repository supports (with
+        # `Repository::Model`, the columns are set to NULL). When the path does
+        # not reach check answers, nothing is cleared.
+        #
+        # Call it after a step saves during a change, and before the final
+        # submission.
+        #
+        # @return [Array<Symbol>] IDs of the steps whose answers were cleared
+        # @raise [ArgumentError] If the graph declares no check answers step
+        #
+        # @example Funding changed from fee to salary
+        #   wizard.clear_off_path_answers
+        #   # => [:student_visa, :deadline_required, :deadline_at]
+        #
+        # @see #orphaned_steps_data For the answers off the path to the current step
+        # @api public
+        def clear_off_path_answers
+          review_step = check_answers_step
+          raise ArgumentError, 'Declare the check answers step with graph.check_answers' unless review_step
+
+          on_path = flow_path(review_step)
+          return [] if on_path.empty?
+
+          kept = on_path | steps_after(review_step) | skippable_steps
+          answered = (raw_data[:steps] || {}).select { |_step_id, data| data.values.any? { |value| !value.nil? } }
+          kept_attributes = kept.flat_map { |step_id| step_attribute_names(step_id) }
+
+          cleared = (answered.keys.map(&:to_sym) - kept)
+                    .index_with { |step_id| step_attribute_names(step_id) - kept_attributes }
+                    .reject { |_step_id, attributes| attributes.empty? }
+          return [] if cleared.empty?
+
+          state_store.write(cleared.values.flatten.index_with(nil))
+          cleared.keys
+        end
+
+        # Whether saving the current step should clear the answers off the path
+        #
+        # Only a step on the path (including the steps after check answers)
+        # says something about the path. A step saved from off it (opened from
+        # a bookmark, say) changes no branch, and clearing would throw away the
+        # answer it just saved. False when the graph declares no check answers
+        # step, since there is no path to clear against.
+        #
+        # It is asked over the answers just saved, so a step whose own answer
+        # takes it off the path (a `skip_when` that reads it) is not cleared.
+        # Override it to change when answers are cleared.
+        #
+        # @return [Boolean]
+        #
+        # @example After saving the step
+        #   wizard.clear_off_path_answers if wizard.clear_off_path_answers?
+        #
+        # @see #clear_off_path_answers
+        # @api public
+        def clear_off_path_answers?
+          !check_answers_step.nil? && in_flow?(current_step_name)
         end
 
         # Save current step using configured operations pipeline
@@ -550,7 +628,7 @@ module DfE
         # @see #set_metadata
         # @api public
         def get_metadata(key, default: nil)
-          raw_data.fetch(key, default)
+          raw_data.fetch(key.to_sym, default)
         end
 
         # Get all metadata (non-step data)
@@ -662,6 +740,21 @@ module DfE
           flat.merge!(metadata)
 
           flat
+        end
+
+        # Steps reachable from a step, over the current answers
+        def steps_after(step_id)
+          (step_definitions.keys.map(&:to_sym) - [step_id]).select { |other| flow_path(other, from: step_id).any? }
+        end
+
+        # Steps declared with skip_when
+        def skippable_steps
+          steps_processor.metadata.fetch(:steps, {}).select { |_step_id, data| data[:skippable?] }.keys
+        end
+
+        def step_attribute_names(step_id)
+          step_class = find_step(step_id)
+          step_class.respond_to?(:attribute_names) ? step_class.attribute_names.map(&:to_sym) : []
         end
 
         # Find which step owns an attribute

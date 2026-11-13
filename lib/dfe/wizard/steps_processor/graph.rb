@@ -63,8 +63,20 @@ module DfE
             raise ArgumentError, 'Graph must have a root node set. Call g.root(:some_step)'
           end
 
+          add_review_navigation(dsl, graph.registry, wizard)
           graph
         end
+
+        # With review navigation on, the review callbacks go after the
+        # wizard's own, so the wizard's win when they return a step
+        def self.add_review_navigation(dsl, registry, wizard)
+          return unless wizard.respond_to?(:review_navigation?) && wizard.review_navigation?
+          raise ArgumentError, 'review_navigation? needs graph.check_answers' unless registry.check_answers_node
+
+          dsl.before_next_step { wizard.next_step_in_review if wizard.return_to_review? }
+          dsl.before_previous_step { wizard.previous_step_in_review(wizard.return_to_review) }
+        end
+        private_class_method :add_review_navigation
 
         attr_reader :registry, :resolver
 
@@ -153,15 +165,17 @@ module DfE
           @resolver.previous_step(step)
         end
 
-        # Calculate the path from root to a target step.
+        # Calculate the path from root (or from a given step) to a target step.
         #
-        # Uses graph traversal (BFS) to find all steps between root and target,
-        # respecting all edge types and their conditions.
+        # Uses graph traversal (BFS) to find all steps between the start and
+        # target, respecting all edge types and their conditions.
         #
-        # Returns empty array if target is unreachable from root.
+        # Returns empty array if target is unreachable from the start, or the
+        # start is not a node.
         #
         # @param target_step [Symbol, nil] Target step (defaults to wizard's current)
-        # @return [Array<Symbol>] Path from root to target (empty if unreachable)
+        # @param from [Symbol, nil] Step to start from (defaults to the root)
+        # @return [Array<Symbol>] Path from start to target, both included (empty if unreachable)
         #
         # @example Linear path
         #   graph.path_traversal(:step3)  # => [:step1, :step2, :step3]
@@ -172,8 +186,11 @@ module DfE
         #
         # @example Unreachable step
         #   graph.path_traversal(:orphaned)  # => []
-        def path_traversal(target_step = nil)
-          @resolver.path_traversal(target_step)
+        #
+        # @example From a given step
+        #   graph.path_traversal(:review, from: :student)  # => [:student, :review]
+        def path_traversal(target_step = nil, from: nil)
+          @resolver.path_traversal(target_step, from:)
         end
 
         # Find step class by node ID.
@@ -213,6 +230,19 @@ module DfE
           @registry.nodes.transform_values(&:klass)
         end
 
+        # The check answers node, declared with `g.check_answers`.
+        #
+        # @return [Symbol, nil] Node ID, or nil if the graph declares none
+        #
+        # @example
+        #   Graph.draw(wizard, predicate_caller: state_store) do |g|
+        #     g.check_answers :check_answers, CheckAnswersStep
+        #   end
+        #   graph.check_answers_step  # => :check_answers
+        def check_answers_step
+          @registry.check_answers_node
+        end
+
         # Generate comprehensive metadata for documentation and visualization.
         #
         # Produces rich hash suitable for:
@@ -224,6 +254,7 @@ module DfE
         # @return [Hash] Metadata structure with:
         #   - structure_type: :graph
         #   - root_step: Symbol
+        #   - check_answers_step: Symbol (only when the graph declares one)
         #   - steps: { id => { class:, label: } }
         #   - edges: [ { from:, to:, type:, label: } ]
         #   - branch_metadata: { from => { branches: [...], default: } }
@@ -255,10 +286,11 @@ module DfE
           {
             structure_type: :graph,
             root_step: build_root_step,
+            check_answers_step: check_answers_step,
             steps: build_steps_metadata,
             transitions: build_all_transitions_metadata,
             counts: build_counts_metadata,
-          }
+          }.tap { |metadata| metadata.delete(:check_answers_step) unless check_answers_step }
         end
 
         def build_root_step
