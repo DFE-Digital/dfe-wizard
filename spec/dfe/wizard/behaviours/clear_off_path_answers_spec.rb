@@ -32,6 +32,37 @@ RSpec.describe 'clear_off_path_answers' do
     )
   end
 
+  describe 'clear_off_path_answers?' do
+    it 'is true for a step on the path' do
+      expect(answer(:funding_type, { funding_type: 'fee' }).clear_off_path_answers?).to be(true)
+    end
+
+    # Funding is fee, so the skilled worker visa question is off the path
+    it 'is false for a step saved from off the path' do
+      wizard = answer(:skilled_worker_visa, { can_sponsor_skilled_worker_visa: 'true' })
+
+      expect(wizard.clear_off_path_answers?).to be(false)
+    end
+
+    it 'is true for a step after check answers' do
+      expect(answer(:declaration, { declared: 'true' }).clear_off_path_answers?).to be(true)
+    end
+
+    it 'is false when the wizard has no check answers step' do
+      wizard_class = Class.new do
+        include DfE::Wizard
+
+        def steps_processor
+          DfE::Wizard::StepsProcessor::Linear.draw(self) do |linear|
+            linear.add_step :start_date, CourseChange::Steps::StartDate
+          end
+        end
+      end
+
+      expect(wizard_class.new(state_store:, current_step: :start_date).clear_off_path_answers?).to be(false)
+    end
+  end
+
   it 'asks a question again when a change brings it back' do
     answer(:qualification, { qualification: 'tda' }).clear_off_path_answers
 

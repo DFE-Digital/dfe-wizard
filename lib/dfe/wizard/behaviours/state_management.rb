@@ -251,6 +251,29 @@ module DfE
           cleared.keys
         end
 
+        # Whether saving the current step should clear the answers off the path
+        #
+        # Only a step on the path (including the steps after check answers)
+        # says something about the path. A step saved from off it (opened from
+        # a bookmark, say) changes no branch, and clearing would throw away the
+        # answer it just saved. False when the graph declares no check answers
+        # step, since there is no path to clear against.
+        #
+        # It is asked over the answers just saved, so a step whose own answer
+        # takes it off the path (a `skip_when` that reads it) is not cleared.
+        # Override it to change when answers are cleared.
+        #
+        # @return [Boolean]
+        #
+        # @example After saving the step
+        #   wizard.clear_off_path_answers if wizard.clear_off_path_answers?
+        #
+        # @see #clear_off_path_answers
+        # @api public
+        def clear_off_path_answers?
+          !check_answers_step.nil? && in_flow?(current_step_name)
+        end
+
         # Save current step using configured operations pipeline
         #
         # Gets the configured operations for the current step from `steps_operator`,

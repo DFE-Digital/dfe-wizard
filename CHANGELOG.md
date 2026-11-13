@@ -36,7 +36,9 @@
 - **`clear_off_path_answers`** sets to nil the answers of steps that a change
   took off the path, so they are not read by mistake and are asked again if
   the step comes back. Answers of `skip_when` steps, and attributes that a kept
-  step also declares, are kept.
+  step also declares, are kept. **`clear_off_path_answers?`** says whether to
+  clear after saving the current step: only a step on the path says
+  something about the path. Wizards can override it.
 
 ### Changed
 
