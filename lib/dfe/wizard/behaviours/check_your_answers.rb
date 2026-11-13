@@ -174,6 +174,9 @@ module DfE
         # skipped. A step whose valid options depend on an earlier answer must
         # validate against the current branch for this to work.
         #
+        # The steps {#review_asks_again} returns for the change origin are
+        # asked whenever they are on the path ahead, even when valid.
+        #
         # Returns nil, so a `before_next_step` callback falls through to the
         # graph, when the current step is the check answers step, is after it,
         # or the path from it does not reach check answers (an edge with no
@@ -186,11 +189,6 @@ module DfE
         #   finish on a confirm step or a Redirect node instead.
         # @param only [Array<Symbol>, nil] When given, only these steps can be
         #   shown. Useful for an edit that seeds just some of the answers.
-        # @param show [Array<Symbol, String>, Symbol, nil] Steps to show when they are on the path
-        #   ahead, even when valid. Useful for a check answers row that shows
-        #   the answers of several steps behind one Change link (a subject and
-        #   its specialisms), so the user can change each of them. `only`
-        #   still applies.
         # @return [Symbol, nil] Step to go to next, or nil to fall through
         # @raise [ArgumentError] If the graph declares no check answers step
         #
@@ -205,12 +203,8 @@ module DfE
         # @example An edit of a saved course that finishes on a confirm page
         #   wizard.next_step_in_review(finish: :confirm_changes, only: %i[funding_type skilled_worker_visa])
         #
-        # @example A subject row that also shows the languages
-        #   # path ahead of :subject: languages (valid), start_date (valid)
-        #   wizard.next_step_in_review(show: %i[languages])  # => :languages
-        #
         # @api public
-        def next_step_in_review(finish: check_answers_step, only: nil, show: [])
+        def next_step_in_review(finish: check_answers_step, only: nil)
           review_step = required_check_answers_step
           return if current_step_name == review_step
 
@@ -219,9 +213,33 @@ module DfE
 
           ahead = path[1...-1]
           ahead &= only.map(&:to_sym) if only
-          to_show = Array(show).map(&:to_sym)
+          asked_again = Array(review_asks_again(return_to_review)).map(&:to_sym)
 
-          ahead.find { |step_id| to_show.include?(step_id) || !valid?(step_id) } || finish
+          ahead.find { |step_id| asked_again.include?(step_id) || !valid?(step_id) } || finish
+        end
+
+        # Steps a change asks again, even when they are already answered
+        #
+        # Returns none by default. Override it for a check answers row that
+        # shows the answers of several steps behind one Change link (a subject
+        # and its specialisms), so the user can change each of them.
+        #
+        # {#next_step_in_review} asks these steps only when they are on the
+        # path ahead, so the graph's conditions still decide whether each one
+        # is asked, and its `only:` still applies.
+        #
+        # @param origin [Symbol, nil] What {#return_to_review} returns: the
+        #   step whose Change link was followed, or nil outside a change
+        # @return [Array<Symbol>] Steps to ask again
+        #
+        # @example The Subjects row also shows the languages
+        #   def review_asks_again(origin)
+        #     origin == :subject ? %i[languages] : []
+        #   end
+        #
+        # @api public
+        def review_asks_again(_origin)
+          []
         end
 
         # Previous step during a change from check answers

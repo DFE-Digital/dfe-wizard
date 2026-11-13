@@ -12,12 +12,14 @@
   it; custom processors without `from:` keep working.
 - **Review navigation** in `CheckYourAnswers`, for changes from check answers
   and edits of saved records:
-  - `next_step_in_review(finish:, only:, show:)` goes to the first step ahead
-    that is not valid (a required question left blank is not valid), skipping
-    valid steps, and otherwise to check answers (or `finish:`). `show:` names
-    steps to show even when valid, for a check answers row that covers several
-    steps. It only reads state, and returns nil (falling through) on or after
-    check answers or when the path ahead does not reach it.
+  - `next_step_in_review(finish:, only:)` goes to the first step ahead that
+    is not valid (a required question left blank is not valid), skipping
+    valid steps, and otherwise to check answers (or `finish:`). It only reads
+    state, and returns nil (falling through) on or after check answers or when
+    the path ahead does not reach it.
+  - `review_asks_again(origin)` names steps a change asks even when valid, for
+    a check answers row that covers several steps. It returns none by default;
+    the steps are asked only when they are on the path ahead.
   - `previous_step_in_review(origin, finish:)` retraces the steps shown in the
     change, recorded with `track_review_step` until `clear_review`.
 - **`return_to_review`** reads the step whose Change link was followed from

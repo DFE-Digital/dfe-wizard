@@ -149,45 +149,65 @@ RSpec.describe DfE::Wizard::Behaviours::CheckYourAnswers do
       expect(wizard.next_step_in_review(only: %w[skilled_worker_visa])).to eq(:skilled_worker_visa)
     end
 
-    context 'with steps to show' do
+    context 'with steps the change asks again' do
       let(:answers) { CourseChange::Wizard.complete_answers.merge(subject: 'physics', physics_specialism: 'engineers') }
 
-      it 'shows a valid step on the path ahead' do
-        wizard = wizard_at(:subject, { subject: 'physics' }, origin: :subject)
+      # The subject row also shows the physics specialism, so its Change link asks it again
+      let(:wizard_class) do
+        Class.new(CourseChange::Wizard) do
+          def review_asks_again(origin)
+            origin == :subject ? %i[physics_specialism] : []
+          end
+        end
+      end
+
+      def saved_change(step, params, origin:)
+        current_step_params = { step => params, return_to_review: origin }
+
+        wizard_class.new(state_store:, current_step: step, current_step_params:).tap(&:save_current_step)
+      end
+
+      it 'asks a valid step on the path ahead' do
+        expect(saved_change(:subject, { subject: 'physics' }, origin: :subject).next_step_in_review)
+          .to eq(:physics_specialism)
+      end
+
+      it 'asks nothing again for another origin' do
+        expect(saved_change(:level, { level: 'secondary' }, origin: :level).next_step_in_review).to eq(:check_answers)
+      end
+
+      it 'asks the steps of the origin, not of the current step' do
+        wizard_class.define_method(:return_to_review) { :subject }
+
+        expect(saved_change(:level, { level: 'secondary' }, origin: nil).next_step_in_review).to eq(:physics_specialism)
+      end
+
+      it 'asks no valid step again by default' do
+        wizard = CourseChange::Wizard.new(
+          state_store:, current_step: :subject,
+          current_step_params: { subject: { subject: 'physics' }, return_to_review: :subject }
+        )
         wizard.save_current_step
 
         expect(wizard.next_step_in_review).to eq(:check_answers)
-        expect(wizard.next_step_in_review(show: %w[physics_specialism])).to eq(:physics_specialism)
       end
 
-      it 'takes a single step, or nil for none' do
-        wizard = wizard_at(:subject, { subject: 'physics' }, origin: :subject)
-        wizard.save_current_step
+      # The current step is never asked again, or the change would loop on it
+      it 'goes on to check answers from the step asked again' do
+        wizard = saved_change(:physics_specialism, { physics_specialism: 'none' }, origin: :subject)
 
-        expect(wizard.next_step_in_review(show: :physics_specialism)).to eq(:physics_specialism)
-        expect(wizard.next_step_in_review(show: nil)).to eq(:check_answers)
-      end
-
-      # The current step is never shown again, or the change would loop on it
-      it 'goes on to check answers from the shown step' do
-        wizard = wizard_at(:physics_specialism, { physics_specialism: 'none' }, origin: :subject)
-        wizard.save_current_step
-
-        expect(wizard.next_step_in_review(show: %i[physics_specialism])).to eq(:check_answers)
+        expect(wizard.next_step_in_review).to eq(:check_answers)
       end
 
       it 'ignores a step the change took off the path' do
-        wizard = wizard_at(:subject, { subject: 'history' }, origin: :subject)
-        wizard.save_current_step
-
-        expect(wizard.next_step_in_review(show: %i[physics_specialism])).to eq(:check_answers)
+        expect(saved_change(:subject, { subject: 'history' }, origin: :subject).next_step_in_review)
+          .to eq(:check_answers)
       end
 
-      it 'shows only the steps that only allows' do
-        wizard = wizard_at(:subject, { subject: 'physics' }, origin: :subject)
-        wizard.save_current_step
+      it 'asks only the steps that only allows' do
+        wizard = saved_change(:subject, { subject: 'physics' }, origin: :subject)
 
-        expect(wizard.next_step_in_review(only: %i[start_date], show: %i[physics_specialism])).to eq(:check_answers)
+        expect(wizard.next_step_in_review(only: %i[start_date])).to eq(:check_answers)
       end
     end
 
