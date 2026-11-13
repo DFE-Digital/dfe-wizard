@@ -83,6 +83,8 @@ module DfE
         #
         # @api private
         def resolve_step_path(step_id, options = {})
+          options = review_path_options(step_id).merge(options) if review_navigation?
+
           route_strategy.resolve(step_id:, options:).tap do |path|
             log_route_resolved(step: step_id, path:)
           end
@@ -141,6 +143,23 @@ module DfE
         #   wizard.in_flow?(:skipped_step)    # => false
         def in_flow?(step_id)
           flow_path(step_id).include?(step_id)
+        end
+
+        private
+
+        # During a change, step paths carry the step whose Change link was
+        # followed, so the change goes on across requests. Check answers and
+        # the steps reachable from it (a declaration, a Redirect node) don't.
+        #
+        # @api private
+        def review_path_options(step_id)
+          return {} if step_id.nil? || !return_to_review?
+
+          review_step = check_answers_step
+          return {} unless review_step
+          return {} if flow_path(step_id.to_sym, from: review_step).any?
+
+          { return_to_review: }
         end
       end
     end

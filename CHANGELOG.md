@@ -22,6 +22,20 @@
     the steps are asked only when they are on the path ahead.
   - `previous_step_in_review(origin, finish:)` retraces the steps shown in the
     change, recorded with `track_review_step` until `clear_review`.
+- **`review_navigation?`** turns the review navigation on for a wizard. It is
+  false by default, so 1.0 wizards are unchanged. When a wizard returns true
+  (it needs `graph.check_answers`, or drawing the graph raises):
+  - **`Operations::ReviewNavigation`** runs after Persist on every step that
+    keeps the default operations (after an `add:` step's own operations; a
+    `use:` step lists it to keep it). During a change it records the step for
+    Back links, starting afresh on the step whose Change link was followed.
+    On every save of a step on the path it clears the answers the save took
+    off the path (`clear_off_path_answers?`). It never returns a failure.
+  - The graph gets `before_next_step` and `before_previous_step` callbacks
+    for `next_step_in_review` and `previous_step_in_review`, after the
+    wizard's own callbacks, which win when they return a step.
+  - Step paths carry `return_to_review` during a change, except check answers
+    and the steps after it.
 - **`return_to_review`** reads the step whose Change link was followed from
   the `return_to_review` request param. It gives a Symbol only for a step of
   the wizard other than check answers, and nil for a missing or tampered value.

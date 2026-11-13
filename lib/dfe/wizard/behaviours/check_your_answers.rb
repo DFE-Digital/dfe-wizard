@@ -15,7 +15,8 @@ module DfE
       #   graph.before_previous_step { handle_back_in_check_your_answers(:review, return_origin) }
       #
       # Review navigation (needs `graph.check_answers`) takes the user only to the
-      # steps that need an answer after a change, then back to check answers:
+      # steps that need an answer after a change, then back to check answers.
+      # Turn it on with {#review_navigation?}, or wire it by hand:
       #
       #   graph.check_answers :check_answers, Steps::CheckAnswers
       #   graph.before_next_step { next_step_in_review if return_to_review }
@@ -23,6 +24,40 @@ module DfE
       #
       # @api public
       module CheckYourAnswers
+        # Whether the gem runs the review navigation for this wizard
+        #
+        # Off by default, so wizards written for 1.0 behave as before. A
+        # wizard turns it on by overriding it, and needs a graph with
+        # `graph.check_answers` (a Linear wizard gets no review navigation).
+        # Then:
+        #
+        # - saving a step runs {Operations::ReviewNavigation} after Persist:
+        #   during a change it records the step for Back links, and on every
+        #   save on the path it clears the answers the save took off the path
+        # - during a change, Continue goes to the next step that needs an answer
+        #   ({#next_step_in_review}), and Back retraces the steps shown
+        #   ({#previous_step_in_review}); callbacks of the wizard's own run
+        #   first and win
+        # - during a change, step paths carry `return_to_review` up to check
+        #   answers
+        #
+        # The review is kept in the wizard metadata, which `Repository::Model`
+        # does not store.
+        #
+        # @return [Boolean]
+        #
+        # @example
+        #   class CourseWizard
+        #     include DfE::Wizard
+        #
+        #     def review_navigation? = true
+        #   end
+        #
+        # @api public
+        def review_navigation?
+          false
+        end
+
         # Return to check-your-answers if path is complete and valid
         #
         # Use as a callback in {StepsProcessor::Graph#before_next_step}.
@@ -298,7 +333,8 @@ module DfE
           set_metadata(:review_shown, (review_shown | [current_step_name]).map(&:to_s))
         end
 
-        # Steps recorded with {#track_review_step} since the last {#clear_review}
+        # Steps recorded with {#track_review_step} since the change started
+        # ({#clear_review})
         #
         # @return [Array<Symbol>]
         #
@@ -307,10 +343,11 @@ module DfE
           Array(get_metadata(:review_shown)).map(&:to_sym)
         end
 
-        # Forget the steps shown in a change
+        # Forget the steps shown in a change, so the next change starts afresh
         #
-        # Call it when the user is back on check answers, so the next change
-        # starts afresh.
+        # With {#review_navigation?} on, the gem calls it when the step whose
+        # Change link was followed saves. A wizard that wires the review by
+        # hand calls it itself, for example when check answers is shown.
         #
         # @return [void]
         #

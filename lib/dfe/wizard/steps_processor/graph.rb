@@ -63,8 +63,20 @@ module DfE
             raise ArgumentError, 'Graph must have a root node set. Call g.root(:some_step)'
           end
 
+          add_review_navigation(dsl, graph.registry, wizard)
           graph
         end
+
+        # With review navigation on, the review callbacks go after the
+        # wizard's own, so the wizard's win when they return a step
+        def self.add_review_navigation(dsl, registry, wizard)
+          return unless wizard.respond_to?(:review_navigation?) && wizard.review_navigation?
+          raise ArgumentError, 'review_navigation? needs graph.check_answers' unless registry.check_answers_node
+
+          dsl.before_next_step { wizard.next_step_in_review if wizard.return_to_review? }
+          dsl.before_previous_step { wizard.previous_step_in_review(wizard.return_to_review) }
+        end
+        private_class_method :add_review_navigation
 
         attr_reader :registry, :resolver
 

@@ -44,7 +44,8 @@ module DfE
         # ## Default Behavior
         #
         # If your wizard doesn't define a `steps_operator` method, this provides:
-        # - **All steps**: Default to [Validate, Persist] operations
+        # - **All steps**: Default to [Validate, Persist] operations, plus
+        #   ReviewNavigation when {#review_navigation?} is on
         # - **No filtering**: Same operations run for all steps
         # - **Extensible**: Override `steps_operator` in your wizard to customize
         #

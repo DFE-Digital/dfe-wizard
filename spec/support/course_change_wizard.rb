@@ -125,40 +125,52 @@ module CourseChange
 
     def steps_processor
       DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
-        graph.add_node :level, Steps::Level
-        graph.add_node :subject, Steps::Subject
-        graph.add_node :physics_specialism, Steps::PhysicsSpecialism
-        graph.add_node :qualification, Steps::Qualification
-        graph.add_node :funding_type, Steps::FundingType
-        graph.add_node :student_visa, Steps::StudentVisa
-        graph.add_node :skilled_worker_visa, Steps::SkilledWorkerVisa
-        graph.add_node :deadline_required, Steps::DeadlineRequired
-        graph.add_node :deadline_at, Steps::DeadlineAt
-        graph.add_node :start_date, Steps::StartDate
-        graph.check_answers :check_answers, Steps::CheckAnswers
-        graph.add_node :declaration, Steps::Declaration
-        graph.add_node :courses, DfE::Wizard::Redirect
-
-        graph.root :level
-        graph.add_conditional_edge from: :level, when: :further_education?, then: :qualification, else: :subject
-        graph.add_conditional_edge from: :subject, when: :physics?, then: :physics_specialism, else: :qualification
-        graph.add_edge from: :physics_specialism, to: :qualification
-        graph.add_conditional_edge from: :qualification, when: :tda?, then: :start_date, else: :funding_type
-        graph.add_conditional_edge from: :funding_type, when: :salary?, then: :skilled_worker_visa, else: :student_visa
-        graph.add_conditional_edge from: :student_visa, when: :sponsors_student_visa?,
-                                   then: :deadline_required, else: :start_date
-        graph.add_conditional_edge from: :skilled_worker_visa, when: :sponsors_skilled_worker_visa?,
-                                   then: :deadline_required, else: :start_date
-        graph.add_conditional_edge from: :deadline_required, when: :deadline_required?,
-                                   then: :deadline_at, else: :start_date
-        graph.add_edge from: :deadline_at, to: :start_date
-        graph.add_edge from: :start_date, to: :check_answers
-        graph.add_edge from: :check_answers, to: :declaration
-        graph.add_edge from: :declaration, to: :courses
-
+        graph.flow :course_flow
         graph.before_next_step { next_step_in_review if return_to_review }
         graph.before_previous_step { previous_step_in_review(return_to_review) }
       end
+    end
+
+    def route_strategy
+      DfE::Wizard::RouteStrategy::DynamicRoutes.new(
+        state_store:,
+        path_builder: lambda { |step_id, _state_store, _helpers, options|
+          options.empty? ? "/course/#{step_id}" : "/course/#{step_id}?#{options.to_query}"
+        },
+      )
+    end
+
+    def course_flow(graph)
+      graph.add_node :level, Steps::Level
+      graph.add_node :subject, Steps::Subject
+      graph.add_node :physics_specialism, Steps::PhysicsSpecialism
+      graph.add_node :qualification, Steps::Qualification
+      graph.add_node :funding_type, Steps::FundingType
+      graph.add_node :student_visa, Steps::StudentVisa
+      graph.add_node :skilled_worker_visa, Steps::SkilledWorkerVisa
+      graph.add_node :deadline_required, Steps::DeadlineRequired
+      graph.add_node :deadline_at, Steps::DeadlineAt
+      graph.add_node :start_date, Steps::StartDate
+      graph.check_answers :check_answers, Steps::CheckAnswers
+      graph.add_node :declaration, Steps::Declaration
+      graph.add_node :courses, DfE::Wizard::Redirect
+
+      graph.root :level
+      graph.add_conditional_edge from: :level, when: :further_education?, then: :qualification, else: :subject
+      graph.add_conditional_edge from: :subject, when: :physics?, then: :physics_specialism, else: :qualification
+      graph.add_edge from: :physics_specialism, to: :qualification
+      graph.add_conditional_edge from: :qualification, when: :tda?, then: :start_date, else: :funding_type
+      graph.add_conditional_edge from: :funding_type, when: :salary?, then: :skilled_worker_visa, else: :student_visa
+      graph.add_conditional_edge from: :student_visa, when: :sponsors_student_visa?,
+                                 then: :deadline_required, else: :start_date
+      graph.add_conditional_edge from: :skilled_worker_visa, when: :sponsors_skilled_worker_visa?,
+                                 then: :deadline_required, else: :start_date
+      graph.add_conditional_edge from: :deadline_required, when: :deadline_required?,
+                                 then: :deadline_at, else: :start_date
+      graph.add_edge from: :deadline_at, to: :start_date
+      graph.add_edge from: :start_date, to: :check_answers
+      graph.add_edge from: :check_answers, to: :declaration
+      graph.add_edge from: :declaration, to: :courses
     end
 
     # Answers for a complete secondary history course: QTS, fee-paying,
@@ -174,6 +186,20 @@ module CourseChange
         visa_deadline_at: '2026-09-01',
         start_date: '2026-09',
       }
+    end
+  end
+
+  # The same wizard with review navigation built in: the gem adds the
+  # callbacks, the review operation and the change origin on step URLs
+  class ReviewWizard < Wizard
+    def steps_processor
+      DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
+        graph.flow :course_flow
+      end
+    end
+
+    def review_navigation?
+      true
     end
   end
 

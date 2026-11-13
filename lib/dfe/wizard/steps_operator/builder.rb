@@ -4,7 +4,8 @@ module DfE
       # Builds the operations configuration for each step in a wizard.
       #
       # The Builder uses a DSL to define which operations run on each step.
-      # If a step is not mentioned, it gets default operations [Validate, Persist].
+      # If a step is not mentioned, it gets default operations [Validate, Persist],
+      # plus ReviewNavigation when the wizard has review navigation on.
       #
       # Observation the `use:` option overwrites the whole thing INCLUDING Validation
       # so Validation won't be triggered for that step.
@@ -64,8 +65,10 @@ module DfE
         # Configure operations for a specific step
         #
         # @param step_name [Symbol] The name of the step
-        # @param use [Array<Class>] Explicitly set operations (replaces ALL defaults)
-        # @param add [Array<Class>] Add operations to defaults (rare)
+        # @param use [Array<Class>] Explicitly set operations (replaces ALL defaults,
+        #   ReviewNavigation included: list it to keep the review navigation)
+        # @param add [Array<Class>] Add operations to defaults (rare). They run
+        #   after Persist and before ReviewNavigation.
         #
         # @example Replace defaults entirely (so validation is not triggered!)
         #   builder.on_step(:what_a_level_is_required, use: [CreateALevel])
@@ -92,7 +95,7 @@ module DfE
           if use
             @config.set_operations(step_name, use)
           elsif add
-            merged_ops = DEFAULT_OPERATIONS + add
+            merged_ops = DEFAULT_OPERATIONS + add + review_operations
             @config.set_operations(step_name, merged_ops)
           end
         end
@@ -107,7 +110,7 @@ module DfE
         #
         # @return [Array<Class>] Array of operation classes
         def operations_for(step_name)
-          @config.operations_for(step_name) || DEFAULT_OPERATIONS.dup
+          @config.operations_for(step_name) || (DEFAULT_OPERATIONS + review_operations)
         end
 
         # Get all configured operations
@@ -119,6 +122,16 @@ module DfE
         # @return [Hash{Symbol => Array<Class>}] All configured operations by step
         def all_operations
           @config.all_operations
+        end
+
+        private
+
+        # ReviewNavigation runs last, after the app's operations, in a wizard
+        # with review navigation on
+        def review_operations
+          return [] unless @wizard.respond_to?(:review_navigation?) && @wizard.review_navigation?
+
+          [Operations::ReviewNavigation]
         end
       end
 
