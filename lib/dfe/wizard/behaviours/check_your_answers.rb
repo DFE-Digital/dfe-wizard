@@ -113,6 +113,53 @@ module DfE
           target_step if current_step_name.to_s == origin_step.to_s
         end
 
+        # The step whose Change link the user followed on check answers
+        #
+        # Read from the `return_to_review` request param, which
+        # `current_step_params` leaves out (it keeps only the step's
+        # attributes). Only a step of this wizard counts: a missing or blank
+        # param, a tampered value (an array, an unknown name) and the check
+        # answers step itself give nil.
+        #
+        # Override it to keep the change origin somewhere else, such as the
+        # wizard metadata of an edit.
+        #
+        # @return [Symbol, nil] The origin step, or nil outside a change
+        #
+        # @example During a change, at /funding_type?return_to_review=funding_type
+        #   wizard.return_to_review  # => :funding_type
+        #
+        # @api public
+        def return_to_review
+          value = @current_step_params&.[](:return_to_review) || @current_step_params&.[]('return_to_review')
+          return unless value.is_a?(String) || value.is_a?(Symbol)
+
+          origin = step_definitions.each_key.find { |step_id| step_id.to_s == value.to_s }
+          origin unless origin.nil? || origin == check_answers_step
+        end
+
+        # Whether a change from check answers is in progress
+        #
+        # @return [Boolean]
+        #
+        # @api public
+        def return_to_review?
+          !return_to_review.nil?
+        end
+
+        # Path for a Change link on check answers
+        #
+        # @param step_id [Symbol] The step the Change link opens
+        # @return [String] Its path, with the step as the change origin
+        #
+        # @example
+        #   wizard.change_path(:email)  # => "/registration/email?return_to_review=email"
+        #
+        # @api public
+        def change_path(step_id)
+          resolve_step_path(step_id, return_to_review: step_id)
+        end
+
         # Next step after a change from check answers
         #
         # Looks at the steps ahead of the current one on the path to check

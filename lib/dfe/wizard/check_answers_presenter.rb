@@ -250,7 +250,7 @@ module DfE
       # @param step_id [Symbol] the step to link to
       # @return [String] the path with return_to_review parameter
       def change_path_for(step_id)
-        wizard.resolve_step_path(step_id, return_to_review: step_id)
+        wizard.change_path(step_id)
       end
 
       # Get all valid steps that have been completed.

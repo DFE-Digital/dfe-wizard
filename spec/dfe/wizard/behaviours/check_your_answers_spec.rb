@@ -22,6 +22,65 @@ RSpec.describe DfE::Wizard::Behaviours::CheckYourAnswers do
     wizard.next_step
   end
 
+  describe '#return_to_review' do
+    def wizard_with(current_step_params)
+      CourseChange::Wizard.new(state_store:, current_step: :funding_type, current_step_params:)
+    end
+
+    it 'is the step whose Change link was followed, from a Symbol or String key' do
+      expect(wizard_with({ return_to_review: 'funding_type' }).return_to_review).to eq(:funding_type)
+      expect(wizard_with({ 'return_to_review' => :funding_type }).return_to_review).to eq(:funding_type)
+    end
+
+    it 'reads request params' do
+      params = ActionController::Parameters.new(step: 'funding_type', return_to_review: 'funding_type')
+
+      expect(wizard_with(params).return_to_review).to eq(:funding_type)
+    end
+
+    it 'is nil outside a change' do
+      expect(wizard_with({}).return_to_review).to be_nil
+      expect(wizard_with(nil).return_to_review).to be_nil
+      expect(wizard_with({ return_to_review: '' }).return_to_review).to be_nil
+    end
+
+    it 'is nil when the param is not a step of the wizard' do
+      expect(wizard_with({ return_to_review: ['funding_type'] }).return_to_review).to be_nil
+      expect(wizard_with({ return_to_review: 'not_a_step' }).return_to_review).to be_nil
+      expect(wizard_with({ return_to_review: 'check_answers' }).return_to_review).to be_nil
+    end
+
+    it 'reads the origin in a wizard without a check answers step' do
+      wizard_class = Class.new do
+        include DfE::Wizard
+
+        def steps_processor
+          DfE::Wizard::StepsProcessor::Linear.draw(self) do |linear|
+            linear.add_step :start_date, CourseChange::Steps::StartDate
+          end
+        end
+      end
+      wizard = wizard_class.new(state_store:, current_step_params: { return_to_review: 'start_date' })
+
+      expect(wizard.return_to_review).to eq(:start_date)
+    end
+
+    it 'says whether a change is in progress' do
+      expect(wizard_with({ return_to_review: 'funding_type' }).return_to_review?).to be(true)
+      expect(wizard_with({ return_to_review: 'not_a_step' }).return_to_review?).to be(false)
+    end
+  end
+
+  describe '#change_path' do
+    it 'is the path to the step with the step as the change origin' do
+      wizard = RegisterECTWizard.new(state_store: StateStores::RegisterECTStore.new(repository:))
+
+      expect(wizard.change_path(:email_address)).to eq(
+        "#{wizard.resolve_step_path(:email_address)}?return_to_review=email_address",
+      )
+    end
+  end
+
   describe '#next_step_in_review' do
     it 'goes straight back to check answers when nothing ahead needs an answer' do
       expect(submit_change(:start_date, { start_date: '2027-01' })).to eq(:check_answers)

@@ -20,6 +20,14 @@
     check answers or when the path ahead does not reach it.
   - `previous_step_in_review(origin, finish:)` retraces the steps shown in the
     change, recorded with `track_review_step` until `clear_review`.
+- **`return_to_review`** reads the step whose Change link was followed from
+  the `return_to_review` request param. It gives a Symbol only for a step of
+  the wizard other than check answers, and nil for a missing or tampered value.
+  **`return_to_review?`** says whether a change is in progress, and
+  **`change_path(step_id)`** builds a Change link. `CheckAnswersPresenter`
+  now calls `wizard.change_path`, so a wizard that defines its own
+  `change_path` is used by the presenter. Wizards can override the reader to
+  keep the origin elsewhere.
 - **`graph.flow :method_name`** draws a flow: a method on the wizard that
   draws part of the graph. Wizards that share questions (creating a record and
   editing a saved one) draw them once, each with its own ending.

@@ -161,11 +161,6 @@ module CourseChange
       end
     end
 
-    # The step whose Change link the user followed on check answers
-    def return_to_review
-      @current_step_params[:return_to_review]
-    end
-
     # Answers for a complete secondary history course: QTS, fee-paying,
     # sponsoring student visas with an application deadline
     def self.complete_answers
