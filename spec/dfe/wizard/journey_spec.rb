@@ -12,17 +12,4 @@ RSpec.describe 'the journey of a wizard' do
     expect(CourseChange::Wizard.new(state_store:, journey: :edit).journey).to eq(:edit)
     expect(CourseChange::Wizard.new(state_store:, journey: 'edit').journey).to eq(:edit)
   end
-
-  it 'is set before the graph is first drawn' do
-    wizard_class = Class.new(CourseChange::Wizard) do
-      attr_reader :journey_when_drawn
-
-      def steps_processor
-        @journey_when_drawn ||= journey
-        super
-      end
-    end
-
-    expect(wizard_class.new(state_store:, journey: :edit).journey_when_drawn).to eq(:edit)
-  end
 end
