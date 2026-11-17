@@ -1250,30 +1250,82 @@ end
 A flow takes the graph, like the block of `Graph.draw`. It can be private,
 come from a parent class or an included module, and draw other flows.
 
-### Editing a Saved Record
+To create and edit with one wizard class instead, see
+[Journeys](#journeys-one-wizard-several-ways-through-it).
 
-An edit of a saved record is a change from check answers with a different
-start and end: it starts from the record's answers, and ends on the record.
-Draw the same flow in an edit wizard, seed it from the record, and wire the
-review navigation by hand with `finish:` and `only:`:
+### Journeys: One Wizard, Several Ways Through It
+
+Creating a record and editing a saved one can be journeys of one wizard
+instead of two wizard classes. Build the wizard with `journey:`, and draw the
+parts of the graph that belong to one journey in a `graph.journey` block:
 
 ```ruby
-class EditCourseWizard < CourseWizard
+class CourseWizard
+  include DfE::Wizard
+
   EDITABLE_STEPS = %i[funding_type visa_sponsorship].freeze
-
-  attr_accessor :record
-
-  # The edit wires the review itself
-  def review_navigation? = false
 
   def steps_processor
     DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
       graph.flow :course_details
-      graph.add_node :course_page, DfE::Wizard::Redirect
-      graph.before_next_step { next_step_in_review(finish: :course_page, only: EDITABLE_STEPS) }
-      graph.before_previous_step { previous_step_in_review(return_to_review, finish: :course_page) }
+
+      graph.journey :create do
+        graph.add_node :courses_index, DfE::Wizard::Redirect
+        graph.add_edge from: :check_answers, to: :courses_index
+      end
+
+      graph.journey :edit do
+        graph.add_node :course_page, DfE::Wizard::Redirect
+        graph.before_next_step { next_step_in_review(finish: :course_page, only: EDITABLE_STEPS) }
+        graph.before_previous_step { previous_step_in_review(return_to_review, finish: :course_page) }
+      end
     end
   end
+
+  # The gem's review navigation when creating; the edit wires its own
+  def review_navigation? = journey == :create
+end
+```
+
+Each controller builds the wizard for its journey:
+
+```ruby
+# CourseWizardsController
+@wizard = CourseWizard.new(current_step:, current_step_params: params, state_store:, journey: :create)
+
+# EditCourseWizardsController
+@wizard = CourseWizard.new(current_step:, current_step_params: params, state_store:, journey: :edit)
+```
+
+- A `graph.journey` block is drawn only for the wizard's journey: its nodes,
+  edges and callbacks don't exist in the others.
+- Pass the journey from the controller, not from a request param, so a user
+  can't switch journeys by changing a URL.
+- Once a graph declares journeys, building the wizard without one of them
+  (or without a journey at all) raises. A typo can't draw a graph with no
+  ending.
+- Journeys can be declared in a flow, but not inside another journey.
+- Methods that differ between journeys ask `journey`: `review_navigation?`,
+  `steps_operator`, `route_strategy`, `return_to_review`.
+- The graph of a wizard without journeys ignores `journey:`, and 1.0 wizards
+  are unchanged.
+
+The graph metadata lists the journeys (`journeys:`) and the one drawn
+(`journey:`). To document each journey, build one wizard per journey (see
+[Auto-generated Documentation](#auto-generated-documentation)).
+
+### Editing a Saved Record
+
+An edit of a saved record is a change from check answers with a different
+start and end: it starts from the record's answers, and ends on the record.
+Make it a journey of the wizard (above), seed it from the record, and wire the
+review navigation by hand with `finish:` and `only:`:
+
+```ruby
+class CourseWizard
+  attr_accessor :record
+
+  # EDITABLE_STEPS, steps_processor and review_navigation? as above
 
   # Seeds the edit, and returns the step it opens on, or nil when the record
   # does not ask that question
@@ -1289,7 +1341,7 @@ class EditCourseWizard < CourseWizard
   # The step the edit opened on, kept in the wizard state: a URL param
   # could be changed to open a step the user may not edit
   def return_to_review
-    get_metadata(:edit_entry)&.to_sym
+    journey == :edit ? get_metadata(:edit_entry)&.to_sym : super
   end
 
   # The edit's questions: the one it opened on and the editable ones after it
@@ -1302,8 +1354,8 @@ class EditCourseWizard < CourseWizard
 end
 ```
 
-In the controller, save the record when the edit reaches its end. The gem does
-not save records: transactions and messages stay in the app.
+In the edit controller, save the record when the edit reaches its end. The
+gem does not save records: transactions and messages stay in the app.
 
 A URL names any step of the graph, and `only:` limits where navigation goes,
 not what a request can open. Check the step before showing or saving it:
@@ -1331,6 +1383,10 @@ end
   of the answers.
 - Check answers stays in the flow: the review navigation reads the path up to
   it, but an edit never shows it.
+- Two wizard classes sharing a flow (above) work the same way: an
+  `EditCourseWizard < CourseWizard` that draws `course_details` and its own
+  ending, with `review_navigation? = false` and a `return_to_review` that
+  always reads `get_metadata(:edit_entry)`.
 
 ---
 
@@ -1609,6 +1665,24 @@ rake wizard:docs:generate
 A wizard that declares `graph.check_answers` gets a "Check Answers" section in
 the Markdown, and its check answers node is highlighted in the Mermaid and
 GraphViz diagrams.
+
+A wizard with journeys draws one journey at a time, and raises when built
+without one, so leave it out of the list above. Build one wizard per journey
+instead, each with its own title (the title names the files):
+
+```ruby
+%i[create edit].each do |journey|
+  state_store = CourseWizard::StateStore.new(repository: DfE::Wizard::Repository::InMemory.new)
+
+  CourseWizard.new(state_store:, journey:)
+    .documentation(title: "CourseWizard #{journey}")
+    .generate_all(output_dir)
+end
+```
+
+`OpenStruct` works as the state store only for wizards whose branching
+predicates aren't methods on the state store: the graph looks them up when it
+is drawn.
 
 ---
 
@@ -2470,6 +2544,7 @@ Generated documentation: [spec/rails-dummy/docs/wizards](spec/rails-dummy/docs/w
 - `save_current_step` → Boolean
 - `current_step_valid?` → Boolean
 - `state_store` → StateStore instance
+- `journey` → Symbol or nil (the journey the wizard was built with)
 
 ### Step Methods
 

@@ -2,6 +2,19 @@
 
 ### Added
 
+- **Journeys: one wizard, several ways through it.** `Wizard.new` takes an
+  optional `journey:` (read with `wizard.journey`), and `graph.journey(name)
+  { ... }` draws part of the graph only for that journey, so creating a record
+  and editing a saved one can be one wizard class. Once a graph declares
+  journeys, building the wizard without one of them raises, and a journey
+  inside another raises. The graph metadata lists the journeys and the one
+  drawn. The graph of a wizard without journeys ignores `journey:`, so
+  1.0 wizards are unchanged.
+
+## [1.1.0] - Unreleased
+
+### Added
+
 - **`graph.check_answers :id, StepClass`** declares the check answers page. It
   adds an ordinary node and marks it, so `wizard.check_answers_step` returns it,
   the graph metadata names it, and the generated Markdown, Mermaid and Graphviz
