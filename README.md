@@ -1282,7 +1282,10 @@ class CourseWizard
     end
   end
 
-  # The gem's review navigation when creating; the edit wires its own
+  # The gem's review navigation goes back to check answers and can ask any
+  # step. The edit ends on the course page and asks only EDITABLE_STEPS, so
+  # it wires next_step_in_review(finish:, only:) itself (above), and leaves
+  # review navigation off.
   def review_navigation? = journey == :create
 end
 ```
@@ -1293,7 +1296,7 @@ Each controller builds the wizard for its journey:
 # CourseWizardsController
 @wizard = CourseWizard.new(current_step:, current_step_params: params, state_store:, journey: :create)
 
-# EditCourseWizardsController
+# Courses::EditWizardsController (the edit)
 @wizard = CourseWizard.new(current_step:, current_step_params: params, state_store:, journey: :edit)
 ```
 
@@ -1383,10 +1386,6 @@ end
   of the answers.
 - Check answers stays in the flow: the review navigation reads the path up to
   it, but an edit never shows it.
-- Two wizard classes sharing a flow (above) work the same way: an
-  `EditCourseWizard < CourseWizard` that draws `course_details` and its own
-  ending, with `review_navigation? = false` and a `return_to_review` that
-  always reads `get_metadata(:edit_entry)`.
 
 ---
 

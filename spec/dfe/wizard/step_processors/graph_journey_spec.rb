@@ -16,11 +16,12 @@ RSpec.describe 'graph.journey' do
             graph.add_edge from: :start_date, to: :check_answers
           end
 
-          graph.journey :edit do |edit|
-            edit.add_node :declaration, CourseChange::Steps::Declaration
-            edit.add_edge from: :start_date, to: :declaration
-            edit.before_next_step { :declaration if current_step_name == :level }
-            edit.before_previous_step { :level if current_step_name == :start_date }
+          graph.journey :edit do
+            graph.add_node :declaration, CourseChange::Steps::Declaration
+            graph.add_edge from: :start_date, to: :declaration
+            # An edit of the subject asks it, then goes to the declaration
+            graph.before_next_step { :declaration if current_step_name == :subject }
+            graph.before_previous_step { :subject if current_step_name == :declaration }
           end
         end
       end
@@ -56,11 +57,10 @@ RSpec.describe 'graph.journey' do
   end
 
   it 'runs only the callbacks of that journey' do
-    expect(wizard_for(:create).next_step).to eq(:subject)
-    expect(wizard_for(:edit).next_step).to eq(:declaration)
+    expect(wizard_for(:create, current_step: :subject).next_step).to eq(:start_date)
+    expect(wizard_for(:edit, current_step: :subject).next_step).to eq(:declaration)
 
-    expect(wizard_for(:create, current_step: :start_date).previous_step).to eq(:subject)
-    expect(wizard_for(:edit, current_step: :start_date).previous_step).to eq(:level)
+    expect(wizard_for(:edit, current_step: :declaration).previous_step).to eq(:subject)
   end
 
   it 'adds the review callbacks after those of the journey, in the journey that turns them on' do
@@ -68,7 +68,7 @@ RSpec.describe 'graph.journey' do
     change = { level: { level: 'secondary' }, return_to_review: 'level' }
 
     expect(wizard_for(:create, current_step_params: change).next_step).to eq(:check_answers)
-    expect(wizard_for(:edit, current_step_params: change).next_step).to eq(:declaration)
+    expect(wizard_for(:edit, current_step_params: change).next_step).to eq(:subject)
   end
 
   it 'lets a method on the journey turn review navigation on for one journey only' do
