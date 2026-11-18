@@ -68,14 +68,15 @@ module DfE
           # @param method_name [Symbol] Method on the wizard that draws the flow
           # @raise [NameError] If the wizard has no such method
           #
-          # @example A flow shared by two wizards
+          # @example A flow shared by the journeys of a wizard
           #   class CourseWizard
           #     include DfE::Wizard
           #
           #     def steps_processor
           #       DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
           #         graph.flow :course_details
-          #         graph.add_edge from: :check_answers, to: :courses_index
+          #         graph.journey(:create) { graph.add_edge from: :check_answers, to: :courses_index }
+          #         graph.journey(:edit) { graph.add_node :confirm_changes, Steps::ConfirmChanges }
           #       end
           #     end
           #
@@ -85,15 +86,6 @@ module DfE
           #       graph.root :level
           #       graph.add_node :level, Steps::Level
           #       # ...
-          #     end
-          #   end
-          #
-          #   class EditCourseWizard < CourseWizard
-          #     def steps_processor
-          #       DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
-          #         graph.flow :course_details
-          #         graph.add_node :confirm_changes, Steps::ConfirmChanges
-          #       end
           #     end
           #   end
           #

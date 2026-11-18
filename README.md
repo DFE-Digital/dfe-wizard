@@ -1213,12 +1213,11 @@ bookmark, say) changes no branch, and clearing would throw away its answer. With
 wizard.clear_off_path_answers if wizard.clear_off_path_answers?
 ```
 
-### Sharing a Flow Between Wizards
+### Sharing a Flow
 
-Two wizards can ask the same questions with different endings: creating a
-record ends on check answers, editing a saved one on a confirm page or back on
-the record. Draw the shared questions once, in a method on the wizard (a
-flow), and draw it in each wizard with `graph.flow`:
+Draw a group of questions once, in a method on the wizard (a flow), and draw
+it with `graph.flow`. The journeys of one wizard share their questions this
+way (see [Journeys](#journeys-one-wizard-several-ways-through-it)):
 
 ```ruby
 class CourseWizard
@@ -1249,9 +1248,6 @@ end
 
 A flow takes the graph, like the block of `Graph.draw`. It can be private,
 come from a parent class or an included module, and draw other flows.
-
-To create and edit with one wizard class instead, see
-[Journeys](#journeys-one-wizard-several-ways-through-it).
 
 ### Journeys: One Wizard, Several Ways Through It
 
