@@ -68,14 +68,15 @@ module DfE
           # @param method_name [Symbol] Method on the wizard that draws the flow
           # @raise [NameError] If the wizard has no such method
           #
-          # @example A flow shared by two wizards
+          # @example A flow shared by the journeys of a wizard
           #   class CourseWizard
           #     include DfE::Wizard
           #
           #     def steps_processor
           #       DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
           #         graph.flow :course_details
-          #         graph.add_edge from: :check_answers, to: :courses_index
+          #         graph.journey(:create) { graph.add_edge from: :check_answers, to: :courses_index }
+          #         graph.journey(:edit) { graph.add_node :confirm_changes, Steps::ConfirmChanges }
           #       end
           #     end
           #
@@ -88,18 +89,55 @@ module DfE
           #     end
           #   end
           #
-          #   class EditCourseWizard < CourseWizard
-          #     def steps_processor
-          #       DfE::Wizard::StepsProcessor::Graph.draw(self, predicate_caller: state_store) do |graph|
-          #         graph.flow :course_details
-          #         graph.add_node :confirm_changes, Steps::ConfirmChanges
-          #       end
-          #     end
-          #   end
-          #
           # @api public
           def flow(method_name)
             @wizard.method(method_name).call(self)
+          end
+
+          # Draw part of the graph for one journey: one way through the
+          # wizard's steps, such as creating a record or editing a saved one.
+          #
+          # The block is drawn only when the wizard was built with this
+          # journey (`Wizard.new(..., journey: :edit)`), so its nodes, edges
+          # and callbacks exist only in that journey. Every journey declared
+          # is listed in the graph metadata, drawn or not. Once a graph
+          # declares a journey, building the wizard without one of them
+          # raises, so a mistyped journey can't draw a graph with no ending.
+          #
+          # Journeys can be declared in a flow, but not inside another
+          # journey, whose block is drawn only for that journey.
+          #
+          # @param name [Symbol, String] The journey
+          # @yieldparam graph [DSL] This DSL, for blocks that name it
+          # @raise [ArgumentError] If declared inside another journey
+          #
+          # @example Creating and editing a course with one wizard
+          #   graph.flow :course_details # the questions, up to check answers
+          #
+          #   graph.journey :create do
+          #     graph.add_node :courses_index, DfE::Wizard::Redirect
+          #     graph.add_edge from: :check_answers, to: :courses_index
+          #   end
+          #
+          #   graph.journey :edit do
+          #     graph.add_node :course_page, DfE::Wizard::Redirect
+          #     graph.before_next_step :next_step_in_edit
+          #   end
+          #
+          # @api public
+          def journey(name)
+            raise ArgumentError, "graph.journey :#{name} is inside graph.journey :#{@journey}" if @journey
+
+            name = name.to_sym
+            @registry.add_journey(name)
+            return unless @wizard.respond_to?(:journey) && @wizard.journey&.to_sym == name
+
+            begin
+              @journey = name
+              yield(self)
+            ensure
+              @journey = nil
+            end
           end
 
           # Set static root node.
