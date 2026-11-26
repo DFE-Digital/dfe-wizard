@@ -46,6 +46,8 @@ module DfE
         #
         # @raise [ArgumentError] If no block given
         # @raise [ArgumentError] If root node not set
+        # @raise [ArgumentError] If the graph declares journeys and the wizard
+        #   was built without one of them
         #
         # @example
         #   Graph.draw(wizard, predicate_caller: state_store) do |g|
@@ -58,6 +60,7 @@ module DfE
           graph = new(wizard, predicate_caller:)
           dsl = DSL.new(graph.registry, wizard, predicate_caller:)
           yield(dsl)
+          check_journey(graph.registry, wizard)
 
           unless graph.root_step
             raise ArgumentError, 'Graph must have a root node set. Call g.root(:some_step)'
@@ -66,6 +69,19 @@ module DfE
           add_review_navigation(dsl, graph.registry, wizard)
           graph
         end
+
+        # A graph with journeys draws only the wizard's, so a wizard built
+        # without one of them would have no ending
+        def self.check_journey(registry, wizard)
+          return if registry.journeys.empty?
+
+          journey = wizard.journey&.to_sym if wizard.respond_to?(:journey)
+          return if registry.journeys.include?(journey)
+
+          declared = registry.journeys.map(&:inspect).join(', ')
+          raise ArgumentError, "Build the wizard with journey: one of #{declared} (got #{journey.inspect})"
+        end
+        private_class_method :check_journey
 
         # With review navigation on, the review callbacks go after the
         # wizard's own, so the wizard's win when they return a step
@@ -255,6 +271,9 @@ module DfE
         #   - structure_type: :graph
         #   - root_step: Symbol
         #   - check_answers_step: Symbol (only when the graph declares one)
+        #   - journeys: [Symbol] and journey: Symbol (only when the graph
+        #     declares journeys: all of them, and the one drawn, whose steps
+        #     and transitions these are)
         #   - steps: { id => { class:, label: } }
         #   - edges: [ { from:, to:, type:, label: } ]
         #   - branch_metadata: { from => { branches: [...], default: } }
@@ -287,10 +306,17 @@ module DfE
             structure_type: :graph,
             root_step: build_root_step,
             check_answers_step: check_answers_step,
+            **journeys_metadata,
             steps: build_steps_metadata,
             transitions: build_all_transitions_metadata,
             counts: build_counts_metadata,
           }.tap { |metadata| metadata.delete(:check_answers_step) unless check_answers_step }
+        end
+
+        def journeys_metadata
+          return {} if @registry.journeys.empty?
+
+          { journeys: @registry.journeys.dup, journey: @wizard.journey&.to_sym }
         end
 
         def build_root_step

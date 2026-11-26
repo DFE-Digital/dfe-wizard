@@ -25,7 +25,7 @@ module DfE
           CustomBranchingEdge = Struct.new(:from, :conditional, :potential_transitions, keyword_init: true)
 
           attr_reader :nodes, :edges, :conditional_edges, :multiple_conditional_edges, :custom_branching_edges,
-                      :step_labels
+                      :step_labels, :journeys
           attr_accessor :root_node, :conditional_root_method, :conditional_root_block, :potential_root_nodes,
                         :check_answers_node
 
@@ -43,11 +43,16 @@ module DfE
             @previous_step_before_callbacks = []
             @step_labels = {}
             @potential_root_nodes = []
+            @journeys = []
           end
 
           def add_node(node_id, klass, label: nil, skip_when: nil)
             @nodes[node_id] = Node.new(id: node_id, klass: klass, skip_when:, skippable?: skip_when.present?)
             @step_labels[node_id] = label || humanize(node_id)
+          end
+
+          def add_journey(name)
+            @journeys << name unless @journeys.include?(name)
           end
 
           def add_edge(from:, to:)

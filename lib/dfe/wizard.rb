@@ -253,6 +253,10 @@ module DfE
     # @param current_step [Symbol, nil] Name of the current step
     # @param current_step_params [Hash] Parameters for the current step (typically from request)
     # @param state_store [DfE::Wizard::StateStore] State persistence adapter
+    # @param journey [Symbol, String, nil] The way through the wizard's steps
+    #   this wizard serves (creating a record or editing a saved one, say).
+    #   The graph draws the {StepsProcessor::Graph::DSL#journey} block of
+    #   that name. Wizards without journeys leave it out.
     #
     # @example
     #   wizard = MyWizard.new(
@@ -263,11 +267,15 @@ module DfE
     #     ),
     #   )
     #
+    # @example A wizard with journeys
+    #   CourseWizard.new(current_step:, current_step_params: params, state_store:, journey: :edit)
+    #
     # @return [self]
-    def initialize(state_store:, current_step: nil, current_step_params: {})
+    def initialize(state_store:, current_step: nil, current_step_params: {}, journey: nil)
       @current_step_name = current_step&.to_sym
       @current_step_params = current_step_params
       @state_store = state_store
+      @journey = journey&.to_sym
 
       after_initialize
     end
@@ -315,6 +323,11 @@ module DfE
     # The state store instance
     # @return [DfE::Wizard::StateStore::Base]
     attr_accessor :state_store
+
+    # The journey the wizard was built with, or nil
+    # @return [Symbol, nil]
+    # @api public
+    attr_reader :journey
 
     # @!endgroup
     # @!group Extension Points
