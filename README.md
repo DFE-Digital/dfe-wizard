@@ -1278,11 +1278,11 @@ class CourseWizard
     end
   end
 
-  # The gem's review navigation goes back to check answers and can ask any
-  # step. The edit ends on the course page and asks only EDITABLE_STEPS, so
-  # it wires next_step_in_review(finish:, only:) itself (above), and leaves
-  # review navigation off.
-  def review_navigation? = journey == :create
+  # Both journeys use the review navigation. The edit's callbacks run first
+  # and win: they end it on the course page and ask only EDITABLE_STEPS. The
+  # gem still records the steps shown and clears answers a change takes off
+  # the path.
+  def review_navigation? = true
 end
 ```
 
@@ -1304,8 +1304,8 @@ Each controller builds the wizard for its journey:
   (or without a journey at all) raises. A typo can't draw a graph with no
   ending.
 - Journeys can be declared in a flow, but not inside another journey.
-- Methods that differ between journeys ask `journey`: `review_navigation?`,
-  `steps_operator`, `route_strategy`, `return_to_review`.
+- Methods that differ between journeys ask `journey`, such as
+  `steps_operator` and `route_strategy`.
 - The graph of a wizard without journeys ignores `journey:`, and 1.0 wizards
   are unchanged.
 
@@ -1317,8 +1317,9 @@ The graph metadata lists the journeys (`journeys:`) and the one drawn
 
 An edit of a saved record is a change from check answers with a different
 start and end: it starts from the record's answers, and ends on the record.
-Make it a journey of the wizard (above), seed it from the record, and wire the
-review navigation by hand with `finish:` and `only:`:
+Make it a journey of the wizard (above), seed it from the record, and open it
+with a Change link. The edit's callbacks narrow the review navigation with
+`finish:` and `only:`:
 
 ```ruby
 class CourseWizard
@@ -1326,47 +1327,36 @@ class CourseWizard
 
   # EDITABLE_STEPS, steps_processor and review_navigation? as above
 
-  # Seeds the edit, and returns the step it opens on, or nil when the record
-  # does not ask that question
-  def start(entry)
-    state_store.write(CourseMapper.new.to_answers(record))
-    entry = entry.to_sym
-    return unless EDITABLE_STEPS.include?(entry) && flow_path(check_answers_step).include?(entry)
-
-    set_metadata(:edit_entry, entry)
-    entry
-  end
-
-  # The step the edit opened on, kept in the wizard state: a URL param
-  # could be changed to open a step the user may not edit
-  def return_to_review
-    journey == :edit ? get_metadata(:edit_entry)&.to_sym : super
-  end
-
   # The edit's questions: the one it opened on and the editable ones after it
   def question_steps
-    path = flow_path(check_answers_step)
-    return [] unless path.include?(return_to_review)
-
-    path.drop(path.index(return_to_review)) & EDITABLE_STEPS
+    steps = flow_path(check_answers_step) & EDITABLE_STEPS
+    steps.include?(return_to_review) ? steps.drop(steps.index(return_to_review)) : steps
   end
 end
 ```
 
-In the edit controller, save the record when the edit reaches its end. The
-gem does not save records: transactions and messages stay in the app.
+The edit controller seeds the answers and follows the Change link of the step
+it opens on, so `return_to_review` carries that step on every request. It
+saves the record when the edit reaches its end. The gem does not save
+records: transactions and messages stay in the app.
 
 A URL names any step of the graph, and `only:` limits where navigation goes,
-not what a request can open. Check the step before showing or saving it:
+not what a request can open. Check the step before showing or saving it. A
+changed `return_to_review` can then only open another editable step:
 
 ```ruby
-before_action -> { redirect_to course_path(course) unless @wizard.question_steps.include?(@wizard.current_step_name) }
+before_action -> { redirect_to course_path(course) unless @wizard.question_steps.include?(@wizard.current_step_name) }, except: :new
+
+def new
+  @wizard.state_store.write(CourseMapper.new.to_answers(course))
+  step = params[:step].to_s.to_sym
+  return redirect_to(course_path(course)) unless @wizard.question_steps.include?(step)
+
+  redirect_to @wizard.change_path(step) # /edit/funding_type?return_to_review=funding_type
+end
 
 def update
   return render(:show) unless @wizard.save_current_step
-
-  @wizard.track_review_step
-  @wizard.clear_off_path_answers if @wizard.clear_off_path_answers?
   return redirect_to(@wizard.next_step_path) unless @wizard.next_step == :course_page
 
   @wizard.execute_operation(operation_class: UpdateCourse, step: @wizard.current_step)

@@ -26,6 +26,7 @@ RSpec.describe 'graph.journey' do
         end
       end
 
+      # Only create has check answers here, so only create can turn it on
       def review_navigation?
         journey == :create
       end
